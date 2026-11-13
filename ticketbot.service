@@ -1,0 +1,26 @@
+# systemd service to keep TicketBot running 24/7 on Linux
+# (Raspberry Pi, home server, VPS).
+#
+# 1. Edit User and the paths below
+# 2. sudo cp ticketbot.service /etc/systemd/system/
+# 3. sudo systemctl daemon-reload
+# 4. sudo systemctl enable --now ticketbot
+#
+# Live logs: journalctl -u ticketbot -f
+
+[Unit]
+Description=TicketBot - Discord ticket bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/ticketbot
+ExecStart=/home/pi/ticketbot/.venv/bin/python ticketbot.py
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
