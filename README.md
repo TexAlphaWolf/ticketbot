@@ -135,6 +135,11 @@ python -m pip install pytest
 python -m pytest
 ```
 
+## Terms and privacy
+
+- [Terms of Service](TERMS.md)
+- [Privacy Policy](PRIVACY.md)
+
 ## License
 
 [MIT](LICENSE)

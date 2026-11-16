@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1] - 2026-11-16
+
+### Added
+- Terms of Service (`TERMS.md`) and Privacy Policy (`PRIVACY.md`)
+
+### Changed
+- All the data of a server is deleted automatically when the bot is removed from it
+
 ## [1.2.0] - 2026-11-14
 
 ### Added

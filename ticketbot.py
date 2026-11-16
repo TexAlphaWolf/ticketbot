@@ -697,6 +697,13 @@ class TicketBot(commands.Bot):
             ticket["status"] = STATUS_IN_PROGRESS
         save_config()
 
+    async def on_guild_remove(self, guild: discord.Guild):
+        # The bot was removed from a server: delete all the data stored for it
+        if config.pop(str(guild.id), None) is not None:
+            save_config()
+        pending_links.pop(guild.id, None)
+        print(f"Removed from {guild.name}: server data deleted")
+
     async def on_guild_channel_delete(self, channel):
         cfg = guild_cfg(channel.guild)
         if cfg and cfg.get("tickets", {}).pop(str(channel.id), None) is not None:
