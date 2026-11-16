@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.2.0] - 2026-11-14
+
+### Added
+- Ticket priorities (Low, Medium, High): the staff member who claims a ticket
+  chooses the priority; it can be changed with `/priority`
+- `/guidelines` command to post and pin the priority guidelines in the log channel
+- Automatic deletion of Low and Medium transcripts from the log channel after
+  a configurable number of days (`/retention`, default 30); High priority
+  transcripts are kept until deleted manually, and the archive channel always
+  keeps every transcript
+- Telegram notification when a ticket is set to High priority
+- Priority and "Claimed by" shown in transcripts, logs and Telegram messages
+
+### Changed
+- A ticket can no longer be claimed twice
+
+### Docs
+- How to receive notifications in a Telegram group (several admins) and how to
+  link the same chat to more than one server
+
 ## [1.1.0] - 2026-11-13
 
 ### Added

@@ -49,6 +49,31 @@ TICKET_TYPES = {
 STATUS_WAITING = "waiting"          # nobody from the staff has picked it up yet
 STATUS_IN_PROGRESS = "in_progress"  # claimed or answered by the staff
 
+# key: (label, emoji, guideline, target first reply)
+PRIORITIES = {
+    "low": (
+        "Low", "🟢",
+        "General questions, suggestions or cosmetic issues. Nothing is broken "
+        "and nobody is affected.",
+        "within 48 hours",
+    ),
+    "medium": (
+        "Medium", "🟡",
+        "A bug or problem affecting a user or a feature, account or role issues, "
+        "minor rule violations.",
+        "within 24 hours",
+    ),
+    "high": (
+        "High", "🔴",
+        "Harassment, threats, scams or serious rule violations, security issues, "
+        "problems affecting the whole server, or anything that may need to be "
+        "kept as evidence.",
+        "as soon as possible",
+    ),
+}
+KEPT_PRIORITIES = {"high"}     # transcripts of these priorities are never auto-deleted
+DEFAULT_RETENTION_DAYS = 30    # Low/Medium transcripts are deleted after this many days
+
 
 # ---------------------------------------------------------------- config ---
 
@@ -87,6 +112,29 @@ def type_label(type_key: str) -> str:
     return f"{emoji} {label}"
 
 
+def priority_label(priority: str | None) -> str:
+    if priority not in PRIORITIES:
+        return "⚪ Not set"
+    label, emoji, _, _ = PRIORITIES[priority]
+    return f"{emoji} {label}"
+
+
+def retention_days(cfg: dict) -> int:
+    return cfg.get("retention_days", DEFAULT_RETENTION_DAYS)
+
+
+def is_kept(priority: str | None) -> bool:
+    """High priority transcripts are kept until an admin deletes them."""
+    return priority in KEPT_PRIORITIES
+
+
+def expired_transcripts(entries: list[dict], now: float, days: int) -> list[dict]:
+    """Transcript messages (Low/Medium/unset) older than the retention period."""
+    cutoff = now - days * 86400
+    return [e for e in entries
+            if not is_kept(e.get("priority")) and e.get("closed_at", now) <= cutoff]
+
+
 # ---------------------------------------------------------- ticket state ---
 
 def new_ticket_state(owner_id: int, type_key: str, subject: str, now: float) -> dict:
@@ -96,6 +144,8 @@ def new_ticket_state(owner_id: int, type_key: str, subject: str, now: float) -> 
         "subject": subject,
         "status": STATUS_WAITING,
         "claimed_by": None,
+        "priority": None,
+        "control_message": None,  # message with the Claim/Close buttons
         "opened_at": now,
         "last_actor": None,      # "user" or "staff": who wrote the last message
         "last_activity": now,
@@ -191,6 +241,7 @@ async def build_transcript(channel: discord.TextChannel, ticket: dict,
     lines = [
         f"Transcript of #{channel.name}",
         f"Type:      {type_label(ticket.get('type', 'other'))}",
+        f"Priority:  {priority_label(ticket.get('priority'))}",
         f"Subject:   {ticket.get('subject') or '-'}",
         f"Opened by: {ticket.get('owner')}",
         f"Opened at: {opened:%Y-%m-%d %H:%M} UTC",
@@ -300,11 +351,13 @@ class TicketModal(discord.ui.Modal):
             "hours or the ticket will be closed automatically."
         ))
 
-        await channel.send(
+        control = await channel.send(
             content=f"{user.mention} {staff_role.mention}",
             embed=embed,
             view=TicketControls(),
         )
+        tickets[str(channel.id)]["control_message"] = control.id
+        save_config()
         await interaction.followup.send(
             f"Ticket created: {channel.mention}\n📊 Other open tickets: {queue_text}",
             ephemeral=True,
@@ -376,21 +429,109 @@ class TicketControls(discord.ui.View):
             )
             return
         ticket = get_ticket(cfg, interaction.channel)
-        if ticket is not None:
-            ticket["status"] = STATUS_IN_PROGRESS
-            ticket["claimed_by"] = interaction.user.id
+        if ticket is not None and ticket.get("claimed_by"):
+            await interaction.response.send_message(
+                f"This ticket has already been claimed by <@{ticket['claimed_by']}>.",
+                ephemeral=True,
+            )
+            return
+        # Remember which message has the buttons (tickets opened before v1.2)
+        if ticket is not None and not ticket.get("control_message"):
+            ticket["control_message"] = interaction.message.id
             save_config()
-        button.disabled = True
-        button.label = f"Claimed by {interaction.user.display_name}"
-        await interaction.response.edit_message(view=self)
-        await interaction.channel.send(
-            f"✋ {interaction.user.mention} has claimed this ticket."
+        await interaction.response.send_message(
+            "Choose the priority of this ticket (see the guidelines pinned in the log channel):",
+            view=PriorityView(claim=True),
+            ephemeral=True,
         )
 
     @discord.ui.button(label="Close", emoji="🔒",
                        style=discord.ButtonStyle.danger, custom_id="ticket:close")
     async def close(self, interaction: discord.Interaction, _):
         await handle_close_request(interaction, None)
+
+
+class PrioritySelect(discord.ui.Select):
+    def __init__(self, claim: bool):
+        options = [
+            discord.SelectOption(label=label, value=key, emoji=emoji,
+                                 description=f"Reply {target}")
+            for key, (label, emoji, _, target) in PRIORITIES.items()
+        ]
+        super().__init__(placeholder="Choose the priority...", options=options)
+        self.claim = claim
+
+    async def callback(self, interaction: discord.Interaction):
+        await apply_priority(interaction, self.values[0], claim=self.claim)
+
+
+class PriorityView(discord.ui.View):
+    """Ephemeral priority menu shown to the staff member who claims a ticket."""
+
+    def __init__(self, claim: bool):
+        super().__init__(timeout=300)
+        self.add_item(PrioritySelect(claim))
+
+
+def claimed_controls(member: discord.abc.User) -> "TicketControls":
+    view = TicketControls()
+    view.claim.disabled = True
+    view.claim.label = f"Claimed by {member.display_name}"
+    return view
+
+
+async def apply_priority(interaction: discord.Interaction, level: str, claim: bool):
+    cfg = guild_cfg(interaction.guild)
+    ticket = get_ticket(cfg, interaction.channel)
+    if ticket is None:
+        await interaction.response.send_message(
+            "This only works inside a ticket.", ephemeral=True
+        )
+        return
+    if claim and ticket.get("claimed_by"):
+        await interaction.response.edit_message(
+            content=f"This ticket has already been claimed by <@{ticket['claimed_by']}>.",
+            view=None,
+        )
+        return
+
+    previous = ticket.get("priority")
+    ticket["priority"] = level
+    if claim:
+        ticket["claimed_by"] = interaction.user.id
+        ticket["status"] = STATUS_IN_PROGRESS
+    save_config()
+
+    label = priority_label(level)
+    if claim:
+        await interaction.response.edit_message(
+            content=f"You claimed this ticket with priority **{label}**.", view=None
+        )
+        if ticket.get("control_message"):
+            try:
+                await interaction.channel.get_partial_message(
+                    ticket["control_message"]
+                ).edit(view=claimed_controls(interaction.user))
+            except discord.HTTPException:
+                pass
+        await interaction.channel.send(
+            f"✋ {interaction.user.mention} has claimed this ticket · Priority: **{label}**"
+        )
+    else:
+        await interaction.response.send_message(
+            f"📌 Priority changed from **{priority_label(previous)}** to **{label}** "
+            f"by {interaction.user.mention}."
+        )
+
+    if is_kept(level) and not is_kept(previous):
+        await telegram_notify(interaction.guild, (
+            f"🔴 <b>High priority ticket</b> on <b>{html.escape(interaction.guild.name)}</b>\n"
+            f"#{html.escape(interaction.channel.name)} · "
+            f"{type_label(ticket.get('type', 'other'))}\n"
+            f"<b>Subject:</b> {html.escape(ticket.get('subject') or '-')}\n"
+            f"<b>Set by:</b> {html.escape(str(interaction.user))}\n"
+            f"<a href=\"{channel_url(interaction.channel)}\">Open in Discord</a>"
+        ))
 
 
 async def handle_close_request(interaction: discord.Interaction, reason: str | None):
@@ -418,6 +559,7 @@ async def close_ticket(channel: discord.TextChannel, cfg: dict,
                        closed_by: discord.abc.User, reason: str) -> None:
     ticket = get_ticket(cfg, channel) or {}
     owner_id = ticket.get("owner")
+    priority = ticket.get("priority")
     data = await build_transcript(channel, ticket, str(closed_by), reason)
 
     embed = discord.Embed(
@@ -426,24 +568,47 @@ async def close_ticket(channel: discord.TextChannel, cfg: dict,
         timestamp=datetime.now(timezone.utc),
     )
     embed.add_field(name="Type", value=type_label(ticket.get("type", "other")))
+    embed.add_field(name="Priority", value=priority_label(priority))
     embed.add_field(name="Opened by",
                     value=f"<@{owner_id}>" if owner_id else "unknown")
+    embed.add_field(name="Claimed by",
+                    value=f"<@{ticket['claimed_by']}>" if ticket.get("claimed_by") else "-")
     embed.add_field(name="Closed by", value=closed_by.mention)
     embed.add_field(name="Reason", value=reason, inline=False)
 
-    # Log channel + archive channel (no duplicates if they are the same)
-    target_ids = []
-    for key in ("log_channel", "archive_channel"):
-        cid = cfg.get(key)
-        if cid and cid not in target_ids:
-            target_ids.append(cid)
-    for cid in target_ids:
+    # Log channel + archive channel (no duplicates if they are the same).
+    # Only the log copy of Low/Medium tickets is deleted later: the archive
+    # always keeps everything.
+    log_id, archive_id = cfg.get("log_channel"), cfg.get("archive_channel")
+    targets: dict[int, bool] = {}  # channel id -> delete automatically later?
+    if archive_id:
+        targets[archive_id] = False
+    if log_id and log_id not in targets:
+        targets[log_id] = not is_kept(priority)
+    for cid, auto_delete in targets.items():
         target = channel.guild.get_channel(cid)
         if target is not None:
+            copy = embed.copy()
+            if auto_delete:
+                copy.set_footer(
+                    text=f"🗑️ Deleted automatically after {retention_days(cfg)} days")
+            elif cid == archive_id:
+                copy.set_footer(text="🗂️ Archived")
+            else:
+                copy.set_footer(text="🔒 Kept until an admin deletes it")
             try:
-                await target.send(embed=embed, file=transcript_file(data, channel.name))
+                sent = await target.send(embed=copy,
+                                         file=transcript_file(data, channel.name))
             except discord.HTTPException as e:
                 print(f"Could not send the transcript to {target}: {e}")
+                continue
+            if auto_delete:
+                cfg.setdefault("transcripts", []).append({
+                    "channel": target.id,
+                    "message": sent.id,
+                    "priority": priority,
+                    "closed_at": time.time(),
+                })
 
     if owner_id:
         owner = channel.guild.get_member(owner_id)
@@ -460,7 +625,8 @@ async def close_ticket(channel: discord.TextChannel, cfg: dict,
     await telegram_notify(
         channel.guild,
         (f"🔒 <b>Ticket closed</b> on <b>{html.escape(channel.guild.name)}</b>\n"
-         f"#{html.escape(channel.name)} · {type_label(ticket.get('type', 'other'))}\n"
+         f"#{html.escape(channel.name)} · {type_label(ticket.get('type', 'other'))} · "
+         f"{priority_label(priority)}\n"
          f"<b>Closed by:</b> {html.escape(str(closed_by))}\n"
          f"<b>Reason:</b> {html.escape(reason)}"),
         document=data,
@@ -503,6 +669,7 @@ class TicketBot(commands.Bot):
                 print(f"[telegram] connected as @{notifier.username}")
 
         self.inactivity_check.start()
+        self.transcript_cleanup.start()
 
     async def close(self):
         if self._telegram_poller is not None:
@@ -572,6 +739,34 @@ class TicketBot(commands.Bot):
 
     @inactivity_check.before_loop
     async def before_inactivity_check(self):
+        await self.wait_until_ready()
+
+    @tasks.loop(hours=1)
+    async def transcript_cleanup(self):
+        """Delete Low/Medium transcripts from the log channel after the retention period."""
+        now = time.time()
+        for guild_id, cfg in list(config.items()):
+            guild = self.get_guild(int(guild_id))
+            entries = cfg.get("transcripts")
+            if guild is None or not entries:
+                continue
+            expired = expired_transcripts(entries, now, retention_days(cfg))
+            for entry in expired:
+                channel = guild.get_channel(entry["channel"])
+                if channel is not None:
+                    try:
+                        await channel.get_partial_message(entry["message"]).delete()
+                    except discord.NotFound:
+                        pass  # already deleted by hand
+                    except discord.HTTPException as e:
+                        print(f"Could not delete transcript {entry['message']}: {e}")
+                        continue  # try again next hour
+                entries.remove(entry)
+            if expired:
+                save_config()
+
+    @transcript_cleanup.before_loop
+    async def before_transcript_cleanup(self):
         await self.wait_until_ready()
 
 
@@ -652,6 +847,136 @@ async def queue(interaction: discord.Interaction):
     waiting, in_progress = queue_counts(cfg)
     await interaction.response.send_message(
         f"📊 Open tickets: **{waiting}** waiting · **{in_progress}** in progress",
+        ephemeral=True,
+    )
+
+
+def guidelines_embed(cfg: dict) -> discord.Embed:
+    embed = discord.Embed(
+        title="📋 Ticket priority guidelines",
+        description=(
+            "When you **claim** a ticket, choose its priority using these rules. "
+            "It can be changed later with `/priority`."
+        ),
+        color=COLOR,
+    )
+    for label, emoji, guideline, target in PRIORITIES.values():
+        embed.add_field(
+            name=f"{emoji} {label}",
+            value=f"{guideline}\n**First reply:** {target}",
+            inline=False,
+        )
+    kept = ", ".join(priority_label(p) for p in KEPT_PRIORITIES)
+    embed.add_field(
+        name="🗂️ Transcripts",
+        value=(
+            f"• In this channel, {kept} transcripts are **kept** until an admin "
+            "deletes them.\n"
+            f"• All other transcripts are **deleted automatically** from this channel "
+            f"after **{retention_days(cfg)} days**.\n"
+            "• The archive channel always keeps every transcript.\n"
+            "• Tickets closed without a priority are treated as Low."
+        ),
+        inline=False,
+    )
+    return embed
+
+
+async def refresh_guidelines(guild: discord.Guild, cfg: dict) -> None:
+    """Update the pinned guidelines message if it exists."""
+    ref = cfg.get("guidelines_message")
+    if not ref:
+        return
+    channel = guild.get_channel(ref["channel"])
+    if channel is None:
+        return
+    try:
+        await channel.get_partial_message(ref["message"]).edit(embed=guidelines_embed(cfg))
+    except discord.HTTPException:
+        pass
+
+
+@bot.tree.command(name="priority", description="Change the priority of this ticket")
+@app_commands.guild_only()
+@app_commands.describe(level="New priority")
+@app_commands.choices(level=[
+    app_commands.Choice(name=f"{emoji} {label}", value=key)
+    for key, (label, emoji, _, _) in PRIORITIES.items()
+])
+async def priority(interaction: discord.Interaction, level: app_commands.Choice[str]):
+    if not await require_staff_in_ticket(interaction):
+        return
+    await apply_priority(interaction, level.value, claim=False)
+
+
+@bot.tree.command(name="guidelines",
+                  description="Post and pin the priority guidelines in the log channel")
+@app_commands.default_permissions(administrator=True)
+@app_commands.guild_only()
+async def guidelines(interaction: discord.Interaction):
+    cfg = guild_cfg(interaction.guild)
+    if cfg is None:
+        await interaction.response.send_message(
+            "Set up the ticket system with /setup first.", ephemeral=True
+        )
+        return
+    channel = interaction.guild.get_channel(cfg["log_channel"])
+    if channel is None:
+        await interaction.response.send_message(
+            "The log channel no longer exists: run /setup again.", ephemeral=True
+        )
+        return
+
+    # Replace the previous guidelines message, if any
+    old = cfg.get("guidelines_message")
+    if old:
+        old_channel = interaction.guild.get_channel(old["channel"])
+        if old_channel is not None:
+            try:
+                await old_channel.get_partial_message(old["message"]).delete()
+            except discord.HTTPException:
+                pass
+
+    message = await channel.send(embed=guidelines_embed(cfg))
+    cfg["guidelines_message"] = {"channel": channel.id, "message": message.id}
+    save_config()
+    try:
+        await message.pin(reason="Ticket priority guidelines")
+        note = "and pinned"
+    except discord.HTTPException:
+        note = ("but I couldn't pin it: give me the **Pin Messages** permission "
+                "in that channel, or pin it manually")
+    await interaction.response.send_message(
+        f"📋 Guidelines posted in {channel.mention} {note}.", ephemeral=True
+    )
+
+
+@bot.tree.command(name="retention",
+                  description="Days after which Low/Medium transcripts are deleted from the log")
+@app_commands.default_permissions(administrator=True)
+@app_commands.guild_only()
+@app_commands.describe(days="Number of days (1-365). Leave empty to see the current value")
+async def retention(interaction: discord.Interaction,
+                    days: app_commands.Range[int, 1, 365] | None = None):
+    cfg = guild_cfg(interaction.guild)
+    if cfg is None:
+        await interaction.response.send_message(
+            "Set up the ticket system with /setup first.", ephemeral=True
+        )
+        return
+    if days is None:
+        await interaction.response.send_message(
+            f"🗑️ Low and Medium transcripts are deleted from the log channel after "
+            f"**{retention_days(cfg)} days**. High priority transcripts and the archive "
+            "channel are kept.", ephemeral=True
+        )
+        return
+    cfg["retention_days"] = days
+    save_config()
+    await refresh_guidelines(interaction.guild, cfg)
+    await interaction.response.send_message(
+        f"🗑️ Low and Medium transcripts will be deleted from the log channel "
+        f"after **{days} days**.",
         ephemeral=True,
     )
 

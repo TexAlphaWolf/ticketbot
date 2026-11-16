@@ -56,3 +56,31 @@ def test_queue_counts():
     }}
     assert tb.queue_counts(cfg) == (2, 1)
     assert tb.queue_counts({}) == (0, 0)
+
+
+DAY = 86400
+
+
+def test_high_priority_is_kept():
+    assert tb.is_kept("high")
+    assert not tb.is_kept("medium")
+    assert not tb.is_kept("low")
+    assert not tb.is_kept(None)
+
+
+def test_expired_transcripts_respect_retention_and_priority():
+    now = 10_000_000.0
+    entries = [
+        {"message": 1, "priority": "low", "closed_at": now - 31 * DAY},
+        {"message": 2, "priority": "medium", "closed_at": now - 31 * DAY},
+        {"message": 3, "priority": None, "closed_at": now - 31 * DAY},
+        {"message": 4, "priority": "low", "closed_at": now - 5 * DAY},
+        {"message": 5, "priority": "high", "closed_at": now - 400 * DAY},
+    ]
+    expired = [e["message"] for e in tb.expired_transcripts(entries, now, 30)]
+    assert expired == [1, 2, 3]
+
+
+def test_priority_label():
+    assert tb.priority_label("high") == "🔴 High"
+    assert tb.priority_label(None) == "⚪ Not set"
