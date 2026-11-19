@@ -9,10 +9,18 @@ from discord.ext import tasks
 
 from . import __version__, config
 from .commands import all_commands
-from .common import is_staff, translator
+from .common import channel_url, esc, is_staff, priority_label, telegram_notify, translator
 from .db import Database
 from .i18n import CommandTranslator
-from .logic import activity_changes, autoclose_action, expired_refs
+from .logic import (
+    activity_changes,
+    autoclose_action,
+    expired_refs,
+    format_duration,
+    staff_reminder_due,
+    staff_reply_hours,
+    waiting_for_staff_since,
+)
 from .migrate import migrate_legacy_config
 from .telegram_notifier import TelegramError, TelegramNotifier
 from .tickets import ClosedControls, RatingButton, TicketControls, TicketPanel, close_ticket
@@ -116,7 +124,8 @@ class TicketBot(discord.Client):
                 if guild is not None:
                     await self.on_guild_channel_delete(discord.Object(ticket["channel_id"]))
                 continue
-            _ = translator(self.db.get_guild(guild.id))
+            cfg = self.db.get_guild(guild.id)
+            _ = translator(cfg)
             try:
                 action = autoclose_action(ticket, now)
                 if action == "warn":
@@ -127,6 +136,8 @@ class TicketBot(discord.Client):
                     reason = _("auto.reason", hours=config.AUTO_CLOSE_HOURS)
                     await channel.send(f"🔒 {reason}")
                     await close_ticket(self, channel, ticket, self.user, reason)
+                elif cfg and cfg.get("staff_reminders", 1) and staff_reminder_due(ticket, now):
+                    await self.remind_staff(channel, ticket, cfg, now)
             except discord.HTTPException as e:
                 print(f"Inactivity check failed for #{channel}: {e}")
 
@@ -141,6 +152,29 @@ class TicketBot(discord.Client):
                     await channel.delete(reason="Closed ticket expired")
                 except discord.HTTPException as e:
                     print(f"Could not delete #{channel}: {e}")
+
+    async def remind_staff(self, channel: discord.TextChannel, ticket: dict, cfg: dict,
+                           now: float) -> None:
+        """Remind the staff that a ticket has waited too long for a reply."""
+        _ = translator(cfg)
+        self.db.update_ticket(ticket["id"], staff_reminded_at=now)
+        waited = format_duration(now - waiting_for_staff_since(ticket))
+        priority = priority_label(_, ticket.get("priority"))
+        if ticket.get("claimed_by"):
+            target = f"<@{ticket['claimed_by']}>"
+        elif cfg.get("staff_role"):
+            target = f"<@&{cfg['staff_role']}>"
+        else:
+            target = ""
+        await channel.send(
+            _("reminder.channel", target=target, waited=waited, priority=priority,
+              hours=staff_reply_hours(ticket.get("priority"))).strip(),
+            allowed_mentions=discord.AllowedMentions(everyone=False, roles=True, users=True),
+        )
+        await telegram_notify(self, cfg, _(
+            "tg.reminder", guild=esc(channel.guild.name), channel=esc(channel.name),
+            priority=priority, waited=waited, url=channel_url(channel.guild.id, channel.id),
+        ))
 
     @tasks.loop(hours=1)
     async def hourly_cleanup(self):

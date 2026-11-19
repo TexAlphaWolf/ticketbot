@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS guilds (
     guidelines_message INTEGER,
     counter            INTEGER NOT NULL DEFAULT 0,
     retention_days     INTEGER NOT NULL DEFAULT 30,
-    telegram_chat_id   TEXT
+    telegram_chat_id   TEXT,
+    staff_reminders    INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS ticket_types (
@@ -54,6 +55,8 @@ CREATE TABLE IF NOT EXISTS tickets (
     last_actor        TEXT,
     last_activity     REAL    NOT NULL,
     warned            INTEGER NOT NULL DEFAULT 0,
+    awaiting_staff_since REAL,
+    staff_reminded_at REAL,
     closed_at         REAL,
     closed_by         INTEGER,
     close_reason      TEXT,
@@ -92,16 +95,15 @@ CREATE TABLE IF NOT EXISTS transcript_refs (
 GUILD_FIELDS = {
     "language", "staff_role", "category", "log_channel", "archive_channel",
     "panel_channel", "panel_message", "guidelines_channel", "guidelines_message",
-    "counter", "retention_days", "telegram_chat_id",
+    "counter", "retention_days", "telegram_chat_id", "staff_reminders",
 }
 TYPE_FIELDS = {"label", "emoji", "description", "position"}
 TICKET_FIELDS = {
     "guild_id", "channel_id", "number", "user_number", "name", "owner_id", "type_key",
-    "type_label",
-    "type_emoji", "subject", "description", "status", "priority", "claimed_by",
-    "control_message", "opened_at", "first_response_at", "last_actor",
-    "last_activity", "warned", "closed_at", "closed_by", "close_reason",
-    "channel_deleted", "rating", "rating_comment", "rated_at",
+    "type_label", "type_emoji", "subject", "description", "status", "priority", "claimed_by",
+    "control_message", "opened_at", "first_response_at", "last_actor", "last_activity",
+    "warned", "awaiting_staff_since", "staff_reminded_at", "closed_at", "closed_by",
+    "close_reason", "channel_deleted", "rating", "rating_comment", "rated_at",
 }
 
 
@@ -127,10 +129,16 @@ class Database:
 
     def _upgrade(self) -> None:
         """Add columns introduced after a database was first created."""
-        columns = {r["name"] for r in self.conn.execute("PRAGMA table_info(tickets)")}
-        for column, kind in (("user_number", "INTEGER"), ("name", "TEXT")):
-            if column not in columns:
-                self.conn.execute(f"ALTER TABLE tickets ADD COLUMN {column} {kind}")
+        added = {
+            "tickets": (("user_number", "INTEGER"), ("name", "TEXT"),
+                        ("awaiting_staff_since", "REAL"), ("staff_reminded_at", "REAL")),
+            "guilds": (("staff_reminders", "INTEGER NOT NULL DEFAULT 1"),),
+        }
+        for table, new_columns in added.items():
+            columns = {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}
+            for column, kind in new_columns:
+                if column not in columns:
+                    self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
 
     def close(self) -> None:
         self.conn.close()

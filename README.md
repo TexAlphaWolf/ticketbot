@@ -26,6 +26,9 @@ Available in **English**, **Italian** and **German**.
   log channel with `/guidelines`
 - **Quick replies**: saved answers sent with `/reply` (with `{user}`, `{staff}` and
   `{server}` placeholders), managed by admins with `/replies`
+- **Staff reminders**: if a ticket waits too long for a staff reply (🔴 2h, 🟡 24h,
+  🟢 48h, ⚪ 12h without a priority), the bot pings the staff member who claimed it, or
+  the staff role, and sends a Telegram notification; it can be turned off per server
 - **Transfer** a ticket to another staff member
 - **Private notes** visible only to the staff and included in the staff transcript
 - **Reopen**: closed tickets stay available for 12 hours before the channel is deleted
@@ -158,7 +161,7 @@ With Docker, `restart: unless-stopped` in `docker-compose.yml` does the same.
 |---|---|---|
 | `/setup` | Admin | Sets up the ticket system and posts the panel |
 | `/guidelines` | Admin | Posts and pins the priority guidelines in the log channel |
-| `/settings show` / `language` / `retention` / `archive` | Admin | Shows or changes the settings |
+| `/settings show` / `language` / `retention` / `archive` / `reminders` | Admin | Shows or changes the settings |
 | `/types list` / `add` / `edit` / `remove` | Admin | Manages the ticket types |
 | `/telegram link` / `verify` / `status` / `test` / `unlink` | Admin | Manages Telegram notifications |
 | `/profile name` / `avatar` / `banner` / `bio` / `reset` | Admin | Changes the bot's profile in this server only |

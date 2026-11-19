@@ -174,6 +174,7 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
         type_key=ticket_type["key"], type_label=ticket_type["label"],
         type_emoji=ticket_type["emoji"], subject=subject, description=description,
         status=config.STATUS_WAITING, opened_at=now, last_activity=now,
+        awaiting_staff_since=now,
     )
 
     queue = (_("queue.line", waiting=waiting, in_progress=in_progress)
@@ -557,6 +558,7 @@ async def reopen_ticket(interaction: discord.Interaction) -> None:
     interaction.client.db.update_ticket(
         ticket["id"], status=status, closed_at=None, closed_by=None, close_reason=None,
         last_actor=None, last_activity=time.time(), warned=0,
+        awaiting_staff_since=time.time(), staff_reminded_at=None,
     )
     await interaction.response.send_message(_("reopen.done", user=interaction.user.mention))
     if interaction.type == discord.InteractionType.component and interaction.message:
@@ -696,6 +698,12 @@ def guidelines_embed(cfg: dict, _: Translate) -> discord.Embed:
     embed.add_field(name=_("guidelines.transcripts_title"),
                     value=_("guidelines.transcripts", kept=kept, days=cfg["retention_days"]),
                     inline=False)
+    if cfg.get("staff_reminders", 1):
+        hours = config.STAFF_REPLY_HOURS
+        embed.add_field(name=_("guidelines.reminders_title"),
+                        value=_("guidelines.reminders", high=hours["high"],
+                                medium=hours["medium"], low=hours["low"], none=hours[None]),
+                        inline=False)
     return embed
 
 

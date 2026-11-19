@@ -9,6 +9,12 @@
   (multi-line, up to 100 per server); staff send them in a ticket with `/reply`, with
   autocomplete and the `{user}`, `{staff}` and `{server}` placeholders. A quick reply
   counts as a staff answer for the statistics and the auto-close timer
+- **Staff reminders**: when a ticket waits for a staff reply longer than its priority
+  allows (High 2h, Medium 24h, Low 48h, no priority 12h), the bot mentions the staff
+  member who claimed it (or the staff role) in the ticket and notifies Telegram; the
+  reminder repeats every same interval until the staff answers. The wait starts from
+  the first unanswered user message. Turn it on or off with `/settings reminders`;
+  the times are shown in the pinned guidelines
 
 ### Changed
 - Tool settings (`ruff`, `pytest`) moved to `pyproject.toml`; `pytest.ini` removed

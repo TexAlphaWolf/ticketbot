@@ -169,4 +169,39 @@ def activity_changes(ticket: dict, now: float, from_staff: bool) -> dict:
             changes["status"] = config.STATUS_IN_PROGRESS
         if not ticket.get("first_response_at"):
             changes["first_response_at"] = now
+        # The staff answered: stop waiting and reset the reminders
+        changes["awaiting_staff_since"] = None
+        changes["staff_reminded_at"] = None
+    elif ticket.get("last_actor") == "staff" or not ticket.get("awaiting_staff_since"):
+        # The user wrote after a staff answer: a new wait for the staff starts now.
+        # If the user writes again before the staff answers, the start is kept.
+        changes["awaiting_staff_since"] = now
     return changes
+
+
+def waiting_for_staff_since(ticket: dict) -> float | None:
+    """When the ticket started waiting for a staff reply, or None if it isn't waiting."""
+    if ticket.get("status") == config.STATUS_CLOSED or ticket.get("last_actor") == "staff":
+        return None
+    return (ticket.get("awaiting_staff_since") or ticket.get("last_activity")
+            or ticket.get("opened_at"))
+
+
+def staff_reply_hours(priority: str | None) -> int:
+    hours = config.STAFF_REPLY_HOURS
+    return hours.get(priority, hours[None])
+
+
+def staff_reminder_due(ticket: dict, now: float) -> bool:
+    """
+    True when the ticket has waited longer than its priority allows for a staff reply.
+    The reminder repeats every same interval until someone from the staff answers.
+    """
+    since = waiting_for_staff_since(ticket)
+    if since is None:
+        return False
+    interval = staff_reply_hours(ticket.get("priority")) * 3600
+    if now - since < interval:
+        return False
+    last = ticket.get("staff_reminded_at")
+    return last is None or now - last >= interval

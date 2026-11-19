@@ -34,6 +34,9 @@ PRIORITIES = ("low", "medium", "high")
 PRIORITY_EMOJI = {"low": "🟢", "medium": "🟡", "high": "🔴"}
 KEPT_PRIORITIES = {"high"}     # transcripts of these priorities are never auto-deleted
 
+# Hours a ticket can wait for a staff reply before the staff is reminded (None = no priority)
+STAFF_REPLY_HOURS = {"high": 2, "medium": 24, "low": 48, None: 12}
+
 STATUS_WAITING = "waiting"          # nobody from the staff has picked it up yet
 STATUS_IN_PROGRESS = "in_progress"  # claimed or answered by the staff
 STATUS_CLOSED = "closed"

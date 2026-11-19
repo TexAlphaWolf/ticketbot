@@ -267,6 +267,21 @@ STRINGS["en"] = {
     "replies.modal_hint": "You can use {{user}}, {{staff}} and {{server}}",
     "replies.saved": "✅ Quick reply `{name}` saved. Preview:\n\n{preview}",
     "replies.removed": "🗑️ Quick reply `{name}` removed.",
+    "reminder.channel":
+        "⏰ {target} this ticket has been waiting for a staff reply for **{waited}** (priority "
+        "{priority}: first reply within {hours}h).",
+    "tg.reminder":
+        "⏰ <b>Ticket waiting for the staff</b> on <b>{guild}</b>\n#{channel} · "
+        "{priority}\nWaiting for {waited}\n<a href=\"{url}\">Open in Discord</a>",
+    "guidelines.reminders_title": "⏰ Staff reminders",
+    "guidelines.reminders":
+        "If a ticket waits too long for a staff reply, the bot reminds the staff: 🔴 after "
+        "{high}h, 🟡 after {medium}h, 🟢 after {low}h, ⚪ without a priority after {none}h.",
+    "settings.reminders": "Staff reminders",
+    "settings.on": "On",
+    "settings.off": "Off",
+    "settings.reminders_on": "⏰ Staff reminders enabled.",
+    "settings.reminders_off": "⏰ Staff reminders disabled.",
 }
 
 STRINGS["it"] = {
@@ -500,6 +515,21 @@ STRINGS["it"] = {
     "replies.modal_hint": "Puoi usare {{user}}, {{staff}} e {{server}}",
     "replies.saved": "✅ Risposta rapida `{name}` salvata. Anteprima:\n\n{preview}",
     "replies.removed": "🗑️ Risposta rapida `{name}` rimossa.",
+    "reminder.channel":
+        "⏰ {target} questo ticket aspetta una risposta dello staff da **{waited}** (priorità "
+        "{priority}: prima risposta entro {hours}h).",
+    "tg.reminder":
+        "⏰ <b>Ticket in attesa dello staff</b> su <b>{guild}</b>\n#{channel} · {priority}\nIn "
+        "attesa da {waited}\n<a href=\"{url}\">Apri su Discord</a>",
+    "guidelines.reminders_title": "⏰ Promemoria per lo staff",
+    "guidelines.reminders":
+        "Se un ticket aspetta troppo una risposta dello staff, il bot avvisa lo staff: 🔴 dopo "
+        "{high}h, 🟡 dopo {medium}h, 🟢 dopo {low}h, ⚪ senza priorità dopo {none}h.",
+    "settings.reminders": "Promemoria staff",
+    "settings.on": "Attivi",
+    "settings.off": "Disattivati",
+    "settings.reminders_on": "⏰ Promemoria per lo staff attivati.",
+    "settings.reminders_off": "⏰ Promemoria per lo staff disattivati.",
 }
 
 STRINGS["de"] = {
@@ -743,6 +773,22 @@ STRINGS["de"] = {
     "replies.modal_hint": "Du kannst {{user}}, {{staff}} und {{server}} verwenden",
     "replies.saved": "✅ Schnellantwort `{name}` gespeichert. Vorschau:\n\n{preview}",
     "replies.removed": "🗑️ Schnellantwort `{name}` entfernt.",
+    "reminder.channel":
+        "⏰ {target} dieses Ticket wartet seit **{waited}** auf eine Antwort des Teams (Priorität "
+        "{priority}: erste Antwort innerhalb von {hours} Std.).",
+    "tg.reminder":
+        "⏰ <b>Ticket wartet auf das Team</b> auf <b>{guild}</b>\n#{channel} · {priority}\nWartet "
+        "seit {waited}\n<a href=\"{url}\">In Discord öffnen</a>",
+    "guidelines.reminders_title": "⏰ Erinnerungen für das Team",
+    "guidelines.reminders":
+        "Wenn ein Ticket zu lange auf eine Antwort des Teams wartet, erinnert der Bot das Team: "
+        "🔴 nach {high} Std., 🟡 nach {medium} Std., 🟢 nach {low} Std., ⚪ ohne Priorität nach "
+        "{none} Std.",
+    "settings.reminders": "Team-Erinnerungen",
+    "settings.on": "An",
+    "settings.off": "Aus",
+    "settings.reminders_on": "⏰ Team-Erinnerungen aktiviert.",
+    "settings.reminders_off": "⏰ Team-Erinnerungen deaktiviert.",
 }
 
 
@@ -759,6 +805,9 @@ def t(lang: str, key: str, /, **kwargs) -> str:
 # English text -> translation, used for command, option and choice descriptions.
 COMMAND_TEXT: dict[str, dict[str, str]] = {
     "it": {
+        "Turn the staff reminders on or off": "Attiva o disattiva i promemoria per lo staff",
+        "Remind the staff when a ticket waits too long for a reply":
+            "Avvisa lo staff quando un ticket aspetta troppo una risposta",
         "Send a quick reply in this ticket": "Invia una risposta rapida in questo ticket",
         "Quick reply to send": "Risposta rapida da inviare",
         "Manage the quick replies of this server": "Gestisci le risposte rapide di questo server",
@@ -855,6 +904,9 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Stop sending notifications to Telegram": "Smetti di inviare notifiche su Telegram",
     },
     "de": {
+        "Turn the staff reminders on or off": "Team-Erinnerungen ein- oder ausschalten",
+        "Remind the staff when a ticket waits too long for a reply":
+            "Das Team erinnern, wenn ein Ticket zu lange auf eine Antwort wartet",
         "Send a quick reply in this ticket": "Eine Schnellantwort in diesem Ticket senden",
         "Quick reply to send": "Zu sendende Schnellantwort",
         "Manage the quick replies of this server": "Schnellantworten dieses Servers verwalten",

@@ -522,6 +522,8 @@ def test_existing_database_is_upgraded(tmp_path):
     database = Database(path)
     old = database.ticket_by_channel(100)
     assert old["user_number"] is None and old["name"] is None
+    assert old["awaiting_staff_since"] is None and old["staff_reminded_at"] is None
+    assert database.get_guild(1)["staff_reminders"] == 1
     assert database.next_user_number(1, 10) == 1
     database.close()
 
@@ -546,18 +548,65 @@ def test_reply_name_and_placeholders():
 
 
 def test_activity_changes():
-    waiting = {"status": "waiting", "first_response_at": None}
-    staff = logic.activity_changes(waiting, 50.0, from_staff=True)
+    new = {"status": "waiting", "first_response_at": None, "last_actor": None,
+           "awaiting_staff_since": 10.0}
+    staff = logic.activity_changes(new, 50.0, from_staff=True)
     assert staff == {"last_actor": "staff", "last_activity": 50.0, "warned": 0,
-                     "status": "in_progress", "first_response_at": 50.0}
-    answered = {"status": "in_progress", "first_response_at": 10.0}
-    assert logic.activity_changes(answered, 60.0, from_staff=True) == {
-        "last_actor": "staff", "last_activity": 60.0, "warned": 0}
-    assert logic.activity_changes(waiting, 70.0, from_staff=False) == {
-        "last_actor": "user", "last_activity": 70.0, "warned": 0}
+                     "status": "in_progress", "first_response_at": 50.0,
+                     "awaiting_staff_since": None, "staff_reminded_at": None}
+    answered = {"status": "in_progress", "first_response_at": 10.0, "last_actor": "staff",
+                "awaiting_staff_since": None}
+    assert "first_response_at" not in logic.activity_changes(answered, 60.0, from_staff=True)
+    # user writes after the staff: a new wait starts
+    assert logic.activity_changes(answered, 70.0, from_staff=False) == {
+        "last_actor": "user", "last_activity": 70.0, "warned": 0,
+        "awaiting_staff_since": 70.0}
+    # user writes again before the staff answers: the start of the wait is kept
+    assert logic.activity_changes(new, 80.0, from_staff=False) == {
+        "last_actor": "user", "last_activity": 80.0, "warned": 0}
 
 
 def test_modal_hint_shows_placeholders():
     for lang in LANGUAGES:
         hint = t(lang, "replies.modal_hint")
         assert "{user}" in hint and "{staff}" in hint and "{server}" in hint
+
+
+
+def _waiting(priority, waited_hours, reminded_hours_ago=None, last_actor="user",
+             status="in_progress", now=1_000_000.0):
+    return {"status": status, "priority": priority, "last_actor": last_actor,
+            "awaiting_staff_since": now - waited_hours * HOUR, "last_activity": now,
+            "opened_at": now - 100 * HOUR,
+            "staff_reminded_at": (now - reminded_hours_ago * HOUR
+                                  if reminded_hours_ago is not None else None)}, now
+
+
+@pytest.mark.parametrize("priority, hours", [("high", 2), ("medium", 24), ("low", 48),
+                                             (None, 12)])
+def test_staff_reminder_after_priority_limit(priority, hours):
+    assert not logic.staff_reminder_due(*_waiting(priority, hours - 0.1))
+    assert logic.staff_reminder_due(*_waiting(priority, hours))
+
+
+def test_staff_reminder_repeats_every_interval():
+    assert not logic.staff_reminder_due(*_waiting("high", 3, reminded_hours_ago=1))
+    assert logic.staff_reminder_due(*_waiting("high", 5, reminded_hours_ago=2))
+
+
+def test_no_staff_reminder_when_waiting_for_user_or_closed():
+    assert not logic.staff_reminder_due(*_waiting("high", 50, last_actor="staff"))
+    assert not logic.staff_reminder_due(*_waiting("high", 50, status="closed"))
+
+
+def test_waiting_since_falls_back_for_old_tickets():
+    ticket = {"status": "waiting", "last_actor": None, "awaiting_staff_since": None,
+              "last_activity": None, "opened_at": 5.0}
+    assert logic.waiting_for_staff_since(ticket) == 5.0
+    ticket.update(last_actor="user", last_activity=9.0)
+    assert logic.waiting_for_staff_since(ticket) == 9.0
+
+
+def test_guild_reminder_setting_and_upgrade(db):
+    assert db.save_guild(1)["staff_reminders"] == 1
+    assert db.save_guild(1, staff_reminders=0)["staff_reminders"] == 0

@@ -336,6 +336,9 @@ class SettingsGroup(app_commands.Group):
         embed.add_field(name=_("settings.telegram"),
                         value=f"`{cfg['telegram_chat_id']}`" if cfg.get("telegram_chat_id")
                         else "-")
+        embed.add_field(name=_("settings.reminders"),
+                        value=_("settings.on") if cfg.get("staff_reminders", 1)
+                        else _("settings.off"))
         embed.add_field(name=_("settings.types"),
                         value=str(len(interaction.client.db.list_types(interaction.guild.id))))
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -372,6 +375,21 @@ class SettingsGroup(app_commands.Group):
         _ = translator(cfg)
         await interaction.response.send_message(_("settings.retention_set", days=days),
                                                 ephemeral=True)
+        await refresh_guidelines(interaction.guild, cfg)
+
+    @app_commands.command(name="reminders", description="Turn the staff reminders on or off")
+    @app_commands.describe(
+        enabled="Remind the staff when a ticket waits too long for a reply")
+    async def reminders(self, interaction: discord.Interaction, enabled: bool):
+        ctx = await require_setup(interaction)
+        if ctx is None:
+            return
+        cfg = interaction.client.db.save_guild(interaction.guild.id,
+                                               staff_reminders=int(enabled))
+        _ = translator(cfg)
+        await interaction.response.send_message(
+            _("settings.reminders_on") if enabled else _("settings.reminders_off"),
+            ephemeral=True)
         await refresh_guidelines(interaction.guild, cfg)
 
     @app_commands.command(name="archive", description="Set or remove the archive channel")
