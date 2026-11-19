@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- GitHub Actions workflow: `ruff` lint and tests on Python 3.10, 3.11, 3.12, 3.13 and 3.14
+  at every push and pull request, with a status badge in the README
+
+### Changed
+- Tool settings (`ruff`, `pytest`) moved to `pyproject.toml`; `pytest.ini` removed
+
 ## [2.0.0] - 2026-11-18
 
 ### Added

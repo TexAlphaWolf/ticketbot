@@ -1,5 +1,9 @@
 # TicketBot 🎫
 
+[![Tests](https://github.com/TexAlphaWolf/ticketbot/actions/workflows/tests.yml/badge.svg)](https://github.com/TexAlphaWolf/ticketbot/actions/workflows/tests.yml)
+![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 A Discord ticket bot written in Python with [discord.py](https://discordpy.readthedocs.io/).
 Users pick a ticket type and open a private channel with the staff team. Staff members
 claim tickets with a priority, leave private notes, transfer and close them; every ticket
@@ -184,9 +188,12 @@ ticketbot/
 ## Tests
 
 ```bash
-python -m pip install pytest
-python -m pytest
+python -m pip install pytest ruff
+python -m pytest     # unit tests
+ruff check .         # code style and common mistakes
 ```
+
+Both run automatically on GitHub Actions at every push, on Python 3.10 to 3.14.
 
 ## Terms and privacy
 

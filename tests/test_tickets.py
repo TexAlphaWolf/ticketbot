@@ -232,7 +232,8 @@ def test_translations_complete_and_consistent():
 def test_all_keys_used_in_code_exist():
     used = set()
     for f in (ROOT / "ticketbot").glob("*.py"):
-        used |= set(re.findall(r"""_\(\s*["']([a-z_.]+)["']\s*[,)]""", f.read_text(encoding="utf-8")))
+        source = f.read_text(encoding="utf-8")
+        used |= set(re.findall(r"""_\(\s*["']([a-z_.]+)["']\s*[,)]""", source))
     assert used - set(STRINGS["en"]) == set()
 
 
@@ -439,7 +440,7 @@ def test_collect_messages_reads_stickers_and_reactions():
             try:
                 return SimpleNamespace(display_name=next(self.i))
             except StopIteration:
-                raise StopAsyncIteration
+                raise StopAsyncIteration from None
 
     custom = discord.PartialEmoji(name="wolf", id=123456789012345678, animated=False)
     reactions = [SimpleNamespace(emoji="👍", count=2, users=lambda limit: Users(["Tex", "User"])),

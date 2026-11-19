@@ -245,7 +245,8 @@ STRINGS["en"] = {
     "profile.avatar_set": "✅ Avatar updated for this server.",
     "profile.banner_set": "✅ Banner updated for this server.",
     "profile.bio_set": "✅ Bio updated for this server.",
-    "profile.reset": "↩️ Name, avatar, banner and bio restored to the original ones in this server.",
+    "profile.reset":
+        "↩️ Name, avatar, banner and bio restored to the original ones in this server.",
     "profile.bad_image": "Use a PNG, JPG, GIF or WEBP image of at most {mb} MB.",
     "profile.forbidden": "I can't change my profile here. Give my role the "
                          "**Change Nickname** permission.",
@@ -713,7 +714,8 @@ def t(lang: str, key: str, /, **kwargs) -> str:
 # English text -> translation, used for command, option and choice descriptions.
 COMMAND_TEXT: dict[str, dict[str, str]] = {
     "it": {
-        "Customize the bot's profile in this server": "Personalizza il profilo del bot in questo server",
+        "Customize the bot's profile in this server":
+            "Personalizza il profilo del bot in questo server",
         "Change the bot's name in this server": "Cambia il nome del bot in questo server",
         "New name (up to 32 characters)": "Nuovo nome (massimo 32 caratteri)",
         "Change the bot's avatar in this server": "Cambia l'avatar del bot in questo server",
@@ -721,7 +723,8 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Change the bot's banner in this server": "Cambia il banner del bot in questo server",
         "Change the bot's bio in this server": "Cambia la bio del bot in questo server",
         "New bio (up to 190 characters)": "Nuova bio (massimo 190 caratteri)",
-        "Restore the bot's original profile in this server": "Ripristina il profilo originale del bot in questo server",
+        "Restore the bot's original profile in this server":
+            "Ripristina il profilo originale del bot in questo server",
         "Set up the ticket system and post the panel":
             "Configura il sistema ticket e pubblica il pannello",
         "Role of the moderators who handle tickets": "Ruolo dei moderatori che gestiscono i ticket",
@@ -746,10 +749,12 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Low": "Bassa",
         "Medium": "Media",
         "High": "Alta",
-        "Assign this ticket to another staff member": "Assegna questo ticket a un altro membro dello staff",
+        "Assign this ticket to another staff member":
+            "Assegna questo ticket a un altro membro dello staff",
         "Staff member who will handle the ticket": "Membro dello staff che gestirà il ticket",
         "Private staff notes on this ticket": "Note private dello staff su questo ticket",
-        "Add a private note visible only to the staff": "Aggiungi una nota privata visibile solo allo staff",
+        "Add a private note visible only to the staff":
+            "Aggiungi una nota privata visibile solo allo staff",
         "Text of the note": "Testo della nota",
         "Show the private notes of this ticket": "Mostra le note private di questo ticket",
         "Show ticket statistics": "Mostra le statistiche dei ticket",
@@ -767,7 +772,8 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
             "Giorni dopo cui le trascrizioni Bassa/Media vengono eliminate dal log",
         "Number of days (1-365)": "Numero di giorni (1-365)",
         "Set or remove the archive channel": "Imposta o rimuovi il canale archivio",
-        "Archive channel (leave empty to disable it)": "Canale archivio (lascia vuoto per disattivarlo)",
+        "Archive channel (leave empty to disable it)":
+            "Canale archivio (lascia vuoto per disattivarlo)",
         "Manage the ticket types of this server": "Gestisci i tipi di ticket di questo server",
         "Show the ticket types": "Mostra i tipi di ticket",
         "Add a ticket type": "Aggiungi un tipo di ticket",
@@ -786,7 +792,8 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Link a Telegram chat to this server": "Collega una chat Telegram a questo server",
         "Telegram chat ID (send /start to the Telegram bot to get it)":
             "Chat ID di Telegram (invia /start al bot Telegram per ottenerlo)",
-        "Confirm the Telegram link with the code": "Conferma il collegamento Telegram con il codice",
+        "Confirm the Telegram link with the code":
+            "Conferma il collegamento Telegram con il codice",
         "The 6-digit code you received on Telegram": "Il codice di 6 cifre ricevuto su Telegram",
         "Show the Telegram link of this server": "Mostra il collegamento Telegram di questo server",
         "Send a test notification to Telegram": "Invia una notifica di prova su Telegram",
@@ -801,11 +808,14 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Change the bot's banner in this server": "Banner des Bots auf diesem Server ändern",
         "Change the bot's bio in this server": "Bio des Bots auf diesem Server ändern",
         "New bio (up to 190 characters)": "Neue Bio (bis zu 190 Zeichen)",
-        "Restore the bot's original profile in this server": "Ursprüngliches Profil des Bots auf diesem Server wiederherstellen",
+        "Restore the bot's original profile in this server":
+            "Ursprüngliches Profil des Bots auf diesem Server wiederherstellen",
         "Set up the ticket system and post the panel":
             "Ticket-System einrichten und das Panel posten",
-        "Role of the moderators who handle tickets": "Rolle der Moderatoren, die Tickets bearbeiten",
-        "Category where ticket channels are created": "Kategorie, in der Ticket-Kanäle erstellt werden",
+        "Role of the moderators who handle tickets":
+            "Rolle der Moderatoren, die Tickets bearbeiten",
+        "Category where ticket channels are created":
+            "Kategorie, in der Ticket-Kanäle erstellt werden",
         "Channel where transcripts are logged": "Kanal, in dem Transkripte protokolliert werden",
         "Channel where the 'Open ticket' button is posted":
             "Kanal, in dem der Button 'Ticket öffnen' gepostet wird",
@@ -826,10 +836,12 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Low": "Niedrig",
         "Medium": "Mittel",
         "High": "Hoch",
-        "Assign this ticket to another staff member": "Dieses Ticket einem anderen Teammitglied zuweisen",
+        "Assign this ticket to another staff member":
+            "Dieses Ticket einem anderen Teammitglied zuweisen",
         "Staff member who will handle the ticket": "Teammitglied, das das Ticket bearbeitet",
         "Private staff notes on this ticket": "Private Team-Notizen zu diesem Ticket",
-        "Add a private note visible only to the staff": "Private Notiz hinzufügen, nur für das Team sichtbar",
+        "Add a private note visible only to the staff":
+            "Private Notiz hinzufügen, nur für das Team sichtbar",
         "Text of the note": "Text der Notiz",
         "Show the private notes of this ticket": "Private Notizen dieses Tickets anzeigen",
         "Show ticket statistics": "Ticket-Statistiken anzeigen",
@@ -847,7 +859,8 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
             "Tage, nach denen Niedrig-/Mittel-Transkripte aus dem Log gelöscht werden",
         "Number of days (1-365)": "Anzahl der Tage (1-365)",
         "Set or remove the archive channel": "Archiv-Kanal festlegen oder entfernen",
-        "Archive channel (leave empty to disable it)": "Archiv-Kanal (leer lassen zum Deaktivieren)",
+        "Archive channel (leave empty to disable it)":
+            "Archiv-Kanal (leer lassen zum Deaktivieren)",
         "Manage the ticket types of this server": "Ticket-Arten dieses Servers verwalten",
         "Show the ticket types": "Ticket-Arten anzeigen",
         "Add a ticket type": "Ticket-Art hinzufügen",
@@ -870,7 +883,8 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "The 6-digit code you received on Telegram": "Der 6-stellige Code aus Telegram",
         "Show the Telegram link of this server": "Telegram-Verknüpfung dieses Servers anzeigen",
         "Send a test notification to Telegram": "Test-Benachrichtigung an Telegram senden",
-        "Stop sending notifications to Telegram": "Keine Benachrichtigungen mehr an Telegram senden",
+        "Stop sending notifications to Telegram":
+            "Keine Benachrichtigungen mehr an Telegram senden",
     },
 }
 

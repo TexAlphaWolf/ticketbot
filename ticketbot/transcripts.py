@@ -2,9 +2,9 @@
 
 import html
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Callable
 
 import discord
 
@@ -166,7 +166,8 @@ def markdown_to_html(text: str) -> str:
 CSS = """
 :root{color-scheme:dark}
 *{box-sizing:border-box}
-body{margin:0;background:#313338;color:#dbdee1;font:15px/1.4 "gg sans","Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+body{margin:0;background:#313338;color:#dbdee1;
+font:15px/1.4 "gg sans","Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 .wrap{max-width:960px;margin:0 auto;padding:24px 16px}
 .head{background:#2b2d31;border-radius:8px;padding:20px;margin-bottom:24px}
 .head h1{margin:0 0 4px;font-size:22px;color:#f2f3f5}
@@ -180,13 +181,15 @@ body{margin:0;background:#313338;color:#dbdee1;font:15px/1.4 "gg sans","Segoe UI
 .gap{width:40px;flex:none}
 .body{min-width:0;flex:1}
 .name{font-weight:600;color:#f2f3f5}
-.bot{background:#5865f2;color:#fff;font-size:10px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;vertical-align:middle}
+.bot{background:#5865f2;color:#fff;font-size:10px;font-weight:700;padding:1px 4px;border-radius:3px;
+margin-left:4px;vertical-align:middle}
 .time{color:#949ba4;font-size:12px;margin-left:6px}
 .text{word-wrap:break-word;overflow-wrap:anywhere}
 .text a{color:#00a8fc}
 code{background:#1e1f22;padding:1px 4px;border-radius:4px;font-size:13px}
 pre{background:#1e1f22;padding:8px;border-radius:4px;white-space:pre-wrap;margin:4px 0}
-.embed{background:#2b2d31;border-left:4px solid #5865f2;border-radius:4px;padding:8px 12px;margin:4px 0;max-width:520px}
+.embed{background:#2b2d31;border-left:4px solid #5865f2;border-radius:4px;padding:8px 12px;
+margin:4px 0;max-width:520px}
 .embed .et{font-weight:600;color:#f2f3f5;margin-bottom:4px}
 .embed .ef{margin-top:6px}
 .embed .ef b{display:block;color:#f2f3f5}
@@ -197,11 +200,13 @@ pre{background:#1e1f22;padding:8px;border-radius:4px;white-space:pre-wrap;margin
 .sticker img{width:160px;height:160px;object-fit:contain;display:block}
 .sticker span{color:#949ba4;font-size:12px}
 .reactions{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
-.reaction{background:#2b2d31;border:1px solid #3f4147;border-radius:8px;padding:2px 8px;font-size:14px}
+.reaction{background:#2b2d31;border:1px solid #3f4147;border-radius:8px;padding:2px 8px;
+font-size:14px}
 .reaction .emoji{width:18px;height:18px;vertical-align:-3px}
 .reaction b{color:#f2f3f5;margin-left:4px}
 .reaction small{color:#949ba4;margin-left:6px}
-.notes{background:#2b2d31;border-left:4px solid #f0b232;border-radius:8px;padding:16px 20px;margin-top:32px}
+.notes{background:#2b2d31;border-left:4px solid #f0b232;border-radius:8px;padding:16px 20px;
+margin-top:32px}
 .notes h2{margin:0 0 8px;font-size:16px;color:#f0b232}
 .note{padding:6px 0;border-top:1px solid #3f4147}
 .foot{color:#949ba4;font-size:12px;text-align:center;margin-top:32px}

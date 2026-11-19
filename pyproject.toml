@@ -1,0 +1,17 @@
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ticketbot"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:anyio"
+filterwarnings = [
+    # discord.py imports the deprecated stdlib audioop on Python 3.11/3.12 (voice only)
+    "ignore:'audioop' is deprecated:DeprecationWarning:discord.player",
+]

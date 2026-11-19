@@ -1,7 +1,8 @@
 """Helpers shared by tickets, commands and the bot."""
 
 import html
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import discord
 

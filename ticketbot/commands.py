@@ -10,12 +10,27 @@ from discord import app_commands
 from . import config
 from .common import esc, is_staff, priority_label, respond, telegram_notify, translator
 from .i18n import DEFAULT_TYPES, LANGUAGES
-from .logic import (PROFILE_IMAGE_MAX_MB, compute_stats, format_duration, slugify,
-                    valid_emoji, valid_profile_image)
+from .logic import (
+    PROFILE_IMAGE_MAX_MB,
+    compute_stats,
+    format_duration,
+    slugify,
+    valid_emoji,
+    valid_profile_image,
+)
 from .telegram_notifier import TelegramError
-from .tickets import (TicketPanel, apply_priority, get_context, guidelines_embed,
-                      panel_embed, refresh_guidelines, refresh_panel, reopen_ticket,
-                      request_close, transfer_ticket)
+from .tickets import (
+    TicketPanel,
+    apply_priority,
+    get_context,
+    guidelines_embed,
+    panel_embed,
+    refresh_guidelines,
+    refresh_panel,
+    reopen_ticket,
+    request_close,
+    transfer_ticket,
+)
 
 admin_only = app_commands.default_permissions(administrator=True)
 
@@ -340,8 +355,10 @@ class SettingsGroup(app_commands.Group):
         await refresh_panel(interaction.client, interaction.guild, cfg)
         await refresh_guidelines(interaction.guild, cfg)
 
-    @app_commands.command(name="retention",
-                          description="Days after which Low/Medium transcripts are deleted from the log")
+    @app_commands.command(
+        name="retention",
+        description="Days after which Low/Medium transcripts are deleted from the log",
+    )
     @app_commands.describe(days="Number of days (1-365)")
     async def retention(self, interaction: discord.Interaction,
                         days: app_commands.Range[int, 1, 365]):

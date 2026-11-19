@@ -7,11 +7,20 @@ from datetime import datetime, timezone
 import discord
 
 from . import config
-from .common import (Translate, channel_url, esc, is_staff, priority_label, respond,
-                     telegram_notify, translator, type_label, user_name)
+from .common import (
+    Translate,
+    channel_url,
+    esc,
+    is_staff,
+    priority_label,
+    respond,
+    telegram_notify,
+    translator,
+    type_label,
+    user_name,
+)
 from .logic import format_duration, is_kept, stars, ticket_channel_name
 from .transcripts import collect_messages, render_html, render_txt
-
 
 # ----------------------------------------------------------------- panel ---
 
