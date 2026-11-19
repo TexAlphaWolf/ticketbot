@@ -72,6 +72,13 @@ CREATE TABLE IF NOT EXISTS notes (
     created_at REAL    NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS replies (
+    guild_id INTEGER NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    name     TEXT    NOT NULL,
+    content  TEXT    NOT NULL,
+    PRIMARY KEY (guild_id, name)
+);
+
 CREATE TABLE IF NOT EXISTS transcript_refs (
     guild_id   INTEGER NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
     channel_id INTEGER NOT NULL,
@@ -277,6 +284,24 @@ class Database:
     def list_notes(self, ticket_id: int) -> list[dict]:
         return self._all("SELECT * FROM notes WHERE ticket_id = ? ORDER BY created_at",
                          (ticket_id,))
+
+    # ---------------------------------------------------- quick replies ---
+
+    def list_replies(self, guild_id: int) -> list[dict]:
+        return self._all("SELECT * FROM replies WHERE guild_id = ? ORDER BY name", (guild_id,))
+
+    def get_reply(self, guild_id: int, name: str) -> dict | None:
+        return self._one("SELECT * FROM replies WHERE guild_id = ? AND name = ?",
+                         (guild_id, name.lower()))
+
+    def save_reply(self, guild_id: int, name: str, content: str) -> None:
+        self._write("INSERT INTO replies (guild_id, name, content) VALUES (?, ?, ?) "
+                    "ON CONFLICT (guild_id, name) DO UPDATE SET content = excluded.content",
+                    (guild_id, name.lower(), content))
+
+    def remove_reply(self, guild_id: int, name: str) -> bool:
+        return self._write("DELETE FROM replies WHERE guild_id = ? AND name = ?",
+                           (guild_id, name.lower())).rowcount > 0
 
     # ------------------------------------------------- transcript refs ---
 

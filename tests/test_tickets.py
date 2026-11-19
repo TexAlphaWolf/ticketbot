@@ -524,3 +524,40 @@ def test_existing_database_is_upgraded(tmp_path):
     assert old["user_number"] is None and old["name"] is None
     assert database.next_user_number(1, 10) == 1
     database.close()
+
+
+def test_quick_replies_storage(db):
+    db.save_guild(1)
+    db.save_reply(1, "Logs", "Send me the logs, {user}")
+    assert db.get_reply(1, "logs")["content"] == "Send me the logs, {user}"
+    db.save_reply(1, "logs", "Updated")  # same name: replaces
+    assert [r["content"] for r in db.list_replies(1)] == ["Updated"]
+    assert db.remove_reply(1, "LOGS") and db.list_replies(1) == []
+    db.save_reply(1, "x", "y")
+    db.delete_guild(1)
+    assert db.conn.execute("SELECT COUNT(*) FROM replies").fetchone()[0] == 0
+
+
+def test_reply_name_and_placeholders():
+    assert logic.reply_name("Send Logs!") == "send-logs"
+    assert logic.reply_name("🙂") == ""
+    text = logic.fill_reply("Hi {user}, I'm {staff} from {server}. {other} {", "@U", "@S", "Club")
+    assert text == "Hi @U, I'm @S from Club. {other} {"
+
+
+def test_activity_changes():
+    waiting = {"status": "waiting", "first_response_at": None}
+    staff = logic.activity_changes(waiting, 50.0, from_staff=True)
+    assert staff == {"last_actor": "staff", "last_activity": 50.0, "warned": 0,
+                     "status": "in_progress", "first_response_at": 50.0}
+    answered = {"status": "in_progress", "first_response_at": 10.0}
+    assert logic.activity_changes(answered, 60.0, from_staff=True) == {
+        "last_actor": "staff", "last_activity": 60.0, "warned": 0}
+    assert logic.activity_changes(waiting, 70.0, from_staff=False) == {
+        "last_actor": "user", "last_activity": 70.0, "warned": 0}
+
+
+def test_modal_hint_shows_placeholders():
+    for lang in LANGUAGES:
+        hint = t(lang, "replies.modal_hint")
+        assert "{user}" in hint and "{staff}" in hint and "{server}" in hint

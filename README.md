@@ -24,6 +24,8 @@ Available in **English**, **Italian** and **German**.
 **Staff tools**
 - **Claim with priority** (🟢 Low, 🟡 Medium, 🔴 High) following guidelines pinned in the
   log channel with `/guidelines`
+- **Quick replies**: saved answers sent with `/reply` (with `{user}`, `{staff}` and
+  `{server}` placeholders), managed by admins with `/replies`
 - **Transfer** a ticket to another staff member
 - **Private notes** visible only to the staff and included in the staff transcript
 - **Reopen**: closed tickets stay available for 12 hours before the channel is deleted
@@ -161,6 +163,8 @@ With Docker, `restart: unless-stopped` in `docker-compose.yml` does the same.
 | `/telegram link` / `verify` / `status` / `test` / `unlink` | Admin | Manages Telegram notifications |
 | `/profile name` / `avatar` / `banner` / `bio` / `reset` | Admin | Changes the bot's profile in this server only |
 | `/stats period member` | Staff | Shows ticket statistics |
+| `/replies list` / `add` / `edit` / `remove` | Admin | Manages the quick replies |
+| `/reply name` | Staff | Sends a quick reply in the ticket |
 | `/priority level` | Staff | Changes the priority of the ticket |
 | `/transfer member` | Staff | Assigns the ticket to another staff member |
 | `/note add` / `list` | Staff | Adds or shows private staff notes |

@@ -27,6 +27,8 @@ STATS_KEEP_DAYS = 365          # closed ticket metadata (for /stats) is kept thi
 VERIFY_CODE_TTL = 10 * 60      # Telegram verification code lifetime (seconds)
 VERIFY_MAX_ATTEMPTS = 5
 MAX_TICKET_TYPES = 25          # Discord select menus allow up to 25 options
+MAX_REPLIES = 100              # quick replies per server
+MAX_REPLY_LENGTH = 1800        # leaves room for the signature (Discord: 2000)
 
 PRIORITIES = ("low", "medium", "high")
 PRIORITY_EMOJI = {"low": "🟢", "medium": "🟡", "high": "🔴"}

@@ -5,6 +5,10 @@
 ### Added
 - GitHub Actions workflow: `ruff` lint and tests on Python 3.10, 3.11, 3.12, 3.13 and 3.14
   at every push and pull request, with a status badge in the README
+- **Quick replies**: admins save answers with `/replies add`, `edit`, `remove` and `list`
+  (multi-line, up to 100 per server); staff send them in a ticket with `/reply`, with
+  autocomplete and the `{user}`, `{staff}` and `{server}` placeholders. A quick reply
+  counts as a staff answer for the statistics and the auto-close timer
 
 ### Changed
 - Tool settings (`ruff`, `pytest`) moved to `pyproject.toml`; `pytest.ini` removed

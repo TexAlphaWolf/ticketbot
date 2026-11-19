@@ -254,6 +254,19 @@ STRINGS["en"] = {
                       "banner many times in a row, wait a few minutes and try again.",
     "transcript.reactions": "Reactions",
     "transcript.sticker": "Sticker",
+    "replies.signature": "— {staff}",
+    "replies.unknown": "There's no quick reply called `{name}`. Use `/replies list` to see them.",
+    "replies.none": "There are no quick replies yet. An admin can add them with `/replies add`.",
+    "replies.title": "💬 Quick replies ({count}/{max})",
+    "replies.exists":
+        "A quick reply called `{name}` already exists: use `/replies edit` to change it.",
+    "replies.too_many": "You can have at most {max} quick replies.",
+    "replies.bad_name": "Use a name with letters or numbers, e.g. `logs` or `solved`.",
+    "replies.modal_title": "Quick reply: {name}",
+    "replies.modal_label": "Text of the reply",
+    "replies.modal_hint": "You can use {{user}}, {{staff}} and {{server}}",
+    "replies.saved": "✅ Quick reply `{name}` saved. Preview:\n\n{preview}",
+    "replies.removed": "🗑️ Quick reply `{name}` removed.",
 }
 
 STRINGS["it"] = {
@@ -472,6 +485,21 @@ STRINGS["it"] = {
                       "banner tante volte di fila, aspetta qualche minuto e riprova.",
     "transcript.reactions": "Reazioni",
     "transcript.sticker": "Sticker",
+    "replies.signature": "— {staff}",
+    "replies.unknown":
+        "Non esiste una risposta rapida chiamata `{name}`. Usa `/replies list` per vederle.",
+    "replies.none":
+        "Non ci sono ancora risposte rapide. Un admin può aggiungerle con `/replies add`.",
+    "replies.title": "💬 Risposte rapide ({count}/{max})",
+    "replies.exists":
+        "Esiste già una risposta rapida chiamata `{name}`: usa `/replies edit` per modificarla.",
+    "replies.too_many": "Puoi avere al massimo {max} risposte rapide.",
+    "replies.bad_name": "Usa un nome con lettere o numeri, per esempio `log` o `risolto`.",
+    "replies.modal_title": "Risposta rapida: {name}",
+    "replies.modal_label": "Testo della risposta",
+    "replies.modal_hint": "Puoi usare {{user}}, {{staff}} e {{server}}",
+    "replies.saved": "✅ Risposta rapida `{name}` salvata. Anteprima:\n\n{preview}",
+    "replies.removed": "🗑️ Risposta rapida `{name}` rimossa.",
 }
 
 STRINGS["de"] = {
@@ -698,6 +726,23 @@ STRINGS["de"] = {
                       "versuche es erneut.",
     "transcript.reactions": "Reaktionen",
     "transcript.sticker": "Sticker",
+    "replies.signature": "— {staff}",
+    "replies.unknown":
+        "Es gibt keine Schnellantwort namens `{name}`. Verwende `/replies list`, um sie zu sehen.",
+    "replies.none":
+        "Es gibt noch keine Schnellantworten. Ein Admin kann sie mit `/replies add` hinzufügen.",
+    "replies.title": "💬 Schnellantworten ({count}/{max})",
+    "replies.exists":
+        "Eine Schnellantwort namens `{name}` gibt es bereits: "
+        "verwende `/replies edit`, um sie zu ändern.",
+    "replies.too_many": "Du kannst höchstens {max} Schnellantworten haben.",
+    "replies.bad_name":
+        "Verwende einen Namen mit Buchstaben oder Zahlen, z. B. `logs` oder `erledigt`.",
+    "replies.modal_title": "Schnellantwort: {name}",
+    "replies.modal_label": "Text der Antwort",
+    "replies.modal_hint": "Du kannst {{user}}, {{staff}} und {{server}} verwenden",
+    "replies.saved": "✅ Schnellantwort `{name}` gespeichert. Vorschau:\n\n{preview}",
+    "replies.removed": "🗑️ Schnellantwort `{name}` entfernt.",
 }
 
 
@@ -714,6 +759,16 @@ def t(lang: str, key: str, /, **kwargs) -> str:
 # English text -> translation, used for command, option and choice descriptions.
 COMMAND_TEXT: dict[str, dict[str, str]] = {
     "it": {
+        "Send a quick reply in this ticket": "Invia una risposta rapida in questo ticket",
+        "Quick reply to send": "Risposta rapida da inviare",
+        "Manage the quick replies of this server": "Gestisci le risposte rapide di questo server",
+        "Show the quick replies": "Mostra le risposte rapide",
+        "Add a quick reply": "Aggiungi una risposta rapida",
+        "Name of the quick reply (e.g. logs)": "Nome della risposta rapida (es. log)",
+        "Edit a quick reply": "Modifica una risposta rapida",
+        "Quick reply to edit": "Risposta rapida da modificare",
+        "Remove a quick reply": "Rimuovi una risposta rapida",
+        "Quick reply to remove": "Risposta rapida da rimuovere",
         "Customize the bot's profile in this server":
             "Personalizza il profilo del bot in questo server",
         "Change the bot's name in this server": "Cambia il nome del bot in questo server",
@@ -800,6 +855,16 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Stop sending notifications to Telegram": "Smetti di inviare notifiche su Telegram",
     },
     "de": {
+        "Send a quick reply in this ticket": "Eine Schnellantwort in diesem Ticket senden",
+        "Quick reply to send": "Zu sendende Schnellantwort",
+        "Manage the quick replies of this server": "Schnellantworten dieses Servers verwalten",
+        "Show the quick replies": "Schnellantworten anzeigen",
+        "Add a quick reply": "Schnellantwort hinzufügen",
+        "Name of the quick reply (e.g. logs)": "Name der Schnellantwort (z. B. logs)",
+        "Edit a quick reply": "Schnellantwort bearbeiten",
+        "Quick reply to edit": "Zu bearbeitende Schnellantwort",
+        "Remove a quick reply": "Schnellantwort entfernen",
+        "Quick reply to remove": "Zu entfernende Schnellantwort",
         "Customize the bot's profile in this server": "Profil des Bots auf diesem Server anpassen",
         "Change the bot's name in this server": "Namen des Bots auf diesem Server ändern",
         "New name (up to 32 characters)": "Neuer Name (bis zu 32 Zeichen)",

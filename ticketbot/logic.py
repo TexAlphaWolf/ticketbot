@@ -146,3 +146,27 @@ def valid_profile_image(content_type: str | None, size: int) -> bool:
     """Images accepted for the bot's server avatar and banner."""
     kind = (content_type or "").split(";")[0].strip().lower()
     return kind in PROFILE_IMAGE_TYPES and 0 < size <= PROFILE_IMAGE_MAX_MB * 1024 * 1024
+
+
+def reply_name(text: str) -> str:
+    """Normalize a quick reply name: lowercase, letters/numbers/dashes, max 32 chars."""
+    return slugify(text, max_len=32)
+
+
+def fill_reply(content: str, user: str, staff: str, server: str) -> str:
+    """Replace {user}, {staff} and {server}; any other brace is left untouched."""
+    for key, value in (("{user}", user), ("{staff}", staff), ("{server}", server)):
+        content = content.replace(key, value)
+    return content
+
+
+def activity_changes(ticket: dict, now: float, from_staff: bool) -> dict:
+    """Fields to update when someone writes in a ticket."""
+    changes = {"last_actor": "staff" if from_staff else "user",
+               "last_activity": now, "warned": 0}
+    if from_staff:
+        if ticket.get("status") == config.STATUS_WAITING:
+            changes["status"] = config.STATUS_IN_PROGRESS
+        if not ticket.get("first_response_at"):
+            changes["first_response_at"] = now
+    return changes

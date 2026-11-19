@@ -12,8 +12,11 @@ from .common import esc, is_staff, priority_label, respond, telegram_notify, tra
 from .i18n import DEFAULT_TYPES, LANGUAGES
 from .logic import (
     PROFILE_IMAGE_MAX_MB,
+    activity_changes,
     compute_stats,
+    fill_reply,
     format_duration,
+    reply_name,
     slugify,
     valid_emoji,
     valid_profile_image,
@@ -620,6 +623,141 @@ class TelegramGroup(app_commands.Group):
         await interaction.response.send_message(_("tg.unlinked"), ephemeral=True)
 
 
+# ---------------------------------------------------------- quick replies ---
+
+async def reply_autocomplete(interaction: discord.Interaction, current: str):
+    current = current.lower()
+    return [
+        app_commands.Choice(name=f"{r['name']} – {r['content']}".replace("\n", " ")[:100],
+                            value=r["name"])
+        for r in interaction.client.db.list_replies(interaction.guild.id)
+        if current in r["name"]
+    ][:25]
+
+
+@app_commands.command(name="reply", description="Send a quick reply in this ticket")
+@app_commands.guild_only()
+@app_commands.describe(name="Quick reply to send")
+@app_commands.autocomplete(name=reply_autocomplete)
+async def reply(interaction: discord.Interaction, name: str):
+    ctx = await get_context(interaction, staff=True)
+    if ctx is None:
+        return
+    cfg, _, ticket = ctx
+    db = interaction.client.db
+    saved = db.get_reply(interaction.guild.id, name)
+    if saved is None:
+        await interaction.response.send_message(_("replies.unknown", name=name), ephemeral=True)
+        return
+    text = fill_reply(saved["content"], user=f"<@{ticket['owner_id']}>",
+                      staff=interaction.user.mention, server=interaction.guild.name)
+    await interaction.response.send_message(
+        text + "\n-# " + _("replies.signature", staff=interaction.user.display_name),
+        allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True),
+    )
+    # A quick reply is a staff answer: it counts for stats and the auto-close timer
+    db.update_ticket(ticket["id"], **activity_changes(ticket, time.time(), from_staff=True))
+
+
+class ReplyModal(discord.ui.Modal):
+    def __init__(self, name: str, _, content: str | None = None):
+        super().__init__(title=_("replies.modal_title", name=name)[:45])
+        self.name = name
+        self._ = _
+        self.content = discord.ui.TextInput(
+            style=discord.TextStyle.paragraph, max_length=config.MAX_REPLY_LENGTH,
+            default=content,
+        )
+        self.add_item(discord.ui.Label(text=_("replies.modal_label"),
+                                       description=_("replies.modal_hint"),
+                                       component=self.content))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        _ = self._
+        db = interaction.client.db
+        is_new = db.get_reply(interaction.guild.id, self.name) is None
+        if is_new and len(db.list_replies(interaction.guild.id)) >= config.MAX_REPLIES:
+            await interaction.response.send_message(
+                _("replies.too_many", max=config.MAX_REPLIES), ephemeral=True)
+            return
+        db.save_reply(interaction.guild.id, self.name, self.content.value)
+        preview = fill_reply(self.content.value, user="@User", staff="@Staff",
+                             server=interaction.guild.name)
+        await interaction.response.send_message(
+            _("replies.saved", name=self.name, preview=preview)[:2000], ephemeral=True)
+
+
+class RepliesGroup(app_commands.Group):
+    def __init__(self):
+        super().__init__(name="replies", description="Manage the quick replies of this server",
+                         guild_only=True,
+                         default_permissions=discord.Permissions(administrator=True))
+
+    @app_commands.command(name="list", description="Show the quick replies")
+    async def list_replies(self, interaction: discord.Interaction):
+        _ = translator(interaction.client.db.get_guild(interaction.guild.id))
+        replies = interaction.client.db.list_replies(interaction.guild.id)
+        if not replies:
+            await interaction.response.send_message(_("replies.none"), ephemeral=True)
+            return
+        lines = []
+        for r in replies:
+            preview = r["content"].replace("\n", " ")
+            preview = preview[:80] + ("…" if len(preview) > 80 else "")
+            lines.append(f"**`{r['name']}`** – {preview}")
+        embed = discord.Embed(
+            title=_("replies.title", count=len(replies), max=config.MAX_REPLIES),
+            description="\n".join(lines)[:4096], color=config.COLOR)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="add", description="Add a quick reply")
+    @app_commands.describe(name="Name of the quick reply (e.g. logs)")
+    async def add_reply(self, interaction: discord.Interaction,
+                        name: app_commands.Range[str, 1, 32]):
+        db = interaction.client.db
+        _ = translator(db.get_guild(interaction.guild.id))
+        key = reply_name(name)
+        if not key:
+            await interaction.response.send_message(_("replies.bad_name"), ephemeral=True)
+            return
+        if db.get_reply(interaction.guild.id, key):
+            await interaction.response.send_message(_("replies.exists", name=key),
+                                                    ephemeral=True)
+            return
+        if len(db.list_replies(interaction.guild.id)) >= config.MAX_REPLIES:
+            await interaction.response.send_message(
+                _("replies.too_many", max=config.MAX_REPLIES), ephemeral=True)
+            return
+        db.save_guild(interaction.guild.id)  # make sure the server row exists
+        await interaction.response.send_modal(ReplyModal(key, _))
+
+    @app_commands.command(name="edit", description="Edit a quick reply")
+    @app_commands.describe(name="Quick reply to edit")
+    @app_commands.autocomplete(name=reply_autocomplete)
+    async def edit_reply(self, interaction: discord.Interaction, name: str):
+        db = interaction.client.db
+        _ = translator(db.get_guild(interaction.guild.id))
+        saved = db.get_reply(interaction.guild.id, name)
+        if saved is None:
+            await interaction.response.send_message(_("replies.unknown", name=name),
+                                                    ephemeral=True)
+            return
+        await interaction.response.send_modal(ReplyModal(saved["name"], _, saved["content"]))
+
+    @app_commands.command(name="remove", description="Remove a quick reply")
+    @app_commands.describe(name="Quick reply to remove")
+    @app_commands.autocomplete(name=reply_autocomplete)
+    async def remove_reply(self, interaction: discord.Interaction, name: str):
+        db = interaction.client.db
+        _ = translator(db.get_guild(interaction.guild.id))
+        if db.remove_reply(interaction.guild.id, name):
+            await interaction.response.send_message(_("replies.removed", name=name.lower()),
+                                                    ephemeral=True)
+        else:
+            await interaction.response.send_message(_("replies.unknown", name=name),
+                                                    ephemeral=True)
+
+
 # ---------------------------------------------------------------- profile ---
 
 class ProfileGroup(app_commands.Group):
@@ -695,4 +833,5 @@ class ProfileGroup(app_commands.Group):
 
 def all_commands() -> list:
     return [setup, guidelines, queue, add, remove, close, reopen, priority, transfer, stats,
-            NoteGroup(), SettingsGroup(), TypesGroup(), TelegramGroup(), ProfileGroup()]
+            reply, NoteGroup(), SettingsGroup(), TypesGroup(), TelegramGroup(),
+            ProfileGroup(), RepliesGroup()]

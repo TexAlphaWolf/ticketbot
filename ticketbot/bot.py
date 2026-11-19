@@ -12,7 +12,7 @@ from .commands import all_commands
 from .common import is_staff, translator
 from .db import Database
 from .i18n import CommandTranslator
-from .logic import autoclose_action, expired_refs
+from .logic import activity_changes, autoclose_action, expired_refs
 from .migrate import migrate_legacy_config
 from .telegram_notifier import TelegramError, TelegramNotifier
 from .tickets import ClosedControls, RatingButton, TicketControls, TicketPanel, close_ticket
@@ -85,15 +85,7 @@ class TicketBot(discord.Client):
             return
         cfg = self.db.get_guild(message.guild.id)
         from_staff = message.author.id != ticket["owner_id"] and is_staff(message.author, cfg)
-        now = time.time()
-        changes = {"last_actor": "staff" if from_staff else "user",
-                   "last_activity": now, "warned": 0}
-        if from_staff:
-            if ticket["status"] == config.STATUS_WAITING:
-                changes["status"] = config.STATUS_IN_PROGRESS
-            if not ticket.get("first_response_at"):
-                changes["first_response_at"] = now
-        self.db.update_ticket(ticket["id"], **changes)
+        self.db.update_ticket(ticket["id"], **activity_changes(ticket, time.time(), from_staff))
 
     async def on_guild_channel_delete(self, channel):
         ticket = self.db.ticket_by_channel(channel.id)
