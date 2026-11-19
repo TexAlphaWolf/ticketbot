@@ -1,52 +1,87 @@
 # TicketBot 🎫
 
 A Discord ticket bot written in Python with [discord.py](https://discordpy.readthedocs.io/).
-Users pick a ticket type and open a ticket with a button, the bot creates a private
-channel with the staff team, and when the ticket is closed a transcript of the
-conversation is saved. Each server can also receive notifications on its own Telegram chat.
+Users pick a ticket type and open a private channel with the staff team. Staff members
+claim tickets with a priority, leave private notes, transfer and close them; every ticket
+is saved as a Discord-style HTML transcript, rated by the user and counted in the statistics.
+
+Available in **English**, **Italian** and **German**.
 
 ## Features
 
-- **Ticket types**: Support, Bug report, User report, Other, chosen from a menu
-- Panel with an **Open ticket** button and a form (subject + description)
-- A private channel for every ticket, visible only to the user and the staff role
-- One open ticket per user
-- **Queue info**: when opening a ticket, users see how many other tickets are
-  *waiting* and how many are *in progress* (also available with `/queue`)
-- **Claim with priority**: the staff member who claims a ticket chooses its priority
-  (🟢 Low, 🟡 Medium, 🔴 High), based on guidelines that can be pinned in the log
-  channel with `/guidelines`. It can be changed later with `/priority`
-- **Close**: `.txt` transcript sent to the log channel, the archive channel (optional)
-  and to the user via DM, with the closing reason
-- **Auto-close after 24h of user inactivity**: if the staff replied and the user
-  doesn't answer within 24 hours, the ticket is closed with the reason
-  *"No response from the user"*. The user gets a reminder 4 hours before.
-  A ticket waiting for the staff is **never** closed automatically.
-- **Transcript retention**: Low and Medium transcripts are deleted automatically
-  from the log channel after 30 days (configurable with `/retention`), while High
-  priority transcripts are kept until an admin deletes them. The archive channel
-  always keeps every transcript
-- **Telegram notifications** for new, high priority and closed tickets (with the transcript),
-  sent only to the chat linked to that server
-- Persistent buttons: they keep working after the bot restarts
-- Included systemd service for 24/7 hosting on Linux
+**Tickets**
+- Panel with an **Open ticket** button, a menu of **custom ticket types** and a form
+- A private channel for every ticket, visible only to the user and the staff role,
+  named after the type, the username and the user's ticket number (e.g. `bug-mario-2`)
+- One open ticket per user, with queue info (*waiting* / *in progress*)
+- Auto-close after **24 hours without a reply from the user** (with a reminder 4 hours
+  before); tickets waiting for the staff are never closed automatically
+
+**Staff tools**
+- **Claim with priority** (🟢 Low, 🟡 Medium, 🔴 High) following guidelines pinned in the
+  log channel with `/guidelines`
+- **Transfer** a ticket to another staff member
+- **Private notes** visible only to the staff and included in the staff transcript
+- **Reopen**: closed tickets stay available for 12 hours before the channel is deleted
+- **Statistics** with `/stats`: tickets per type and priority, average first response and
+  resolution time, ratings and a staff leaderboard, per period or per staff member
+
+**Transcripts and feedback**
+- **HTML transcripts** that look like Discord (avatars, colors, embeds, images, code,
+  stickers, reactions and custom emoji) plus
+  a plain `.txt` version, sent to the log channel, the archive channel and the user
+- Low and Medium transcripts are deleted from the log channel after 30 days
+  (configurable); High priority transcripts and the archive channel are kept
+- **Ratings**: the user rates the support from 1 to 5 stars, with an optional comment
+- **Telegram notifications** for new, high priority, closed and rated tickets
+
+**Setup**
+- Settings stored in **SQLite**, with automatic migration from v1 (`config.json`)
+- **Multilingual** bot messages and slash command descriptions (EN / IT / DE)
+- **Per-server profile**: each server can give the bot its own name, avatar, banner
+  and bio with `/profile`
+- Runs with Python, as a **systemd** service or with **Docker**
 
 ## Installation
+
+### Requirements
+- Python 3.10+ (or Docker)
+- A bot created in the [Discord Developer Portal](https://discord.com/developers/applications)
+  with **Message Content Intent** enabled (under **Bot**), required for transcripts
+
+Permissions required by the bot: Manage Channels, Manage Roles, View Channels,
+Send Messages, Manage Messages, Pin Messages, Embed Links, Attach Files,
+Read Message History, Change Nickname.
+
+### With Python
 
 ```bash
 git clone https://github.com/TexAlphaWolf/ticketbot.git
 cd ticketbot
 python -m pip install -r requirements.txt
 cp .env.example .env   # then add your tokens
-python ticketbot.py
+python -m ticketbot
 ```
 
-In the [Developer Portal](https://discord.com/developers/applications), under **Bot**,
-enable **Message Content Intent** (required for transcripts).
+### With Docker
 
-Permissions required by the bot: Manage Channels, Manage Roles, View Channels,
-Send Messages, Manage Messages, Pin Messages, Embed Links, Attach Files,
-Read Message History.
+```bash
+git clone https://github.com/TexAlphaWolf/ticketbot.git
+cd ticketbot
+cp .env.example .env   # then add your tokens
+docker compose up -d --build
+docker compose logs -f
+```
+
+The database is saved in the `data/` folder next to `docker-compose.yml`.
+
+### Upgrading from v1
+
+Stop the bot, update the files and start it with `python -m ticketbot`. On the first
+start, `config.json` is imported into the database and renamed to `config.json.migrated`:
+settings, open tickets, Telegram links and transcript references are kept.
+With Docker, copy `config.json` into the `data/` folder before the first start.
+If you use the systemd service, update `ExecStart` to `python -m ticketbot`.
 
 ## Configuration
 
@@ -56,10 +91,14 @@ As an admin, in your server:
 /setup staff_role:@Moderators category:Tickets log_channel:#ticket-log panel_channel:#support archive_channel:#ticket-archive
 ```
 
-`archive_channel` is optional and can be changed later with `/archive`.
-Then run `/guidelines` to post and pin the priority guidelines in the log channel.
-The configuration and the state of open tickets are saved to `config.json`
-(excluded from git).
+The language is detected from the server's locale and can be changed with
+`/settings language`. Then:
+
+- `/guidelines` posts and pins the priority guidelines in the log channel
+- `/types add` / `edit` / `remove` customize the ticket types (up to 25)
+- `/settings show` shows all the settings
+- `/profile` changes the bot's name, avatar, banner and bio in this server only
+  (other servers keep the original profile)
 
 ## Telegram notifications
 
@@ -72,9 +111,6 @@ The configuration and the state of open tickets are saved to `config.json`
    `/telegram verify code:<code>`.
 
 The verification step makes sure nobody can link a chat they don't own.
-Every Discord server links its own chat, so each server only receives its own
-tickets: different servers can share the same TicketBot instance without seeing
-each other's tickets.
 
 ### Multiple people or devices
 
@@ -83,15 +119,13 @@ each other's tickets.
 - **Several admins or moderators**: create a Telegram group with everyone who
   should receive the tickets, add the Telegram bot to the group and send `/id`
   there. Link the group's chat ID (a negative number, e.g. `-1001234567890`) with
-  `/telegram link` and confirm the code that arrives in the group. To add or
-  remove people, just add or remove them from the group.
+  `/telegram link` and confirm the code that arrives in the group.
 
 ### Multiple servers in the same chat
 
 A Telegram chat can be linked to more than one Discord server: run
 `/telegram link` and `/telegram verify` with the same chat ID in each server.
-Every notification shows the server name, so you always know where a ticket
-comes from. Each server still sends only its own tickets to the chat linked to it.
+Every notification shows the server name, and each server only sends its own tickets.
 
 > Whoever hosts the bot technically has access to the data of every server it is in.
 > If you want full control over your tickets, host your own instance.
@@ -110,23 +144,42 @@ journalctl -u ticketbot -f                       # logs
 ```
 
 systemd starts the bot at boot and automatically restarts it if it crashes.
+With Docker, `restart: unless-stopped` in `docker-compose.yml` does the same.
 
 ## Commands
 
 | Command | Who | What it does |
 |---|---|---|
 | `/setup` | Admin | Sets up the ticket system and posts the panel |
-| `/archive channel` | Admin | Sets (or disables, if empty) the archive channel |
 | `/guidelines` | Admin | Posts and pins the priority guidelines in the log channel |
-| `/retention days` | Admin | Sets after how many days Low/Medium transcripts are deleted from the log |
-| `/telegram link chat_id` | Admin | Starts linking a Telegram chat (sends a code) |
-| `/telegram verify code` | Admin | Confirms the link with the received code |
-| `/telegram status` / `test` / `unlink` | Admin | Shows, tests or removes the Telegram link |
-| `/queue` | Everyone | Shows how many tickets are waiting / in progress |
+| `/settings show` / `language` / `retention` / `archive` | Admin | Shows or changes the settings |
+| `/types list` / `add` / `edit` / `remove` | Admin | Manages the ticket types |
+| `/telegram link` / `verify` / `status` / `test` / `unlink` | Admin | Manages Telegram notifications |
+| `/profile name` / `avatar` / `banner` / `bio` / `reset` | Admin | Changes the bot's profile in this server only |
+| `/stats period member` | Staff | Shows ticket statistics |
 | `/priority level` | Staff | Changes the priority of the ticket |
-| `/add user` | Staff | Adds a user to the ticket |
-| `/remove user` | Staff | Removes a user from the ticket |
-| `/close reason` | Staff or ticket owner | Closes the ticket (reason is optional) |
+| `/transfer member` | Staff | Assigns the ticket to another staff member |
+| `/note add` / `list` | Staff | Adds or shows private staff notes |
+| `/add user` / `/remove user` | Staff | Adds or removes a member from the ticket |
+| `/reopen` | Staff | Reopens a closed ticket |
+| `/close reason` | Staff or ticket owner | Closes the ticket |
+| `/queue` | Everyone | Shows how many tickets are waiting / in progress |
+
+## Project structure
+
+```
+ticketbot/
+├── bot.py               # Discord client, events and background tasks
+├── commands.py          # slash commands
+├── tickets.py           # panel, opening, claiming, closing, reopening, ratings
+├── transcripts.py       # HTML and text transcripts
+├── db.py                # SQLite storage
+├── logic.py             # pure functions (auto-close, stats, retention...)
+├── i18n.py              # translations (EN / IT / DE)
+├── telegram_notifier.py # Telegram Bot API client
+├── migrate.py           # v1 config.json import
+└── config.py            # settings and constants
+```
 
 ## Tests
 

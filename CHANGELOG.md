@@ -1,5 +1,45 @@
 # Changelog
 
+## [2.0.0] - 2026-11-18
+
+### Added
+- **Staff tools**: `/transfer` to assign a ticket to another staff member, private staff
+  notes (`/note add`, `/note list`) included only in the staff transcript, and `/reopen`
+- **Closed tickets** stay available for 12 hours with *Reopen* and *Delete now* buttons
+  before the channel is deleted
+- **Ratings**: after closing, the user rates the support from 1 to 5 stars with an
+  optional comment (in DM, or in the ticket if DMs are closed); ratings are posted in
+  the log channel and sent to Telegram
+- **Statistics** with `/stats`: tickets by type and priority, average first response and
+  resolution time, average rating and staff leaderboard, for 7/30/90 days or all time,
+  for the whole team or a single staff member
+- **HTML transcripts** that look like Discord, sent together with the `.txt` version;
+  transcripts show stickers (name and ID), reactions (with who reacted) and custom
+  server emoji
+- **Custom ticket types** per server with `/types list`, `add`, `edit`, `remove`;
+  the panel updates automatically
+- **Languages**: English, Italian and German for bot messages and slash command
+  descriptions, detected from the server locale and changeable with `/settings language`
+- `/settings show`, `/settings retention`, `/settings archive`
+- **Per-server profile** with `/profile name`, `avatar`, `banner`, `bio` and `reset`:
+  the bot's name, avatar, banner and bio change only in that server
+- **Docker** support (`Dockerfile`, `docker-compose.yml`)
+
+### Changed
+- **Breaking**: the bot is now a package started with `python -m ticketbot`
+  (update `ExecStart` in the systemd service)
+- Ticket channels are named after the type, the username and the number of tickets
+  opened by that user (e.g. `bug-mario-2`) instead of a server-wide counter
+- **Breaking**: `/archive` and `/retention` moved to `/settings archive` and
+  `/settings retention`
+- Data is stored in a SQLite database (`data/ticketbot.db`); `config.json` from v1 is
+  imported automatically on the first start and renamed to `config.json.migrated`
+- The data of servers the bot was removed from while offline is deleted at startup
+- Subject, description and staff notes are deleted when a closed ticket's channel is
+  deleted; ticket metadata for the statistics is kept for 365 days
+- Modals use the new `discord.ui.Label` component (discord.py 2.6 or newer)
+- The bot needs the **Change Nickname** permission for `/profile name`
+
 ## [1.2.1] - 2026-11-16
 
 ### Added

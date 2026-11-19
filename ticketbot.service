@@ -2,6 +2,7 @@
 # (Raspberry Pi, home server, VPS).
 #
 # 1. Edit User and the paths below
+#    (the database is saved in the data/ folder inside WorkingDirectory)
 # 2. sudo cp ticketbot.service /etc/systemd/system/
 # 3. sudo systemctl daemon-reload
 # 4. sudo systemctl enable --now ticketbot
@@ -17,7 +18,7 @@ Wants=network-online.target
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/ticketbot
-ExecStart=/home/pi/ticketbot/.venv/bin/python ticketbot.py
+ExecStart=/home/pi/ticketbot/.venv/bin/python -m ticketbot
 Restart=always
 RestartSec=10
 Environment=PYTHONUNBUFFERED=1

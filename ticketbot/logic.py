@@ -1,0 +1,148 @@
+"""Pure functions (no Discord calls), easy to unit test."""
+
+import re
+import unicodedata
+from collections import Counter
+
+from . import config
+
+
+def is_kept(priority: str | None) -> bool:
+    """High priority transcripts are kept until an admin deletes them."""
+    return priority in config.KEPT_PRIORITIES
+
+
+def autoclose_action(ticket: dict, now: float,
+                     hours: int = config.AUTO_CLOSE_HOURS,
+                     warn_before: int = config.WARNING_HOURS_BEFORE) -> str | None:
+    """
+    Decide what to do with an idle ticket: "warn", "close" or None.
+
+    The timer only runs while the ticket is waiting on the USER (the last
+    message came from the staff). A ticket waiting on the staff is never
+    closed automatically.
+    """
+    if ticket.get("status") == config.STATUS_CLOSED or ticket.get("last_actor") != "staff":
+        return None
+    idle = now - (ticket.get("last_activity") or now)
+    if idle >= hours * 3600:
+        return "close"
+    if idle >= (hours - warn_before) * 3600 and not ticket.get("warned"):
+        return "warn"
+    return None
+
+
+def expired_refs(refs: list[dict], now: float, days: int) -> list[dict]:
+    """Transcript messages (Low/Medium/unset) older than the retention period."""
+    cutoff = now - days * 86400
+    return [r for r in refs
+            if not is_kept(r.get("priority")) and r.get("closed_at", now) <= cutoff]
+
+
+def slugify(text: str, max_len: int = 20) -> str:
+    """'Bug Report!' -> 'bug-report' (used as ticket type key and channel prefix)."""
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    text = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return text[:max_len].strip("-")
+
+
+def ticket_channel_name(type_key: str, username: str, user_id: int, user_number: int) -> str:
+    """'bug', 'Mario.Rossi', 42, 2 -> 'bug-mario-rossi-2' (Discord limit: 100 characters)."""
+    user = slugify(username, max_len=32) or str(user_id)[-6:]
+    return f"{type_key}-{user}-{user_number}"[:100]
+
+
+def format_duration(seconds: float | None) -> str:
+    if seconds is None:
+        return "-"
+    seconds = int(seconds)
+    days, rest = divmod(seconds, 86400)
+    hours, rest = divmod(rest, 3600)
+    minutes = rest // 60
+    if days:
+        return f"{days}d {hours}h"
+    if hours:
+        return f"{hours}h {minutes}m"
+    return f"{max(minutes, 1)}m" if seconds >= 30 else "<1m"
+
+
+def stars(n: int | None) -> str:
+    return "⭐" * n if n else "-"
+
+
+def _avg(values: list[float]) -> float | None:
+    return sum(values) / len(values) if values else None
+
+
+def compute_stats(tickets: list[dict], staff_id: int | None = None) -> dict:
+    """
+    Aggregate statistics for a list of ticket rows.
+    If staff_id is given, only tickets claimed by that staff member are counted.
+    """
+    if staff_id is not None:
+        tickets = [t for t in tickets if t.get("claimed_by") == staff_id]
+
+    closed = [t for t in tickets if t.get("status") == config.STATUS_CLOSED]
+    first_responses = [max(0.0, t["first_response_at"] - t["opened_at"])
+                       for t in tickets if t.get("first_response_at")]
+    resolutions = [max(0.0, t["closed_at"] - t["opened_at"])
+                   for t in closed if t.get("closed_at")]
+    ratings = [t["rating"] for t in tickets if t.get("rating")]
+
+    staff: dict[int, dict] = {}
+    for t in tickets:
+        sid = t.get("claimed_by")
+        if not sid:
+            continue
+        s = staff.setdefault(sid, {"handled": 0, "ratings": [], "first_responses": []})
+        s["handled"] += 1
+        if t.get("rating"):
+            s["ratings"].append(t["rating"])
+        if t.get("first_response_at"):
+            s["first_responses"].append(max(0.0, t["first_response_at"] - t["opened_at"]))
+
+    leaderboard = sorted(
+        ({"staff_id": sid,
+          "handled": s["handled"],
+          "avg_rating": _avg(s["ratings"]),
+          "ratings": len(s["ratings"]),
+          "avg_first_response": _avg(s["first_responses"])}
+         for sid, s in staff.items()),
+        key=lambda x: (-x["handled"], -(x["avg_rating"] or 0)),
+    )
+
+    return {
+        "opened": len(tickets),
+        "closed": len(closed),
+        "open": len(tickets) - len(closed),
+        "by_type": Counter(f"{t['type_emoji']} {t['type_label']}" for t in tickets),
+        "by_priority": Counter(t.get("priority") for t in tickets),
+        "avg_first_response": _avg(first_responses),
+        "avg_resolution": _avg(resolutions),
+        "avg_rating": _avg(ratings),
+        "ratings": len(ratings),
+        "unclaimed": sum(1 for t in tickets if not t.get("claimed_by")),
+        "leaderboard": leaderboard,
+    }
+
+
+def valid_emoji(text: str) -> bool:
+    """Accept one unicode emoji or a custom Discord emoji like <:name:id>."""
+    text = text.strip()
+    if re.fullmatch(r"<a?:\w{2,32}:\d{15,25}>", text):
+        return True
+    if re.fullmatch("[0-9#*]️?⃣", text):  # keycaps like 1️⃣
+        return True
+    if not text or len(text) > 10 or any(c.isascii() and c.isalnum() for c in text):
+        return False
+    return any(unicodedata.category(c) == "So" for c in text)
+
+
+PROFILE_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+PROFILE_IMAGE_MAX_MB = 8
+
+
+def valid_profile_image(content_type: str | None, size: int) -> bool:
+    """Images accepted for the bot's server avatar and banner."""
+    kind = (content_type or "").split(";")[0].strip().lower()
+    return kind in PROFILE_IMAGE_TYPES and 0 < size <= PROFILE_IMAGE_MAX_MB * 1024 * 1024
