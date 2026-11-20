@@ -182,3 +182,43 @@ class TranscriptRef(Base):
     message_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
     priority: Mapped[str | None] = mapped_column(Text)
     closed_at: Mapped[float] = mapped_column(Double)
+
+
+class AuditEntry(Base):
+    """Who did what, when and from where. Details and IP are encrypted (personal data)."""
+
+    __tablename__ = "audit_log"
+    __table_args__ = (
+        Index("ix_audit_log_guild_created", "guild_id", "created_at"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    guild_id: Mapped[int | None] = mapped_column(BigInteger)   # None = not about one server
+    actor_id: Mapped[int | None] = mapped_column(BigInteger)   # None = the bot itself
+    source: Mapped[str] = mapped_column(Text)                  # discord, web, system, cli
+    action: Mapped[str] = mapped_column(Text)                  # e.g. ticket.close
+    target: Mapped[str | None] = mapped_column(Text)           # e.g. ticket:12, user:123
+    details: Mapped[str | None] = mapped_column(EncryptedText("audit_log.details"))
+    ip: Mapped[str | None] = mapped_column(EncryptedText("audit_log.ip"))
+    created_at: Mapped[float] = mapped_column(Double)
+
+
+class BotCommand(Base):
+    """An action asked by the web dashboard and carried out by the bot on Discord."""
+
+    __tablename__ = "bot_commands"
+    __table_args__ = (
+        Index("ix_bot_commands_status", "status", "id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    guild_id: Mapped[int] = mapped_column(BigInteger, guild_fk())
+    kind: Mapped[str] = mapped_column(Text)                    # e.g. ticket.close
+    payload: Mapped[str | None] = mapped_column(EncryptedText("bot_commands.payload"))
+    requested_by: Mapped[int] = mapped_column(BigInteger)
+    status: Mapped[str] = mapped_column(Text, server_default=text("'pending'"))
+    result: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[float] = mapped_column(Double)
+    finished_at: Mapped[float | None] = mapped_column(Double)

@@ -24,7 +24,16 @@ from ..core.logic import (
     valid_profile_image,
 )
 from ..integrations.telegram import TelegramError
-from .common import COLOR, esc, is_staff, priority_label, respond, telegram_notify, translator
+from .common import (
+    COLOR,
+    audit,
+    esc,
+    is_staff,
+    priority_label,
+    respond,
+    telegram_notify,
+    translator,
+)
 from .tickets import (
     TicketPanel,
     apply_priority,
@@ -96,6 +105,9 @@ async def setup(interaction: discord.Interaction, staff_role: discord.Role,
         )
         return
     await db.save_guild(guild.id, panel_channel=panel_channel.id, panel_message=message.id)
+    await audit(interaction, "setup", staff_role=staff_role.id, category=category.id,
+                log_channel=log_channel.id, panel_channel=panel_channel.id,
+                archive_channel=archive_channel.id if archive_channel else None)
     await interaction.response.send_message(
         _("setup.done", channel=panel_channel.mention, language=LANGUAGES[lang]), ephemeral=True
     )
@@ -182,6 +194,8 @@ async def mytickets(interaction: discord.Interaction, member: discord.Member | N
         await interaction.response.send_message(_("mytickets.staff_only"), ephemeral=True)
         return
     tickets = await db.tickets_of_user(interaction.guild.id, target.id)
+    if member is not None and target.id != interaction.user.id:
+        await audit(interaction, "tickets.view_member", f"user:{target.id}")
     title = (_("mytickets.title_member", user=target.display_name) if member
              else _("mytickets.title"))
     await interaction.response.send_message(embed=ticket_history_embed(tickets, title, _),
@@ -202,6 +216,7 @@ async def available(interaction: discord.Interaction, enabled: bool):
         return
     db = interaction.client.db
     await db.set_available(interaction.guild.id, interaction.user.id, enabled)
+    await audit(interaction, "staff.available", enabled=enabled)
     text = _("available.on") if enabled else _("available.off")
     if enabled and not cfg.get("auto_assign"):
         text += "\n" + _("available.feature_off")
@@ -232,11 +247,12 @@ async def add(interaction: discord.Interaction, user: discord.Member):
     ctx = await get_context(interaction, staff=True)
     if ctx is None:
         return
-    _ = ctx[1]
+    _, ticket = ctx[1], ctx[2]
     await interaction.channel.set_permissions(
         user, view_channel=True, send_messages=True, attach_files=True,
         read_message_history=True,
     )
+    await audit(interaction, "ticket.add_member", f"ticket:{ticket['id']}", user=user.id)
     await interaction.response.send_message(_("member.added", user=user.mention))
 
 
@@ -252,6 +268,7 @@ async def remove(interaction: discord.Interaction, user: discord.Member):
         await interaction.response.send_message(_("member.cant_remove_owner"), ephemeral=True)
         return
     await interaction.channel.set_permissions(user, overwrite=None)
+    await audit(interaction, "ticket.remove_member", f"ticket:{ticket['id']}", user=user.id)
     await interaction.response.send_message(_("member.removed", user=user.mention))
 
 
@@ -302,6 +319,7 @@ class NoteGroup(app_commands.Group):
             return
         _, ticket = ctx[1], ctx[2]
         await interaction.client.db.add_note(ticket["id"], interaction.user.id, text, time.time())
+        await audit(interaction, "ticket.note", f"ticket:{ticket['id']}")
         await interaction.response.send_message(_("note.added"), ephemeral=True)
 
     @app_commands.command(name="list", description="Show the private notes of this ticket")
@@ -332,6 +350,39 @@ PERIOD_CHOICES = [
     app_commands.Choice(name="Last 90 days", value="90"),
     app_commands.Choice(name="All time", value="all"),
 ]
+
+
+def audit_lines(entries: list[dict], _) -> list[str]:
+    lines = []
+    for e in entries:
+        who = f"<@{e['actor_id']}>" if e["actor_id"] else _("audit.system")
+        source = "" if e["source"] == "discord" else f" ({e['source']})"
+        target = f" · `{e['target']}`" if e["target"] else ""
+        lines.append(f"<t:{int(e['created_at'])}:R> · {who}{source} · **{e['action']}**{target}")
+    return lines
+
+
+@app_commands.command(name="audit", description="Show the latest actions done in this server")
+@app_commands.guild_only()
+@admin_only
+@app_commands.describe(member="Only the actions of this member")
+async def audit_log(interaction: discord.Interaction, member: discord.Member | None = None):
+    ctx = await require_setup(interaction)
+    if ctx is None:
+        return
+    _ = ctx[1]
+    entries = await interaction.client.db.audit_entries(interaction.guild.id, limit=200)
+    if member is not None:
+        entries = [e for e in entries if e["actor_id"] == member.id]
+    embed = discord.Embed(title=_("audit.title"), color=COLOR)
+    description = ""
+    for line in audit_lines(entries[:config.AUDIT_SHOWN], _):
+        if len(description) + len(line) + 1 > 4000:     # Discord: 4096 characters
+            break
+        description += line + "\n"
+    embed.description = description.strip() or _("audit.none")
+    embed.set_footer(text=_("audit.footer", days=config.AUDIT_KEEP_DAYS))
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 @app_commands.command(name="stats", description="Show ticket statistics")
@@ -428,6 +479,7 @@ async def export_stats(interaction: discord.Interaction,
     if len(data) > guild.filesize_limit:
         await interaction.followup.send(_("export.too_big"), ephemeral=True)
         return
+    await audit(interaction, "data.export", period=key, format=kind, tickets=len(rows))
     day = datetime.now(UTC).strftime("%Y%m%d")
     filename = f"tickets-{key}-{day}.{kind}"
     await interaction.followup.send(
@@ -492,6 +544,7 @@ class SettingsGroup(app_commands.Group):
         if ctx is None:
             return
         cfg = await interaction.client.db.save_guild(interaction.guild.id, language=language.value)
+        await audit(interaction, "settings.language", value=language.value)
         _ = translator(cfg)
         await interaction.response.send_message(
             _("settings.language_set", language=language.name), ephemeral=True
@@ -510,6 +563,7 @@ class SettingsGroup(app_commands.Group):
         if ctx is None:
             return
         cfg = await interaction.client.db.save_guild(interaction.guild.id, retention_days=days)
+        await audit(interaction, "settings.retention", value=days)
         _ = translator(cfg)
         await interaction.response.send_message(_("settings.retention_set", days=days),
                                                 ephemeral=True)
@@ -524,6 +578,7 @@ class SettingsGroup(app_commands.Group):
             return
         cfg = await interaction.client.db.save_guild(interaction.guild.id,
                                                staff_reminders=enabled)
+        await audit(interaction, "settings.reminders", value=enabled)
         _ = translator(cfg)
         await interaction.response.send_message(
             _("settings.reminders_on") if enabled else _("settings.reminders_off"),
@@ -539,6 +594,7 @@ class SettingsGroup(app_commands.Group):
             return
         _ = ctx[1]
         await interaction.client.db.save_guild(interaction.guild.id, auto_assign=enabled)
+        await audit(interaction, "settings.autoassign", value=enabled)
         await interaction.response.send_message(
             _("settings.autoassign_set_on") if enabled else _("settings.autoassign_set_off"),
             ephemeral=True)
@@ -553,6 +609,7 @@ class SettingsGroup(app_commands.Group):
             return
         _ = ctx[1]
         await interaction.client.db.save_guild(interaction.guild.id, ticket_cooldown=minutes)
+        await audit(interaction, "settings.cooldown", value=minutes)
         await interaction.response.send_message(
             _("settings.cooldown_set", time=format_duration(minutes * 60)) if minutes
             else _("settings.cooldown_off"), ephemeral=True)
@@ -567,6 +624,7 @@ class SettingsGroup(app_commands.Group):
         _ = ctx[1]
         await interaction.client.db.save_guild(interaction.guild.id,
                                          archive_channel=channel.id if channel else None)
+        await audit(interaction, "settings.archive", value=channel.id if channel else None)
         await interaction.response.send_message(
             _("settings.archive_set", channel=channel.mention) if channel
             else _("settings.archive_off"), ephemeral=True
@@ -634,6 +692,7 @@ class BlockGroup(app_commands.Group):
         until = now + seconds if seconds else None
         await db.block_user(interaction.guild.id, member.id, reason, interaction.user.id, now,
                             until)
+        await audit(interaction, "block.add", f"user:{member.id}", until=until, reason=reason)
 
         when = _("block.until", time=f"<t:{int(until)}:f>") if until else _("block.permanent")
         text = _("block.added", user=member.mention, when=when)
@@ -661,6 +720,7 @@ class BlockGroup(app_commands.Group):
             await interaction.response.send_message(_("block.not_blocked", user=member.mention),
                                                     ephemeral=True)
             return
+        await audit(interaction, "block.remove", f"user:{member.id}")
         await interaction.response.send_message(_("block.removed", user=member.mention),
                                                 ephemeral=True)
         await log_event(interaction.guild, cfg, _("block.log_removed",
@@ -769,6 +829,7 @@ class QuestionsGroup(app_commands.Group):
                                    (example or "").strip(),
                                    long=bool(length and length.value == "long"),
                                    required=required)
+        await audit(interaction, "type.question_add", f"type:{type}", position=position)
         await interaction.response.send_message(
             _("questions.added", number=position, question=question.strip(),
               type=f"{ticket_type['emoji']} {ticket_type['label']}"), ephemeral=True)
@@ -783,6 +844,7 @@ class QuestionsGroup(app_commands.Group):
         if ticket_type is None:
             return
         if await interaction.client.db.remove_question(interaction.guild.id, type, number):
+            await audit(interaction, "type.question_remove", f"type:{type}", position=number)
             text = _("questions.removed", number=number,
                      type=f"{ticket_type['emoji']} {ticket_type['label']}")
         else:
@@ -838,6 +900,7 @@ class TypesGroup(app_commands.Group):
             n += 1
         await db.add_type(interaction.guild.id, key, name.strip(), emoji.strip(),
                     (description or "").strip())
+        await audit(interaction, "type.add", f"type:{key}", label=name.strip())
         await interaction.response.send_message(
             _("types.added", type=f"{emoji} {name}", key=key), ephemeral=True)
         await refresh_panel(interaction.client, interaction.guild, cfg)
@@ -873,6 +936,7 @@ class TypesGroup(app_commands.Group):
             await interaction.response.send_message(_("types.nothing"), ephemeral=True)
             return
         await db.update_type(interaction.guild.id, type, **changes)
+        await audit(interaction, "type.edit", f"type:{type}", **changes)
         updated = await db.get_type(interaction.guild.id, type)
         await interaction.response.send_message(
             _("types.edited", type=f"{updated['emoji']} {updated['label']}"), ephemeral=True)
@@ -896,6 +960,7 @@ class TypesGroup(app_commands.Group):
             await interaction.response.send_message(_("types.last"), ephemeral=True)
             return
         await db.remove_type(interaction.guild.id, type)
+        await audit(interaction, "type.remove", f"type:{type}")
         await interaction.response.send_message(
             _("types.removed", type=f"{target['emoji']} {target['label']}"), ephemeral=True)
         await refresh_panel(interaction.client, interaction.guild, cfg)
@@ -972,6 +1037,7 @@ class TelegramGroup(app_commands.Group):
                                                         ephemeral=True)
             return
         cfg = await client.db.save_guild(interaction.guild.id, telegram_chat_id=pending["chat_id"])
+        await audit(interaction, "telegram.link", chat=pending["chat_id"])
         client.pending_links.pop(interaction.guild.id, None)
         await interaction.response.send_message(_("tg.linked"), ephemeral=True)
         await telegram_notify(client, cfg, _("tg.linked_chat",
@@ -1009,6 +1075,7 @@ class TelegramGroup(app_commands.Group):
             return
         _ = ctx[1]
         await interaction.client.db.save_guild(interaction.guild.id, telegram_chat_id=None)
+        await audit(interaction, "telegram.unlink")
         interaction.client.pending_links.pop(interaction.guild.id, None)
         await interaction.response.send_message(_("tg.unlinked"), ephemeral=True)
 
@@ -1071,6 +1138,7 @@ class ReplyModal(discord.ui.Modal):
                 _("replies.too_many", max=config.MAX_REPLIES), ephemeral=True)
             return
         await db.save_reply(interaction.guild.id, self.name, self.content.value)
+        await audit(interaction, "reply.save", f"reply:{self.name}")
         preview = fill_reply(self.content.value, user="@User", staff="@Staff",
                              server=interaction.guild.name)
         await interaction.response.send_message(
@@ -1141,6 +1209,7 @@ class RepliesGroup(app_commands.Group):
         db = interaction.client.db
         _ = translator(await db.get_guild(interaction.guild.id))
         if await db.remove_reply(interaction.guild.id, name):
+            await audit(interaction, "reply.remove", f"reply:{name.lower()}")
             await interaction.response.send_message(_("replies.removed", name=name.lower()),
                                                     ephemeral=True)
         else:
@@ -1171,6 +1240,7 @@ class ProfileGroup(app_commands.Group):
             await interaction.followup.send(_("profile.failed", error=(e.text or str(e))[:300]),
                                             ephemeral=True)
         else:
+            await audit(interaction, "profile.change", fields=sorted(changes))
             await interaction.followup.send(done, ephemeral=True)
 
     async def _image(self, interaction: discord.Interaction, image: discord.Attachment):
@@ -1222,6 +1292,6 @@ class ProfileGroup(app_commands.Group):
 
 
 def all_commands() -> list:
-    return [setup, guidelines, queue, mytickets, available, add, remove, close, reopen,
+    return [setup, guidelines, audit_log, queue, mytickets, available, add, remove, close, reopen,
             priority, transfer, stats, export_stats, reply, NoteGroup(), SettingsGroup(),
             TypesGroup(), TelegramGroup(), ProfileGroup(), RepliesGroup(), BlockGroup()]

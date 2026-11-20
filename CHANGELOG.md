@@ -52,6 +52,16 @@
 - **Key rotation**: with the new key in `ENCRYPTION_KEY` and the old one in
   `ENCRYPTION_OLD_KEYS`, the bot re-encrypts everything at start (or run
   `python -m ticketbot db encrypt`)
+- **Audit log**: settings, ticket types and questions, quick replies, blocks, Telegram
+  links, profile changes, ticket opening, claim, priority, transfer, members, notes,
+  closing, reopening, deletion, ratings, exports and views of another member's tickets
+  are recorded with who, when and the source (discord, web, system). Details and IP
+  addresses are encrypted; entries are kept 365 days and deleted with the server's
+  data. `/audit` shows the latest 25 to the admins, optionally for one member
+- **Queue of actions from the web dashboard** (`bot_commands`): the dashboard of Beta3
+  will ask the bot to close a ticket or refresh the panel and the guidelines; the bot
+  checks the queue every 3 seconds, checks the permissions again and records the result.
+  Commands interrupted by a restart are retried
 - `python -m ticketbot db copy <url>` copies all the data to an empty database, e.g. from
   SQLite to PostgreSQL: schema and data in one transaction, same ids, PostgreSQL id
   sequences continued after the copied tickets and notes, row counts checked for every

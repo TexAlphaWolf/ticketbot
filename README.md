@@ -48,6 +48,9 @@ Available in **English**, **Italian** and **German**.
   `/settings cooldown`; staff members are never blocked
 - **Private notes** visible only to the staff and included in the staff transcript
 - **Reopen**: closed tickets stay available for 12 hours before the channel is deleted
+- **Audit log**: every action that changes something (settings, types, blocks, claims,
+  transfers, closings, exports...) is recorded with who did it, when and from where
+  (Discord, the web dashboard or the bot itself); admins see the latest with `/audit`
 - **Statistics** with `/stats`: tickets per type and priority, average first response and
   resolution time, ratings and a staff leaderboard, per period or per staff member
 - **Export** with `/export`: download the tickets of a period as an **Excel** file (with a
@@ -254,6 +257,7 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 | Command | Who | What it does |
 |---|---|---|
 | `/setup` | Admin | Sets up the ticket system and posts the panel |
+| `/audit member` | Admin | Shows the latest actions done in the server (who, what, when) |
 | `/guidelines` | Admin | Posts and pins the priority guidelines in the log channel |
 | `/settings show` / `language` / `retention` / `archive` / `reminders` / `cooldown` / `autoassign` | Admin | Shows or changes the settings |
 | `/types list` / `add` / `edit` / `remove` | Admin | Manages the ticket types |
@@ -291,12 +295,12 @@ ticketbot/
 │   ├── models.py        # V3 tables (SQLAlchemy 2)
 │   ├── engine.py        # async engine: SQLite or PostgreSQL
 │   ├── migrate.py       # runs the Alembic migrations
-│   ├── migrations/      # numbered schema changes
 │   ├── store.py         # async queries used by the bot
 │   ├── v2.py            # recognises and adopts TicketBot 2 databases
 │   ├── transfer.py      # copies all the data to another database
 │   ├── types.py         # encrypted text column
 │   ├── encryption.py    # encrypts old data, re-encrypts after a key change
+│   ├── migrations/      # 0001 = v2.3 schema, 0002 = audit log and web command queue
 │   ├── backup.py        # backups and restore
 │   └── legacy.py        # v1 config.json import
 ├── bot/

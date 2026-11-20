@@ -30,7 +30,15 @@ from ..db.migrate import prepare
 from ..integrations.telegram import TelegramError, TelegramNotifier
 from .commands import all_commands
 from .common import channel_url, esc, is_staff, priority_label, telegram_notify, translator
-from .tickets import ClosedControls, RatingButton, TicketControls, TicketPanel, close_ticket
+from .tickets import (
+    ClosedControls,
+    RatingButton,
+    TicketControls,
+    TicketPanel,
+    close_ticket,
+    refresh_guidelines,
+    refresh_panel,
+)
 from .translator import CommandTranslator
 
 
@@ -73,8 +81,12 @@ class TicketBot(discord.Client):
                 self._telegram_poller = asyncio.create_task(notifier.poll_forever())
                 print(f"[telegram] connected as @{notifier.username}")
 
+        retried = await self.db.reset_running_commands()
+        if retried:
+            print(f"[web] {retried} interrupted command(s) will be retried")
         self.maintenance.start()
         self.hourly_cleanup.start()
+        self.web_commands.start()
 
     async def close(self):
         if self._telegram_poller is not None:
@@ -90,6 +102,8 @@ class TicketBot(discord.Client):
         for guild_id in await self.db.guild_ids():
             if guild_id not in current:
                 await self.db.delete_guild(guild_id)
+                await self.db.audit(None, None, "guild.removed", source="system",
+                                    target=f"guild:{guild_id}")
                 self.pending_links.pop(guild_id, None)
                 print(f"Not in server {guild_id} anymore: server data deleted")
         print(f"TicketBot {__version__} online as {self.user} in {len(self.guilds)} server(s)")
@@ -114,11 +128,15 @@ class TicketBot(discord.Client):
         if ticket["status"] != config.STATUS_CLOSED:
             await self.db.update_ticket(ticket["id"], status=config.STATUS_CLOSED,
                                   closed_at=time.time(), close_reason="Channel deleted")
+            await self.db.audit(ticket["guild_id"], None, "ticket.channel_deleted",
+                                source="system", target=f"ticket:{ticket['id']}")
         await self.db.mark_channel_deleted(ticket["id"])
 
     async def on_guild_remove(self, guild: discord.Guild):
         # The bot was removed from a server: delete all the data stored for it
         if await self.db.delete_guild(guild.id):
+            await self.db.audit(None, None, "guild.removed", source="system",
+                                target=f"guild:{guild.id}")
             print(f"Removed from {guild.name}: server data deleted")
         self.pending_links.pop(guild.id, None)
 
@@ -237,12 +255,58 @@ class TicketBot(discord.Client):
                 await self.db.delete_transcript_ref(ref["channel_id"], ref["message_id"])
         # Old closed tickets used only for /stats
         await self.db.purge_expired_blocks(now)
+        await self.db.purge_audit_before(now - config.AUDIT_KEEP_DAYS * 86400)
+        await self.db.purge_finished_commands(now - config.COMMANDS_KEEP_DAYS * 86400)
         purged = await self.db.purge_closed_before(now - config.STATS_KEEP_DAYS * 86400)
         if purged:
             print(f"Purged {purged} old closed ticket(s)")
 
+    # ------------------------------------------------- commands from the web ---
+
+    @tasks.loop(seconds=config.WEB_COMMAND_POLL_SECONDS)
+    async def web_commands(self):
+        for command in await self.db.take_commands():
+            try:
+                result = await self.run_web_command(command)
+            except Exception as e:  # noqa: BLE001 - one failed command must not stop the loop
+                await self.db.finish_command(command["id"], False, f"{type(e).__name__}: {e}")
+            else:
+                await self.db.finish_command(command["id"], True, result)
+
+    async def run_web_command(self, command: dict) -> str:
+        """Carry out an action asked from the web dashboard. Returns a short result."""
+        guild = self.get_guild(command["guild_id"])
+        cfg = await self.db.get_guild(command["guild_id"])
+        if guild is None or cfg is None:
+            raise RuntimeError("the bot is not in this server anymore")
+        payload, kind = command["payload"], command["kind"]
+        if kind == "panel.refresh":
+            await refresh_panel(self, guild, cfg)
+        elif kind == "guidelines.refresh":
+            await refresh_guidelines(guild, cfg)
+        elif kind == "ticket.close":
+            ticket = await self.db.get_ticket(int(payload["ticket_id"]))
+            if ticket is None or ticket["guild_id"] != guild.id:
+                raise RuntimeError("ticket not found")
+            if ticket["status"] == config.STATUS_CLOSED or ticket["channel_deleted"]:
+                return "already closed"
+            channel = guild.get_channel(ticket["channel_id"])
+            if channel is None:
+                raise RuntimeError("the ticket channel doesn't exist anymore")
+            member = guild.get_member(command["requested_by"])
+            if member is None:
+                member = await guild.fetch_member(command["requested_by"])
+            if not is_staff(member, cfg):
+                raise RuntimeError("only staff members can close tickets")
+            reason = (payload.get("reason") or "").strip() or translator(cfg)("close.reason_staff")
+            await close_ticket(self, channel, ticket, member, reason[:500], source="web")
+        else:
+            raise RuntimeError(f"unknown command {kind!r}")
+        return "ok"
+
     @maintenance.before_loop
     @hourly_cleanup.before_loop
+    @web_commands.before_loop
     async def before_loops(self):
         await self.wait_until_ready()
 

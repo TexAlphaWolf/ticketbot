@@ -5,6 +5,8 @@ Every method is one short transaction and returns plain dicts, like the v2 Datab
 so the bot logic did not have to change. The same code runs on SQLite and PostgreSQL.
 """
 
+import json
+import time
 from pathlib import Path
 
 from sqlalchemy import Table, and_, delete, func, insert, or_, select, update
@@ -17,6 +19,7 @@ T: dict[str, Table] = Base.metadata.tables
 GUILDS, TYPES, QUESTIONS = T["guilds"], T["ticket_types"], T["type_questions"]
 TICKETS, NOTES, REPLIES = T["tickets"], T["notes"], T["replies"]
 STAFF, BLOCKS, REFS = T["staff_availability"], T["blocked_users"], T["transcript_refs"]
+AUDIT, COMMANDS = T["audit_log"], T["bot_commands"]
 
 GUILD_FIELDS = {c.name for c in GUILDS.columns} - {"guild_id"}
 TYPE_FIELDS = {"label", "emoji", "description", "position"}
@@ -93,7 +96,11 @@ class Store:
         return await self.get_guild(guild_id)
 
     async def delete_guild(self, guild_id: int) -> bool:
-        return await self._write(delete(GUILDS).where(GUILDS.c.guild_id == guild_id)) > 0
+        """All the data of a server: its tables cascade, the audit log is removed too."""
+        async with self.engine.begin() as conn:
+            await conn.execute(delete(AUDIT).where(AUDIT.c.guild_id == guild_id))
+            result = await conn.execute(delete(GUILDS).where(GUILDS.c.guild_id == guild_id))
+            return result.rowcount > 0
 
     async def next_ticket_number(self, guild_id: int) -> int:
         async with self.engine.begin() as conn:
@@ -357,3 +364,73 @@ class Store:
     async def delete_transcript_ref(self, channel_id: int, message_id: int) -> None:
         await self._write(delete(REFS).where(REFS.c.channel_id == channel_id,
                                              REFS.c.message_id == message_id))
+
+    # -------------------------------------------------------- audit log ---
+
+    async def audit(self, guild_id: int | None, actor_id: int | None, action: str, *,
+                    source: str = "discord", target: str | None = None,
+                    details: dict | None = None, ip: str | None = None,
+                    now: float | None = None) -> None:
+        await self._write(insert(AUDIT).values(
+            guild_id=guild_id, actor_id=actor_id, source=source, action=action,
+            target=target, ip=ip, created_at=now if now is not None else time.time(),
+            details=json.dumps(details, ensure_ascii=False, default=str) if details else None))
+
+    async def audit_entries(self, guild_id: int, limit: int = 50,
+                            before_id: int | None = None) -> list[dict]:
+        """Newest first; pass the last id seen as before_id for the next page."""
+        stmt = select(AUDIT).where(AUDIT.c.guild_id == guild_id)
+        if before_id is not None:
+            stmt = stmt.where(AUDIT.c.id < before_id)
+        rows = await self._all(stmt.order_by(AUDIT.c.id.desc()).limit(limit))
+        for row in rows:
+            row["details"] = json.loads(row["details"]) if row["details"] else {}
+        return rows
+
+    async def purge_audit_before(self, before: float) -> int:
+        return await self._write(delete(AUDIT).where(AUDIT.c.created_at < before))
+
+    # ----------------------------------------------- commands from the web ---
+
+    async def enqueue_command(self, guild_id: int, kind: str, requested_by: int,
+                              payload: dict | None = None) -> int:
+        async with self.engine.begin() as conn:
+            result = await conn.execute(insert(COMMANDS).values(
+                guild_id=guild_id, kind=kind, requested_by=requested_by,
+                payload=json.dumps(payload or {}, ensure_ascii=False),
+                created_at=time.time()).returning(COMMANDS.c.id))
+            return result.scalar_one()
+
+    async def take_commands(self, limit: int = 20) -> list[dict]:
+        """Pending commands, oldest first, marked as running so nobody else takes them."""
+        taken = []
+        async with self.engine.begin() as conn:
+            rows = (await conn.execute(
+                select(COMMANDS).where(COMMANDS.c.status == "pending")
+                .order_by(COMMANDS.c.id).limit(limit))).all()
+            for row in rows:
+                claimed = await conn.execute(
+                    update(COMMANDS).where(COMMANDS.c.id == row.id,
+                                           COMMANDS.c.status == "pending")
+                    .values(status="running"))
+                if claimed.rowcount:
+                    item = dict(row._mapping, status="running")
+                    item["payload"] = json.loads(item["payload"]) if item["payload"] else {}
+                    taken.append(item)
+        return taken
+
+    async def finish_command(self, command_id: int, ok: bool, result: str = "") -> None:
+        await self._write(update(COMMANDS).where(COMMANDS.c.id == command_id).values(
+            status="done" if ok else "failed", result=result[:500], finished_at=time.time()))
+
+    async def get_command(self, command_id: int) -> dict | None:
+        return await self._one(select(COMMANDS).where(COMMANDS.c.id == command_id))
+
+    async def reset_running_commands(self) -> int:
+        """At startup: commands left running by a crash are tried again."""
+        return await self._write(update(COMMANDS).where(COMMANDS.c.status == "running")
+                                 .values(status="pending"))
+
+    async def purge_finished_commands(self, before: float) -> int:
+        return await self._write(delete(COMMANDS).where(
+            COMMANDS.c.status.in_(("done", "failed")), COMMANDS.c.finished_at < before))

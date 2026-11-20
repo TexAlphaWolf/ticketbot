@@ -79,6 +79,14 @@ async def telegram_notify(client: "TicketBot", cfg: dict | None, text: str,
         print(f"[telegram] could not notify guild {cfg.get('guild_id')}: {e}")
 
 
+async def audit(interaction: discord.Interaction, action: str, target: str | None = None,
+                **details) -> None:
+    """Record an action done by a member from Discord in the audit log."""
+    await interaction.client.db.audit(
+        interaction.guild.id if interaction.guild else None, interaction.user.id, action,
+        target=target, details={k: v for k, v in details.items() if v is not None} or None)
+
+
 async def respond(interaction: discord.Interaction, content: str | None = None, **kwargs) -> None:
     """Reply to an interaction whether or not it was already answered/deferred."""
     if interaction.response.is_done():

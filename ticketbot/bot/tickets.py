@@ -22,6 +22,7 @@ from .collect import collect_messages
 from .common import (
     COLOR,
     Translate,
+    audit,
     channel_url,
     esc,
     is_staff,
@@ -301,6 +302,8 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
         status=config.STATUS_WAITING, opened_at=now, last_activity=now,
         awaiting_staff_since=now, assigned_to=assignee.id if assignee else None,
     )
+    await audit(interaction, "ticket.open", f"ticket:{ticket_id}", type=ticket_type["key"],
+                assigned_to=assignee.id if assignee else None)
 
     queue = (_("queue.line", waiting=waiting, in_progress=in_progress)
              if waiting or in_progress else _("queue.first"))
@@ -450,6 +453,8 @@ async def apply_priority(interaction: discord.Interaction, level: str, claim: bo
             changes["first_response_at"] = time.time()
     await db.update_ticket(ticket["id"], **changes)
     ticket.update(changes)
+    await audit(interaction, "ticket.claim" if claim else "ticket.priority",
+                f"ticket:{ticket['id']}", priority=level, previous=None if claim else previous)
 
     label = priority_label(_, level)
     if claim:
@@ -492,6 +497,7 @@ async def transfer_ticket(interaction: discord.Interaction, member: discord.Memb
         changes["status"] = config.STATUS_IN_PROGRESS
     await interaction.client.db.update_ticket(ticket["id"], **changes)
     ticket.update(changes)
+    await audit(interaction, "ticket.transfer", f"ticket:{ticket['id']}", to=member.id)
     await interaction.response.send_message(
         _("transfer.done", user=member.mention, by=interaction.user.mention)
     )
@@ -557,7 +563,10 @@ async def set_members_can_write(channel: discord.TextChannel, can_write: bool) -
 
 
 async def close_ticket(client, channel: discord.TextChannel, ticket: dict,
-                       closed_by: discord.abc.User, reason: str) -> None:
+                       closed_by: discord.abc.User, reason: str,
+                       source: str | None = None) -> None:
+    """Close a ticket; `source` is discord/web/system (by default: system if the bot
+    closes it, e.g. for inactivity, else discord)."""
     db = client.db
     guild = channel.guild
     cfg = await db.get_guild(guild.id)
@@ -574,6 +583,10 @@ async def close_ticket(client, channel: discord.TextChannel, ticket: dict,
 
     await db.update_ticket(ticket["id"], status=config.STATUS_CLOSED, closed_at=now,
                      closed_by=closed_by.id, close_reason=reason, warned=False)
+    by_bot = client.user is not None and closed_by.id == client.user.id
+    await db.audit(guild.id, None if by_bot else closed_by.id, "ticket.close",
+                   source=source or ("system" if by_bot else "discord"),
+                   target=f"ticket:{ticket['id']}", details={"reason": reason})
     priority = ticket.get("priority")
 
     embed = discord.Embed(title=_("close.log_title", channel=channel.name),
@@ -691,6 +704,7 @@ async def reopen_ticket(interaction: discord.Interaction) -> None:
         last_actor=None, last_activity=time.time(), warned=False,
         awaiting_staff_since=time.time(), staff_reminded_at=None,
     )
+    await audit(interaction, "ticket.reopen", f"ticket:{ticket['id']}")
     await interaction.response.send_message(_("reopen.done", user=interaction.user.mention))
     if interaction.type == discord.InteractionType.component and interaction.message:
         try:
@@ -710,6 +724,7 @@ async def delete_ticket_now(interaction: discord.Interaction) -> None:
         return
     await interaction.response.send_message(_("delete.deleting"))
     await interaction.client.db.mark_channel_deleted(ticket["id"])
+    await audit(interaction, "ticket.delete", f"ticket:{ticket['id']}")
     await interaction.channel.delete(reason=f"Ticket deleted by {interaction.user}")
 
 
@@ -779,6 +794,8 @@ class RatingModal(discord.ui.Modal):
         comment = self.comment.value.strip() or None
         await db.update_ticket(ticket["id"], rating=self.value, rating_comment=comment,
                          rated_at=time.time())
+        await db.audit(ticket["guild_id"], interaction.user.id, "ticket.rate",
+                       target=f"ticket:{ticket['id']}", details={"rating": self.value})
 
         original = interaction.message.content if interaction.message else ""
         await interaction.response.edit_message(

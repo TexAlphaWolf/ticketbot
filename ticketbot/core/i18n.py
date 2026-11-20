@@ -52,6 +52,10 @@ STRINGS["en"] = {
                    "closed automatically.",
     "queue.line": "**{waiting}** waiting · **{in_progress}** in progress",
     "queue.first": "none, you're first in line!",
+    "audit.title": "🧾 Latest actions",
+    "audit.none": "No actions recorded yet.",
+    "audit.system": "TicketBot",
+    "audit.footer": "Actions are kept for {days} days.",
     "export.col.ticket": "Ticket",
     "export.col.type": "Type",
     "export.col.priority": "Priority",
@@ -400,6 +404,10 @@ STRINGS["it"] = {
                    "chiuso automaticamente.",
     "queue.line": "**{waiting}** in attesa · **{in_progress}** in lavorazione",
     "queue.first": "nessuno, sei il primo della fila!",
+    "audit.title": "🧾 Ultime azioni",
+    "audit.none": "Nessuna azione registrata.",
+    "audit.system": "TicketBot",
+    "audit.footer": "Le azioni vengono conservate per {days} giorni.",
     "export.col.ticket": "Ticket",
     "export.col.type": "Tipo",
     "export.col.priority": "Priorità",
@@ -744,6 +752,10 @@ STRINGS["de"] = {
                    "das Ticket automatisch geschlossen.",
     "queue.line": "**{waiting}** wartend · **{in_progress}** in Bearbeitung",
     "queue.first": "keine, du bist als Erster dran!",
+    "audit.title": "🧾 Letzte Aktionen",
+    "audit.none": "Noch keine Aktionen aufgezeichnet.",
+    "audit.system": "TicketBot",
+    "audit.footer": "Aktionen werden {days} Tage lang gespeichert.",
     "export.col.ticket": "Ticket",
     "export.col.type": "Art",
     "export.col.priority": "Priorität",
@@ -1145,6 +1157,9 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Post and pin the priority guidelines in the log channel":
             "Pubblica e fissa le linee guida sulle priorità nel canale log",
         "Show how many tickets are open right now": "Mostra quanti ticket sono aperti ora",
+        "Show the latest actions done in this server":
+            "Mostra le ultime azioni fatte in questo server",
+        "Only the actions of this member": "Solo le azioni di questo membro",
         "Download the ticket statistics as a file": "Scarica le statistiche dei ticket come file",
         "File type": "Tipo di file",
         "Excel (.xlsx)": "Excel (.xlsx)",
@@ -1291,6 +1306,9 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Post and pin the priority guidelines in the log channel":
             "Prioritäts-Richtlinien im Log-Kanal posten und anpinnen",
         "Show how many tickets are open right now": "Zeigen, wie viele Tickets gerade offen sind",
+        "Show the latest actions done in this server":
+            "Die letzten Aktionen auf diesem Server anzeigen",
+        "Only the actions of this member": "Nur die Aktionen dieses Mitglieds",
         "Download the ticket statistics as a file":
             "Die Ticket-Statistiken als Datei herunterladen",
         "File type": "Dateityp",
