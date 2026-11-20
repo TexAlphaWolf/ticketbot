@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased] - V3 Beta2
+
+### Added
+- **Staff per ticket type**: `/types roles add` and `remove` choose the roles that handle
+  the tickets of a type (e.g. *Bug report* → @Developers). Those roles, instead of the
+  staff role, see the ticket channel, are pinged, can claim, transfer, close and write
+  notes, get the staff reminders, and are the only ones picked by auto-assign. Admins
+  always have access; types without roles keep using the staff role. `/types list`
+  shows who handles each type. Changes are recorded in the audit log
+
 ## [3.0.0-beta.1] - 2026-11-20
 
 First beta of TicketBot V3: new foundations (storage, migrations, encryption, audit log)

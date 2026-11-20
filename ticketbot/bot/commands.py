@@ -852,12 +852,72 @@ class QuestionsGroup(app_commands.Group):
         await interaction.response.send_message(text, ephemeral=True)
 
 
+class TypeRolesGroup(app_commands.Group):
+    """/types roles ...: which roles handle the tickets of a type."""
+
+    def __init__(self):
+        super().__init__(name="roles", description="Roles that handle the tickets of a type")
+
+    async def _type(self, interaction: discord.Interaction, key: str):
+        db = interaction.client.db
+        cfg = await db.get_guild(interaction.guild.id)
+        _ = translator(cfg)
+        ticket_type = await db.get_type(interaction.guild.id, key)
+        if ticket_type is None:
+            await interaction.response.send_message(_("error.type_gone"), ephemeral=True)
+        return ticket_type, cfg, _
+
+    @app_commands.command(name="add",
+                          description="Let a role see and handle the tickets of a type")
+    @app_commands.describe(type="Ticket type", role="Role that handles these tickets")
+    @app_commands.autocomplete(type=type_autocomplete)
+    async def add_role(self, interaction: discord.Interaction, type: str, role: discord.Role):
+        ticket_type, cfg, _ = await self._type(interaction, type)
+        if ticket_type is None:
+            return
+        name = f"{ticket_type['emoji']} {ticket_type['label']}"
+        if role.is_default() or role.managed:
+            await interaction.response.send_message(_("roles.invalid"), ephemeral=True)
+            return
+        if not await interaction.client.db.add_type_role(interaction.guild.id, type, role.id):
+            await interaction.response.send_message(
+                _("roles.exists", role=role.mention, type=name), ephemeral=True)
+            return
+        await audit(interaction, "type.role_add", f"type:{type}", role=role.id)
+        await interaction.response.send_message(
+            _("roles.added", role=role.mention, type=name), ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none())
+
+    @app_commands.command(name="remove", description="Remove a role from a ticket type")
+    @app_commands.describe(type="Ticket type", role="Role to remove")
+    @app_commands.autocomplete(type=type_autocomplete)
+    async def remove_role(self, interaction: discord.Interaction, type: str,
+                          role: discord.Role):
+        ticket_type, cfg, _ = await self._type(interaction, type)
+        if ticket_type is None:
+            return
+        name = f"{ticket_type['emoji']} {ticket_type['label']}"
+        db = interaction.client.db
+        if not await db.remove_type_role(interaction.guild.id, type, role.id):
+            await interaction.response.send_message(
+                _("roles.not_there", role=role.mention, type=name), ephemeral=True,
+                allowed_mentions=discord.AllowedMentions.none())
+            return
+        await audit(interaction, "type.role_remove", f"type:{type}", role=role.id)
+        text = _("roles.removed", role=role.mention, type=name)
+        if not await db.type_roles(interaction.guild.id, type):
+            text += "\n" + _("roles.back_to_staff", staff=f"<@&{cfg['staff_role']}>")
+        await interaction.response.send_message(
+            text, ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
+
+
 class TypesGroup(app_commands.Group):
     def __init__(self):
         super().__init__(name="types", description="Manage the ticket types of this server",
                          guild_only=True,
                          default_permissions=discord.Permissions(administrator=True))
         self.add_command(QuestionsGroup())
+        self.add_command(TypeRolesGroup())
 
     @app_commands.command(name="list", description="Show the ticket types")
     async def list_types(self, interaction: discord.Interaction):
@@ -866,8 +926,13 @@ class TypesGroup(app_commands.Group):
             return
         _ = ctx[1]
         types = await interaction.client.db.list_types(interaction.guild.id)
+        roles = await interaction.client.db.all_type_roles(interaction.guild.id)
         lines = [f"{t['emoji']} **{t['label']}** (`{t['key']}`)"
-                 + (f" – {t['description']}" if t["description"] else "") for t in types]
+                 + (f" – {t['description']}" if t["description"] else "")
+                 + ("\n-# " + _("roles.handled_by",
+                                roles=" ".join(f"<@&{r}>" for r in roles[t["key"]]))
+                    if t["key"] in roles else "")
+                 for t in types]
         embed = discord.Embed(title=_("types.title", count=len(types),
                                       max=config.MAX_TICKET_TYPES),
                               description="\n".join(lines) or "-", color=COLOR)

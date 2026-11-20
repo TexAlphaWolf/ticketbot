@@ -15,6 +15,10 @@ Available in **English**, **Italian** and **German**.
 
 **Tickets**
 - Panel with an **Open ticket** button, a menu of **custom ticket types** and a form
+- **Staff per ticket type**: a type can be handled by its own roles (e.g. *Bug report*
+  by @Developers, *Payments* by @Admins) with `/types roles add`: only those roles and
+  the admins see its tickets, are pinged and can claim them, and auto-assign picks among
+  them; types without roles go to the staff role
 - **Custom questions per type**: up to 3 questions for each ticket type (e.g. *Version*
   and *Steps to reproduce* for bug reports), with short or long answers, required or
   optional, and an example inside the field
@@ -261,6 +265,7 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 | `/guidelines` | Admin | Posts and pins the priority guidelines in the log channel |
 | `/settings show` / `language` / `retention` / `archive` / `reminders` / `cooldown` / `autoassign` | Admin | Shows or changes the settings |
 | `/types list` / `add` / `edit` / `remove` | Admin | Manages the ticket types |
+| `/types roles add` / `remove` | Admin | Chooses the roles that handle the tickets of a type |
 | `/types questions list` / `add` / `remove` | Admin | Manages the custom questions of a ticket type |
 | `/telegram link` / `verify` / `status` / `test` / `unlink` | Admin | Manages Telegram notifications |
 | `/profile name` / `avatar` / `banner` / `bio` / `reset` | Admin | Changes the bot's profile in this server only |
@@ -300,7 +305,7 @@ ticketbot/
 │   ├── transfer.py      # copies all the data to another database
 │   ├── types.py         # encrypted text column
 │   ├── encryption.py    # encrypts old data, re-encrypts after a key change
-│   ├── migrations/      # 0001 = v2.3 schema, 0002 = audit log and web command queue
+│   ├── migrations/      # numbered schema changes (0001 = the v2.3 schema)
 │   ├── backup.py        # backups and restore
 │   └── legacy.py        # v1 config.json import
 ├── bot/

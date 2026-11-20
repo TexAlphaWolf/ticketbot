@@ -29,7 +29,16 @@ from ..db.legacy import migrate_legacy_config
 from ..db.migrate import prepare
 from ..integrations.telegram import TelegramError, TelegramNotifier
 from .commands import all_commands
-from .common import channel_url, esc, is_staff, priority_label, telegram_notify, translator
+from .common import (
+    channel_url,
+    esc,
+    is_staff,
+    is_ticket_staff,
+    priority_label,
+    staff_mentions,
+    telegram_notify,
+    translator,
+)
 from .tickets import (
     ClosedControls,
     RatingButton,
@@ -192,10 +201,9 @@ class TicketBot(discord.Client):
         priority = priority_label(_, ticket.get("priority"))
         if ticket.get("claimed_by") or ticket.get("assigned_to"):
             target = f"<@{ticket.get('claimed_by') or ticket['assigned_to']}>"
-        elif cfg.get("staff_role"):
-            target = f"<@&{cfg['staff_role']}>"
         else:
-            target = ""
+            target = staff_mentions(
+                cfg, await self.db.type_roles(ticket["guild_id"], ticket["type_key"]))
         await channel.send(
             _("reminder.channel", target=target, waited=waited, priority=priority,
               hours=staff_reply_hours(ticket.get("priority"))).strip(),
@@ -296,7 +304,8 @@ class TicketBot(discord.Client):
             member = guild.get_member(command["requested_by"])
             if member is None:
                 member = await guild.fetch_member(command["requested_by"])
-            if not is_staff(member, cfg):
+            type_roles = await self.db.type_roles(guild.id, ticket["type_key"])
+            if not is_ticket_staff(member, cfg, type_roles):
                 raise RuntimeError("only staff members can close tickets")
             reason = (payload.get("reason") or "").strip() or translator(cfg)("close.reason_staff")
             await close_ticket(self, channel, ticket, member, reason[:500], source="web")

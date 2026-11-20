@@ -52,6 +52,14 @@ STRINGS["en"] = {
                    "closed automatically.",
     "queue.line": "**{waiting}** waiting · **{in_progress}** in progress",
     "queue.first": "none, you're first in line!",
+    "roles.added": "✅ {role} now sees and handles the {type} tickets. "
+        "New tickets of this type are shown only to their roles and to the admins.",
+    "roles.exists": "{role} already handles the {type} tickets.",
+    "roles.removed": "🗑️ {role} no longer handles the {type} tickets.",
+    "roles.not_there": "{role} doesn't handle the {type} tickets.",
+    "roles.back_to_staff": "No roles left: new tickets of this type go to {staff} again.",
+    "roles.invalid": "❌ Choose a normal role (not @everyone or a bot's role).",
+    "roles.handled_by": "Handled by {roles}",
     "audit.title": "🧾 Latest actions",
     "audit.none": "No actions recorded yet.",
     "audit.system": "TicketBot",
@@ -404,6 +412,15 @@ STRINGS["it"] = {
                    "chiuso automaticamente.",
     "queue.line": "**{waiting}** in attesa · **{in_progress}** in lavorazione",
     "queue.first": "nessuno, sei il primo della fila!",
+    "roles.added": "✅ {role} ora vede e gestisce i ticket {type}. "
+        "I nuovi ticket di questo tipo vengono mostrati solo ai suoi ruoli e agli admin.",
+    "roles.exists": "{role} gestisce già i ticket {type}.",
+    "roles.removed": "🗑️ {role} non gestisce più i ticket {type}.",
+    "roles.not_there": "{role} non gestisce i ticket {type}.",
+    "roles.back_to_staff": "Non ci sono più ruoli: i nuovi ticket di questo tipo tornano a "
+        "{staff}.",
+    "roles.invalid": "❌ Scegli un ruolo normale (non @everyone o il ruolo di un bot).",
+    "roles.handled_by": "Gestito da {roles}",
     "audit.title": "🧾 Ultime azioni",
     "audit.none": "Nessuna azione registrata.",
     "audit.system": "TicketBot",
@@ -752,6 +769,16 @@ STRINGS["de"] = {
                    "das Ticket automatisch geschlossen.",
     "queue.line": "**{waiting}** wartend · **{in_progress}** in Bearbeitung",
     "queue.first": "keine, du bist als Erster dran!",
+    "roles.added": "✅ {role} sieht und bearbeitet jetzt die {type}-Tickets. "
+        "Neue Tickets dieser Art sehen nur ihre Rollen und die Admins.",
+    "roles.exists": "{role} bearbeitet die {type}-Tickets bereits.",
+    "roles.removed": "🗑️ {role} bearbeitet die {type}-Tickets nicht mehr.",
+    "roles.not_there": "{role} bearbeitet die {type}-Tickets nicht.",
+    "roles.back_to_staff": "Keine Rollen mehr: Neue Tickets dieser Art gehen wieder an "
+        "{staff}.",
+    "roles.invalid": "❌ Wähle eine normale Rolle (nicht @everyone oder die Rolle eines "
+        "Bots).",
+    "roles.handled_by": "Bearbeitet von {roles}",
     "audit.title": "🧾 Letzte Aktionen",
     "audit.none": "Noch keine Aktionen aufgezeichnet.",
     "audit.system": "TicketBot",
@@ -1157,6 +1184,12 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Post and pin the priority guidelines in the log channel":
             "Pubblica e fissa le linee guida sulle priorità nel canale log",
         "Show how many tickets are open right now": "Mostra quanti ticket sono aperti ora",
+        "Roles that handle the tickets of a type": "Ruoli che gestiscono i ticket di un tipo",
+        "Let a role see and handle the tickets of a type":
+            "Fai vedere e gestire a un ruolo i ticket di un tipo",
+        "Role that handles these tickets": "Ruolo che gestisce questi ticket",
+        "Remove a role from a ticket type": "Togli un ruolo da un tipo di ticket",
+        "Role to remove": "Ruolo da togliere",
         "Show the latest actions done in this server":
             "Mostra le ultime azioni fatte in questo server",
         "Only the actions of this member": "Solo le azioni di questo membro",
@@ -1306,6 +1339,13 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Post and pin the priority guidelines in the log channel":
             "Prioritäts-Richtlinien im Log-Kanal posten und anpinnen",
         "Show how many tickets are open right now": "Zeigen, wie viele Tickets gerade offen sind",
+        "Roles that handle the tickets of a type":
+            "Rollen, die die Tickets einer Art bearbeiten",
+        "Let a role see and handle the tickets of a type":
+            "Eine Rolle die Tickets einer Art sehen und bearbeiten lassen",
+        "Role that handles these tickets": "Rolle, die diese Tickets bearbeitet",
+        "Remove a role from a ticket type": "Eine Rolle von einer Ticket-Art entfernen",
+        "Role to remove": "Zu entfernende Rolle",
         "Show the latest actions done in this server":
             "Die letzten Aktionen auf diesem Server anzeigen",
         "Only the actions of this member": "Nur die Aktionen dieses Mitglieds",

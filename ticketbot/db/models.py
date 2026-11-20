@@ -96,6 +96,21 @@ class TypeQuestion(Base):
     required: Mapped[bool] = mapped_column(Boolean, server_default=true())
 
 
+class TypeStaffRole(Base):
+    """Roles that handle the tickets of one type (instead of the main staff role)."""
+
+    __tablename__ = "type_staff_roles"
+    __table_args__ = (
+        ForeignKeyConstraint(["guild_id", "type_key"],
+                             ["ticket_types.guild_id", "ticket_types.key"],
+                             ondelete="CASCADE"),
+    )
+
+    guild_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    type_key: Mapped[str] = mapped_column(Text, primary_key=True)
+    role_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+
+
 class Ticket(Base):
     __tablename__ = "tickets"
     __table_args__ = (

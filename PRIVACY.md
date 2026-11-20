@@ -17,7 +17,8 @@ TicketBot only collects the data it needs to run the ticket system.
 **Server configuration**, saved when an admin runs `/setup` and the other admin commands:
 - Server ID and the bot's language for that server
 - IDs of the staff role, ticket category, log, archive and panel channels
-- Custom ticket types (name, emoji and description) and quick replies written by the admins
+- Custom ticket types (name, emoji, description, form questions and the roles that handle
+  them) and quick replies written by the admins
 - Settings such as the transcript retention period and the ticket counter
 - The ID of the Telegram chat linked to the server, if Telegram notifications are enabled
 

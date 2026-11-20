@@ -79,6 +79,25 @@ async def telegram_notify(client: "TicketBot", cfg: dict | None, text: str,
         print(f"[telegram] could not notify guild {cfg.get('guild_id')}: {e}")
 
 
+def is_ticket_staff(member: discord.abc.User, cfg: dict | None,
+                    type_roles: list[int]) -> bool:
+    """Staff for one ticket: the type's roles when the type has some, else the staff
+    role; admins always."""
+    if not type_roles:
+        return is_staff(member, cfg)
+    if cfg is None or not isinstance(member, discord.Member):
+        return False
+    if member.guild_permissions.administrator:
+        return True
+    return any(role.id in type_roles for role in member.roles)
+
+
+def staff_mentions(cfg: dict, type_roles: list[int]) -> str:
+    """Who to ping for a ticket: the type's roles, or the staff role."""
+    roles = type_roles or ([cfg["staff_role"]] if cfg.get("staff_role") else [])
+    return " ".join(f"<@&{r}>" for r in roles)
+
+
 async def audit(interaction: discord.Interaction, action: str, target: str | None = None,
                 **details) -> None:
     """Record an action done by a member from Discord in the audit log."""

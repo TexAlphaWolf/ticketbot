@@ -20,6 +20,7 @@ GUILDS, TYPES, QUESTIONS = T["guilds"], T["ticket_types"], T["type_questions"]
 TICKETS, NOTES, REPLIES = T["tickets"], T["notes"], T["replies"]
 STAFF, BLOCKS, REFS = T["staff_availability"], T["blocked_users"], T["transcript_refs"]
 AUDIT, COMMANDS = T["audit_log"], T["bot_commands"]
+TYPE_ROLES = T["type_staff_roles"]
 
 GUILD_FIELDS = {c.name for c in GUILDS.columns} - {"guild_id"}
 TYPE_FIELDS = {"label", "emoji", "description", "position"}
@@ -149,6 +150,34 @@ class Store:
         if not await self.list_types(guild_id):
             for key, label, emoji, description in defaults:
                 await self.add_type(guild_id, key, label, emoji, description)
+
+    async def type_roles(self, guild_id: int, type_key: str) -> list[int]:
+        """Roles that handle this type; empty = the main staff role."""
+        rows = await self._all(select(TYPE_ROLES.c.role_id)
+                               .where(TYPE_ROLES.c.guild_id == guild_id,
+                                      TYPE_ROLES.c.type_key == type_key)
+                               .order_by(TYPE_ROLES.c.role_id))
+        return [r["role_id"] for r in rows]
+
+    async def all_type_roles(self, guild_id: int) -> dict[str, list[int]]:
+        rows = await self._all(select(TYPE_ROLES).where(TYPE_ROLES.c.guild_id == guild_id)
+                               .order_by(TYPE_ROLES.c.type_key, TYPE_ROLES.c.role_id))
+        found: dict[str, list[int]] = {}
+        for r in rows:
+            found.setdefault(r["type_key"], []).append(r["role_id"])
+        return found
+
+    async def add_type_role(self, guild_id: int, type_key: str, role_id: int) -> bool:
+        """False if the role was already there."""
+        return await self._write(
+            self._insert(TYPE_ROLES).values(guild_id=guild_id, type_key=type_key,
+                                            role_id=role_id)
+            .on_conflict_do_nothing(index_elements=["guild_id", "type_key", "role_id"])) > 0
+
+    async def remove_type_role(self, guild_id: int, type_key: str, role_id: int) -> bool:
+        return await self._write(delete(TYPE_ROLES).where(
+            TYPE_ROLES.c.guild_id == guild_id, TYPE_ROLES.c.type_key == type_key,
+            TYPE_ROLES.c.role_id == role_id)) > 0
 
     async def list_questions(self, guild_id: int, type_key: str) -> list[dict]:
         return await self._all(select(QUESTIONS).where(QUESTIONS.c.guild_id == guild_id,

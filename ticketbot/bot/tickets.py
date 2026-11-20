@@ -26,6 +26,7 @@ from .common import (
     channel_url,
     esc,
     is_staff,
+    is_ticket_staff,
     priority_label,
     respond,
     telegram_notify,
@@ -69,9 +70,10 @@ async def open_problem(db, cfg: dict, member: discord.abc.User, _: Translate) ->
     return None
 
 
-async def pick_assignee(db, guild: discord.Guild, cfg: dict,
-                        owner_id: int) -> discord.Member | None:
-    """Next available staff member for a new ticket (None = ping the staff role)."""
+async def pick_assignee(db, guild: discord.Guild, cfg: dict, owner_id: int,
+                        type_roles: list[int] | None = None) -> discord.Member | None:
+    """Next available staff member for a new ticket (None = ping the staff role).
+    With roles for the ticket's type, only members with one of them are picked."""
     if not cfg.get("auto_assign"):
         return None
     available = await db.available_staff(guild.id)
@@ -86,9 +88,12 @@ async def pick_assignee(db, guild: discord.Guild, cfg: dict,
                 member = None
             except discord.HTTPException:
                 continue
-        if member is None or member.bot or not is_staff(member, cfg):
+        if member is None or member.bot or not is_staff(member, cfg) and not (
+                type_roles and is_ticket_staff(member, cfg, type_roles)):
             await db.set_available(guild.id, user_id, False)  # left the server or the staff
             continue
+        if type_roles and not is_ticket_staff(member, cfg, type_roles):
+            continue  # staff, but not for this type
         return member
     return None
 
@@ -257,6 +262,11 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
     if category is None or staff_role is None:
         await interaction.response.send_message(_("error.bad_setup"), ephemeral=True)
         return
+    # Roles of this type (e.g. Bug -> @Dev) see and handle the ticket instead of the staff
+    type_role_ids = await db.type_roles(guild.id, ticket_type["key"])
+    handlers = [r for r in (guild.get_role(i) for i in type_role_ids) if r is not None]
+    if not handlers:
+        handlers, type_role_ids = [staff_role], []
 
     problem = await open_problem(db, cfg, user, _)  # checked again: the form may stay open a while
     if problem:
@@ -274,10 +284,10 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
         user: discord.PermissionOverwrite(
             view_channel=True, send_messages=True, attach_files=True, read_message_history=True
         ),
-        staff_role: discord.PermissionOverwrite(
+        **{role: discord.PermissionOverwrite(
             view_channel=True, send_messages=True, attach_files=True,
             read_message_history=True, manage_messages=True,
-        ),
+        ) for role in handlers},
         guild.me: discord.PermissionOverwrite(
             view_channel=True, send_messages=True, manage_channels=True,
             read_message_history=True, attach_files=True,
@@ -291,7 +301,7 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
     )
 
     now = time.time()
-    assignee = await pick_assignee(db, guild, cfg, user.id)
+    assignee = await pick_assignee(db, guild, cfg, user.id, type_role_ids)
     if assignee:
         await db.mark_assigned(guild.id, assignee.id, now)
     ticket_id = await db.create_ticket(
@@ -316,7 +326,7 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
         embed.add_field(name=_("field.assigned"), value=assignee.mention)
     embed.set_footer(text=_("open.footer", hours=config.AUTO_CLOSE_HOURS))
 
-    ping = assignee.mention if assignee else staff_role.mention
+    ping = assignee.mention if assignee else " ".join(r.mention for r in handlers)
     control = await channel.send(content=f"{user.mention} {ping}",
                                  embed=embed, view=TicketControls(_))
     await db.update_ticket(ticket_id, control_message=control.id)
@@ -372,7 +382,9 @@ async def get_context(interaction: discord.Interaction, *, staff: bool = False,
     if ticket["status"] == config.STATUS_CLOSED and not allow_closed:
         await respond(interaction, _("error.ticket_closed"), ephemeral=True)
         return None
-    if staff and not is_staff(interaction.user, cfg):
+    if staff and not is_ticket_staff(interaction.user, cfg,
+                                     await db.type_roles(ticket["guild_id"],
+                                                         ticket["type_key"])):
         await respond(interaction, _("error.staff_only"), ephemeral=True)
         return None
     return cfg, _, ticket
@@ -484,7 +496,8 @@ async def transfer_ticket(interaction: discord.Interaction, member: discord.Memb
     if ctx is None:
         return
     cfg, _, ticket = ctx
-    if member.bot or not is_staff(member, cfg):
+    type_roles = await interaction.client.db.type_roles(ticket["guild_id"], ticket["type_key"])
+    if member.bot or not is_ticket_staff(member, cfg, type_roles):
         await interaction.response.send_message(_("transfer.not_staff", user=member.mention),
                                                 ephemeral=True)
         return
