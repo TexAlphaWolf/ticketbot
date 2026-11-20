@@ -50,6 +50,9 @@ Available in **English**, **Italian** and **German**.
 - **Reopen**: closed tickets stay available for 12 hours before the channel is deleted
 - **Statistics** with `/stats`: tickets per type and priority, average first response and
   resolution time, ratings and a staff leaderboard, per period or per staff member
+- **Export** with `/export`: download the tickets of a period as an **Excel** file (with a
+  summary sheet and the staff leaderboard) or as **CSV**; text written by users is
+  protected against spreadsheet formula injection
 
 **Transcripts and feedback**
 - **HTML transcripts** that look like Discord (avatars, colors, embeds, images, code,
@@ -208,6 +211,7 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 | `/available enabled` | Staff | Joins or leaves the auto-assign rotation |
 | `/block add` / `remove` / `list` | Staff | Blocks members from opening tickets |
 | `/stats period member` | Staff | Shows ticket statistics |
+| `/export period format` | Staff | Downloads the tickets of a period as Excel or CSV |
 | `/replies list` / `add` / `edit` / `remove` | Admin | Manages the quick replies |
 | `/reply name` | Staff | Sends a quick reply in the ticket |
 | `/priority level` | Staff | Changes the priority of the ticket |
@@ -229,6 +233,7 @@ ticketbot/
 ├── transcripts.py       # HTML and text transcripts
 ├── db.py                # SQLite storage
 ├── logic.py             # pure functions (auto-close, stats, retention...)
+├── export.py            # Excel and CSV export of the statistics
 ├── i18n.py              # translations (EN / IT / DE)
 ├── telegram_notifier.py # Telegram Bot API client
 ├── migrate.py           # v1 config.json import

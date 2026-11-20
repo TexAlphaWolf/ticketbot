@@ -896,3 +896,68 @@ def test_staff_rotation_in_db(db):
     db.update_ticket(closed, status="closed")
     new_ticket(db, channel_id=4)
     assert db.open_tickets_per_staff(1) == {5: 1, 6: 1}
+
+
+def _export_tickets():
+    base = {"type_label": "Bug", "type_emoji": "🐞", "number": 1, "assigned_to": None,
+            "closed_by": None, "rating_comment": None}
+    return [
+        dict(base, id=1, name="bug-mario-1", owner_id=10, status="closed", priority="high",
+             claimed_by=20, opened_at=1_000_000.0, first_response_at=1_000_600.0,
+             closed_at=1_003_600.0, close_reason="=HYPERLINK(\"http://x\")", rating=5,
+             rating_comment="+great"),
+        dict(base, id=2, name="bug-luigi-1", owner_id=11, status="waiting", priority=None,
+             claimed_by=None, assigned_to=20, opened_at=1_100_000.0, first_response_at=None,
+             closed_at=None, close_reason=None, rating=None),
+    ]
+
+
+def test_safe_text_blocks_formulas():
+    from ticketbot.export import safe_text
+
+    assert safe_text("=1+1") == "'=1+1"
+    assert safe_text("@SUM(A1)") == "'@SUM(A1)"
+    assert safe_text("-2") == "'-2"
+    assert safe_text("normal text") == "normal text"
+    assert safe_text(5) == 5 and safe_text(None) is None
+
+
+def test_export_csv():
+    import csv as _csv
+
+    from ticketbot import export
+
+    _ = lambda key, /, **kw: t("en", key, **kw)  # noqa: E731
+    rows = export.ticket_rows(_export_tickets(), {10: "mario", 20: "mod"}, _)
+    data = export.to_csv(rows, _)
+    assert data.startswith(b"\xef\xbb\xbf")
+    lines = list(_csv.reader(data.decode("utf-8-sig").splitlines()))
+    assert lines[0][:4] == ["Ticket", "Type", "Priority", "Status"]
+    first = dict(zip(lines[0], lines[1], strict=True))
+    assert first["Opened by"] == "mario" and first["Claimed by"] == "mod"
+    assert first["First response (min)"] == "10.0" and first["Resolution (min)"] == "60.0"
+    assert first["Close reason"].startswith("'=") and first["Rating comment"] == "'+great"
+    second = dict(zip(lines[0], lines[2], strict=True))
+    assert second["Opened by"] == "11" and second["Assigned to"] == "mod"
+    assert second["Status"] == "Waiting" and second["Priority"] == "Not set"
+    assert second["Resolution (min)"] == ""
+
+
+def test_export_xlsx():
+    import io as _io
+
+    openpyxl = pytest.importorskip("openpyxl")
+    from ticketbot import export
+
+    _ = lambda key, /, **kw: t("it", key, **kw)  # noqa: E731
+    tickets = _export_tickets()
+    rows = export.ticket_rows(tickets, {20: "mod"}, _)
+    wb = openpyxl.load_workbook(_io.BytesIO(export.to_xlsx(rows, tickets, {20: "mod"},
+                                                           "ultimi 30 giorni", _)))
+    assert wb.sheetnames == ["Ticket", "Riepilogo"]
+    ws = wb["Ticket"]
+    assert ws.max_row == 3 and ws["A2"].value == "bug-mario-1"
+    assert ws["J2"].value.year == 1970  # real dates, not text
+    assert ws["O2"].value.startswith("'=")
+    summary = {r[0]: r[1] for r in wb["Riepilogo"].iter_rows(values_only=True) if r and r[0]}
+    assert summary["Aperti"] == 2 and summary["Chiusi"] == 1 and summary["mod"] == 1

@@ -1,13 +1,15 @@
 """Slash commands."""
 
+import io
 import re
 import secrets
 import time
+from datetime import datetime, timezone
 
 import discord
 from discord import app_commands
 
-from . import config
+from . import config, export
 from .common import esc, is_staff, priority_label, respond, telegram_notify, translator
 from .i18n import DEFAULT_TYPES, LANGUAGES
 from .logic import (
@@ -324,15 +326,18 @@ class NoteGroup(app_commands.Group):
 PERIODS = {"7": 7, "30": 30, "90": 90, "all": None}
 
 
-@app_commands.command(name="stats", description="Show ticket statistics")
-@app_commands.guild_only()
-@app_commands.describe(period="Time period", member="Show the statistics of one staff member")
-@app_commands.choices(period=[
+PERIOD_CHOICES = [
     app_commands.Choice(name="Last 7 days", value="7"),
     app_commands.Choice(name="Last 30 days", value="30"),
     app_commands.Choice(name="Last 90 days", value="90"),
     app_commands.Choice(name="All time", value="all"),
-])
+]
+
+
+@app_commands.command(name="stats", description="Show ticket statistics")
+@app_commands.guild_only()
+@app_commands.describe(period="Time period", member="Show the statistics of one staff member")
+@app_commands.choices(period=PERIOD_CHOICES)
 async def stats(interaction: discord.Interaction,
                 period: app_commands.Choice[str] | None = None,
                 member: discord.Member | None = None):
@@ -381,6 +386,54 @@ async def stats(interaction: discord.Interaction,
     if not s["opened"]:
         embed.description = _("stats.empty")
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@app_commands.command(name="export", description="Download the ticket statistics as a file")
+@app_commands.guild_only()
+@app_commands.describe(period="Time period", file_format="File type")
+@app_commands.rename(file_format="format")
+@app_commands.choices(period=PERIOD_CHOICES, file_format=[
+    app_commands.Choice(name="Excel (.xlsx)", value="xlsx"),
+    app_commands.Choice(name="CSV (.csv)", value="csv"),
+])
+async def export_stats(interaction: discord.Interaction,
+                       period: app_commands.Choice[str] | None = None,
+                       file_format: app_commands.Choice[str] | None = None):
+    ctx = await require_setup(interaction)
+    if ctx is None:
+        return
+    cfg, _ = ctx
+    if not is_staff(interaction.user, cfg):
+        await interaction.response.send_message(_("error.staff_only"), ephemeral=True)
+        return
+
+    key = period.value if period else "30"
+    kind = file_format.value if file_format else "xlsx"
+    days = PERIODS[key]
+    guild = interaction.guild
+    tickets = interaction.client.db.tickets_since(guild.id, time.time() - days * 86400
+                                                  if days else 0)
+    if not tickets:
+        await interaction.response.send_message(_("stats.empty"), ephemeral=True)
+        return
+    await interaction.response.defer(ephemeral=True, thinking=True)
+
+    ids = {t[k] for t in tickets for k in ("owner_id", "claimed_by", "assigned_to", "closed_by")
+           if t.get(k)}
+    names = {i: m.name for i in ids if (m := guild.get_member(i)) is not None}
+    rows = export.ticket_rows(tickets, names, _)
+    period_label = _("stats.period." + key)
+    data = (export.to_xlsx(rows, tickets, names, period_label, _) if kind == "xlsx"
+            else export.to_csv(rows, _))
+    if len(data) > guild.filesize_limit:
+        await interaction.followup.send(_("export.too_big"), ephemeral=True)
+        return
+    day = datetime.now(timezone.utc).strftime("%Y%m%d")
+    filename = f"tickets-{key}-{day}.{kind}"
+    await interaction.followup.send(
+        _("export.done", count=len(rows), period=period_label),
+        file=discord.File(io.BytesIO(data), filename=filename), ephemeral=True,
+    )
 
 
 # --------------------------------------------------------------- settings ---
@@ -1168,6 +1221,6 @@ class ProfileGroup(app_commands.Group):
 
 
 def all_commands() -> list:
-    return [setup, guidelines, queue, mytickets, available, add, remove, close, reopen, priority,
-            transfer, stats, reply, NoteGroup(), SettingsGroup(), TypesGroup(), TelegramGroup(),
-            ProfileGroup(), RepliesGroup(), BlockGroup()]
+    return [setup, guidelines, queue, mytickets, available, add, remove, close, reopen,
+            priority, transfer, stats, export_stats, reply, NoteGroup(), SettingsGroup(),
+            TypesGroup(), TelegramGroup(), ProfileGroup(), RepliesGroup(), BlockGroup()]

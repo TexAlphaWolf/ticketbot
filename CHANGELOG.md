@@ -10,6 +10,16 @@
   ticket; the staff reminders go to them too. Any staff member can still claim the
   ticket. Members who left the server or the staff role are removed from the rotation,
   and if nobody is available the staff role is pinged as before
+- **`/export`**: the staff can download the tickets of the last 7, 30 or 90 days (or all
+  time) as an **Excel** file, with a *Tickets* sheet (real dates, filters, frozen
+  header) and a *Summary* sheet with totals, averages, tickets per type and the staff
+  leaderboard, or as a **CSV** file (UTF-8, opens correctly in Excel). Only metadata is
+  exported, never the subject or the messages; dates are in UTC and the column names
+  follow the server's language. Text written by users is escaped so it can't run as a
+  spreadsheet formula (CSV injection)
+
+### Changed
+- New dependency: `openpyxl` for the Excel export (`pip install -r requirements.txt`)
 
 ## [2.2.0] - 2026-11-20
 
