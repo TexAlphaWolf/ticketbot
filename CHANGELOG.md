@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [2.2.0] - 2026-11-20
 
 ### Added
 - **Custom questions per ticket type** with `/types questions add`, `remove` and `list`:
@@ -22,6 +22,10 @@
   channel. `/settings cooldown` sets a minimum time between two tickets of the same
   member (off by default). Staff members are never blocked or slowed down, and the
   checks run both on the panel button and when the form is sent
+
+### Upgrading
+- Update the files and restart the bot: the database gets the new table and columns
+  automatically. Make a backup first with `python -m ticketbot backup`
 
 ## [2.1.0] - 2026-11-20
 
