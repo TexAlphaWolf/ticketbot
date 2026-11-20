@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [2.3.0] - 2026-11-20
 
 ### Added
 - **Auto-assign**: with `/settings autoassign` on, every new ticket is assigned to one of
@@ -20,6 +20,11 @@
 
 ### Changed
 - New dependency: `openpyxl` for the Excel export (`pip install -r requirements.txt`)
+
+### Upgrading
+- Make a backup with `python -m ticketbot backup`, update the files, run
+  `pip install -r requirements.txt` and restart the bot: the database is upgraded
+  automatically. With Docker, rebuild the image with `docker compose up -d --build`
 
 ## [2.2.0] - 2026-11-20
 
