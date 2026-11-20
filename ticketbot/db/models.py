@@ -66,6 +66,7 @@ class Guild(Base):
     staff_reminders: Mapped[bool] = mapped_column(Boolean, server_default=true())
     ticket_cooldown: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     auto_assign: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    ticket_mode: Mapped[str] = mapped_column(Text, server_default=text("'channel'"))
 
 
 class TicketType(Base):
@@ -146,6 +147,7 @@ class Ticket(Base):
     closed_by: Mapped[int | None] = mapped_column(BigInteger)
     close_reason: Mapped[str | None] = mapped_column(EncryptedText("tickets.close_reason"))
     channel_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    is_thread: Mapped[bool] = mapped_column(Boolean, server_default=false())
     rating: Mapped[int | None] = mapped_column(Integer)
     rating_comment: Mapped[str | None] = mapped_column(EncryptedText("tickets.rating_comment"))
     rated_at: Mapped[float | None] = mapped_column(Double)

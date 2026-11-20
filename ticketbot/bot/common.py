@@ -44,6 +44,18 @@ def type_label(ticket: dict) -> str:
     return f"{ticket['type_emoji']} {ticket['type_label']}"
 
 
+async def ticket_channel(guild: discord.Guild, ticket: dict):
+    """The channel or private thread of a ticket, or None if it doesn't exist anymore.
+    Archived threads are not in the cache, so they are fetched (an API call)."""
+    found = guild.get_channel_or_thread(ticket["channel_id"])
+    if found is not None or not ticket.get("is_thread"):
+        return found
+    try:
+        return await guild.fetch_channel(ticket["channel_id"])
+    except (discord.NotFound, discord.Forbidden):
+        return None
+
+
 def channel_url(guild_id: int, channel_id: int) -> str:
     return f"https://discord.com/channels/{guild_id}/{channel_id}"
 

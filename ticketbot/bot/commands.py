@@ -248,10 +248,13 @@ async def add(interaction: discord.Interaction, user: discord.Member):
     if ctx is None:
         return
     _, ticket = ctx[1], ctx[2]
-    await interaction.channel.set_permissions(
-        user, view_channel=True, send_messages=True, attach_files=True,
-        read_message_history=True,
-    )
+    if isinstance(interaction.channel, discord.Thread):
+        await interaction.channel.add_user(user)
+    else:
+        await interaction.channel.set_permissions(
+            user, view_channel=True, send_messages=True, attach_files=True,
+            read_message_history=True,
+        )
     await audit(interaction, "ticket.add_member", f"ticket:{ticket['id']}", user=user.id)
     await interaction.response.send_message(_("member.added", user=user.mention))
 
@@ -267,7 +270,10 @@ async def remove(interaction: discord.Interaction, user: discord.Member):
     if user.id == ticket["owner_id"]:
         await interaction.response.send_message(_("member.cant_remove_owner"), ephemeral=True)
         return
-    await interaction.channel.set_permissions(user, overwrite=None)
+    if isinstance(interaction.channel, discord.Thread):
+        await interaction.channel.remove_user(user)
+    else:
+        await interaction.channel.set_permissions(user, overwrite=None)
     await audit(interaction, "ticket.remove_member", f"ticket:{ticket['id']}", user=user.id)
     await interaction.response.send_message(_("member.removed", user=user.mention))
 
@@ -526,6 +532,8 @@ class SettingsGroup(app_commands.Group):
         embed.add_field(name=_("settings.autoassign"),
                         value=_("settings.autoassign_on", count=available)
                         if cfg.get("auto_assign") else _("settings.off"))
+        embed.add_field(name=_("settings.mode"),
+                        value=_("settings.mode_" + (cfg.get("ticket_mode") or "channel")))
         cooldown = cfg.get("ticket_cooldown") or 0
         embed.add_field(name=_("settings.cooldown"),
                         value=format_duration(cooldown * 60) if cooldown else _("settings.off"))
@@ -598,6 +606,43 @@ class SettingsGroup(app_commands.Group):
         await interaction.response.send_message(
             _("settings.autoassign_set_on") if enabled else _("settings.autoassign_set_off"),
             ephemeral=True)
+
+    @app_commands.command(name="mode",
+                          description="Open new tickets as channels or as private threads")
+    @app_commands.describe(mode="Where new tickets are opened")
+    @app_commands.choices(mode=[
+        app_commands.Choice(name="Channels (one per ticket)", value="channel"),
+        app_commands.Choice(name="Private threads in the panel channel", value="thread"),
+    ])
+    async def mode(self, interaction: discord.Interaction, mode: app_commands.Choice[str]):
+        ctx = await require_setup(interaction)
+        if ctx is None:
+            return
+        cfg, _ = ctx
+        guild = interaction.guild
+        text = _("settings.mode_set_channel")
+        if mode.value == "thread":
+            panel = guild.get_channel(cfg.get("panel_channel") or 0)
+            if panel is None:
+                await interaction.response.send_message(_("error.bad_setup"), ephemeral=True)
+                return
+            missing = missing_thread_permissions(panel, guild.me)
+            if missing:
+                await interaction.response.send_message(
+                    _("settings.mode_missing", channel=panel.mention,
+                      permissions=", ".join(missing)), ephemeral=True)
+                return
+            roles = {cfg["staff_role"]} | {
+                r for ids in (await interaction.client.db.all_type_roles(guild.id)).values()
+                for r in ids}
+            failed = await grant_thread_access(panel, [guild.get_role(r) for r in roles])
+            text = _("settings.mode_set_thread", channel=panel.mention)
+            if failed:
+                text += "\n" + _("settings.mode_roles_failed", roles=" ".join(failed))
+        await interaction.client.db.save_guild(guild.id, ticket_mode=mode.value)
+        await audit(interaction, "settings.mode", value=mode.value)
+        await interaction.response.send_message(
+            text, ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
 
     @app_commands.command(name="cooldown",
                           description="Minimum time between two tickets of the same member")
@@ -750,6 +795,37 @@ class BlockGroup(app_commands.Group):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
+# -------------------------------------------------------- private threads ---
+
+def missing_thread_permissions(panel: discord.TextChannel, me: discord.Member) -> list[str]:
+    perms = panel.permissions_for(me)
+    needed = (("Create Private Threads", perms.create_private_threads),
+              ("Send Messages in Threads", perms.send_messages_in_threads),
+              ("Manage Threads", perms.manage_threads))
+    return [name for name, ok in needed if not ok]
+
+
+async def grant_thread_access(panel: discord.TextChannel, roles) -> list[str]:
+    """Let the staff roles see every private ticket thread of the panel channel
+    (Manage Threads there). Returns the roles that could not be changed."""
+    failed = []
+    for role in roles:
+        if role is None:
+            continue
+        overwrite = panel.overwrites_for(role)
+        if overwrite.manage_threads and overwrite.send_messages_in_threads:
+            continue
+        overwrite.view_channel = True
+        overwrite.send_messages_in_threads = True
+        overwrite.manage_threads = True
+        try:
+            await panel.set_permissions(role, overwrite=overwrite,
+                                        reason="TicketBot: staff access to ticket threads")
+        except discord.HTTPException:
+            failed.append(role.mention)
+    return failed
+
+
 # ------------------------------------------------------------ ticket types ---
 
 async def type_autocomplete(interaction: discord.Interaction, current: str):
@@ -884,9 +960,14 @@ class TypeRolesGroup(app_commands.Group):
                 _("roles.exists", role=role.mention, type=name), ephemeral=True)
             return
         await audit(interaction, "type.role_add", f"type:{type}", role=role.id)
+        text = _("roles.added", role=role.mention, type=name)
+        if cfg.get("ticket_mode") == "thread":
+            panel = interaction.guild.get_channel(cfg.get("panel_channel") or 0)
+            if panel is not None and await grant_thread_access(panel, [role]):
+                text += "\n" + _("settings.mode_roles_failed", roles=role.mention)
+            text += "\n" + _("roles.thread_note")
         await interaction.response.send_message(
-            _("roles.added", role=role.mention, type=name), ephemeral=True,
-            allowed_mentions=discord.AllowedMentions.none())
+            text, ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
 
     @app_commands.command(name="remove", description="Remove a role from a ticket type")
     @app_commands.describe(type="Ticket type", role="Role to remove")

@@ -9,6 +9,13 @@
   notes, get the staff reminders, and are the only ones picked by auto-assign. Admins
   always have access; types without roles keep using the staff role. `/types list`
   shows who handles each type. Changes are recorded in the audit log
+- **Tickets as private threads**: `/settings mode` opens new tickets as private threads
+  in the panel channel instead of channels. The bot checks its permissions, gives the
+  staff roles *Manage Threads* there (so they see every ticket thread) and announces
+  new tickets in the log channel, because role mentions don't reach people outside a
+  private thread. Closing locks the thread, reopening unlocks it, `/add` and `/remove`
+  add and remove members, and archived threads are found again for the inactivity and
+  cleanup checks. Tickets already open keep their mode
 
 ## [3.0.0-beta.1] - 2026-11-20
 

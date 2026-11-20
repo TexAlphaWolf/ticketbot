@@ -279,6 +279,12 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
     user_number = await db.next_user_number(guild.id, user.id)
     channel_name = ticket_channel_name(ticket_type["key"], user.name, user.id, user_number)
 
+    thread_mode = cfg.get("ticket_mode") == "thread"
+    parent = guild.get_channel(cfg.get("panel_channel") or 0) if thread_mode else None
+    if thread_mode and parent is None:
+        await interaction.followup.send(_("error.bad_setup"), ephemeral=True)
+        return
+
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
         user: discord.PermissionOverwrite(
@@ -293,12 +299,20 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
             read_message_history=True, attach_files=True,
         ),
     }
-    channel = await guild.create_text_channel(
-        name=channel_name,
-        category=category,
-        overwrites=overwrites,
-        topic=f"{config.TOPIC_PREFIX}{user.id}",
-    )
+    if thread_mode:
+        # A private thread in the panel channel: only the people added to it (and those
+        # who can manage threads there, i.e. the staff) see it
+        channel = await parent.create_thread(
+            name=channel_name, type=discord.ChannelType.private_thread, invitable=False,
+            auto_archive_duration=10080, reason=f"Ticket of {user}")
+        await channel.add_user(user)
+    else:
+        channel = await guild.create_text_channel(
+            name=channel_name,
+            category=category,
+            overwrites=overwrites,
+            topic=f"{config.TOPIC_PREFIX}{user.id}",
+        )
 
     now = time.time()
     assignee = await pick_assignee(db, guild, cfg, user.id, type_role_ids)
@@ -311,6 +325,7 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
         type_emoji=ticket_type["emoji"], subject=subject, description=description,
         status=config.STATUS_WAITING, opened_at=now, last_activity=now,
         awaiting_staff_since=now, assigned_to=assignee.id if assignee else None,
+        is_thread=thread_mode,
     )
     await audit(interaction, "ticket.open", f"ticket:{ticket_id}", type=ticket_type["key"],
                 assigned_to=assignee.id if assignee else None)
@@ -332,6 +347,19 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
     await db.update_ticket(ticket_id, control_message=control.id)
     if attachments:
         await forward_attachments(channel, user, attachments, _)
+
+    if thread_mode:
+        # Role mentions don't reach people outside a private thread: tell the staff in
+        # the log channel (an assigned member was mentioned in the thread, so is in it)
+        log = guild.get_channel(cfg.get("log_channel") or 0)
+        if log is not None:
+            try:
+                await log.send(
+                    _("open.thread_log", thread=channel.mention, user=user.mention,
+                      type=f"{ticket_type['emoji']} {ticket_type['label']}", staff=ping),
+                    allowed_mentions=discord.AllowedMentions(roles=True, users=True))
+            except discord.HTTPException as e:
+                print(f"Could not announce the ticket in the log channel: {e}")
 
     await interaction.followup.send(
         _("open.created", channel=channel.mention) + "\n📊 " + queue, ephemeral=True
@@ -561,6 +589,12 @@ def ticket_meta(client, guild: discord.Guild, channel: discord.TextChannel, tick
 
 async def set_members_can_write(channel: discord.TextChannel, can_write: bool) -> None:
     """Lock or unlock the ticket for its owner and the members added with /add."""
+    if isinstance(channel, discord.Thread):
+        try:  # a locked thread: only who can manage threads (the staff) can write
+            await channel.edit(locked=not can_write, archived=False)
+        except discord.HTTPException as e:
+            print(f"Could not lock the thread {channel}: {e}")
+        return
     for target, overwrite in list(channel.overwrites.items()):
         is_member = isinstance(target, discord.Member) or (
             isinstance(target, discord.Object) and getattr(target, "type", None) is discord.Member

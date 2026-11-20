@@ -52,6 +52,22 @@ STRINGS["en"] = {
                    "closed automatically.",
     "queue.line": "**{waiting}** waiting · **{in_progress}** in progress",
     "queue.first": "none, you're first in line!",
+    "settings.mode": "Tickets opened as",
+    "settings.mode_channel": "Channels",
+    "settings.mode_thread": "Private threads",
+    "settings.mode_set_channel": "✅ New tickets are opened as channels in the ticket "
+        "category.",
+    "settings.mode_set_thread": "✅ New tickets are opened as private threads in {channel}. "
+        "The staff roles can now manage threads there, so they see every ticket thread; "
+        "new tickets are announced in the log channel. Tickets already open stay as they "
+        "are.",
+    "settings.mode_missing": "❌ To open private threads in {channel} the bot needs these "
+        "permissions there: {permissions}.",
+    "settings.mode_roles_failed": "⚠️ I couldn't give these roles access to the ticket "
+        "threads: {roles}. Give them Manage Threads in the panel channel by hand.",
+    "roles.thread_note": "-# With private threads every staff role sees all the ticket "
+        "threads; the roles of a type decide who is pinged and who can handle the ticket.",
+    "open.thread_log": "🎫 New ticket {thread} from {user} · {type} · {staff}",
     "roles.added": "✅ {role} now sees and handles the {type} tickets. "
         "New tickets of this type are shown only to their roles and to the admins.",
     "roles.exists": "{role} already handles the {type} tickets.",
@@ -412,6 +428,24 @@ STRINGS["it"] = {
                    "chiuso automaticamente.",
     "queue.line": "**{waiting}** in attesa · **{in_progress}** in lavorazione",
     "queue.first": "nessuno, sei il primo della fila!",
+    "settings.mode": "Ticket aperti come",
+    "settings.mode_channel": "Canali",
+    "settings.mode_thread": "Thread privati",
+    "settings.mode_set_channel": "✅ I nuovi ticket vengono aperti come canali nella "
+        "categoria dei ticket.",
+    "settings.mode_set_thread": "✅ I nuovi ticket vengono aperti come thread privati in "
+        "{channel}. I ruoli dello staff ora possono gestire i thread lì, quindi vedono "
+        "tutti i thread dei ticket; i nuovi ticket vengono annunciati nel canale log. I "
+        "ticket già aperti restano come sono.",
+    "settings.mode_missing": "❌ Per aprire thread privati in {channel} il bot ha bisogno "
+        "di questi permessi lì: {permissions}.",
+    "settings.mode_roles_failed": "⚠️ Non sono riuscito a dare accesso ai thread dei "
+        "ticket a questi ruoli: {roles}. Dagli a mano Gestisci thread nel canale del "
+        "pannello.",
+    "roles.thread_note": "-# Con i thread privati ogni ruolo dello staff vede tutti i "
+        "thread dei ticket; i ruoli di un tipo decidono chi viene taggato e chi può "
+        "gestire il ticket.",
+    "open.thread_log": "🎫 Nuovo ticket {thread} da {user} · {type} · {staff}",
     "roles.added": "✅ {role} ora vede e gestisce i ticket {type}. "
         "I nuovi ticket di questo tipo vengono mostrati solo ai suoi ruoli e agli admin.",
     "roles.exists": "{role} gestisce già i ticket {type}.",
@@ -769,6 +803,24 @@ STRINGS["de"] = {
                    "das Ticket automatisch geschlossen.",
     "queue.line": "**{waiting}** wartend · **{in_progress}** in Bearbeitung",
     "queue.first": "keine, du bist als Erster dran!",
+    "settings.mode": "Tickets geöffnet als",
+    "settings.mode_channel": "Kanäle",
+    "settings.mode_thread": "Private Threads",
+    "settings.mode_set_channel": "✅ Neue Tickets werden als Kanäle in der Ticket-Kategorie "
+        "geöffnet.",
+    "settings.mode_set_thread": "✅ Neue Tickets werden als private Threads in {channel} "
+        "geöffnet. Die Team-Rollen können dort jetzt Threads verwalten und sehen so alle "
+        "Ticket-Threads; neue Tickets werden im Log-Kanal angekündigt. Bereits offene "
+        "Tickets bleiben, wie sie sind.",
+    "settings.mode_missing": "❌ Um private Threads in {channel} zu öffnen, braucht der Bot "
+        "dort diese Berechtigungen: {permissions}.",
+    "settings.mode_roles_failed": "⚠️ Diesen Rollen konnte ich keinen Zugriff auf die "
+        "Ticket-Threads geben: {roles}. Gib ihnen im Panel-Kanal von Hand „Threads "
+        "verwalten“.",
+    "roles.thread_note": "-# Mit privaten Threads sieht jede Team-Rolle alle "
+        "Ticket-Threads; die Rollen einer Art bestimmen, wer erwähnt wird und das Ticket "
+        "bearbeiten kann.",
+    "open.thread_log": "🎫 Neues Ticket {thread} von {user} · {type} · {staff}",
     "roles.added": "✅ {role} sieht und bearbeitet jetzt die {type}-Tickets. "
         "Neue Tickets dieser Art sehen nur ihre Rollen und die Admins.",
     "roles.exists": "{role} bearbeitet die {type}-Tickets bereits.",
@@ -1184,6 +1236,11 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Post and pin the priority guidelines in the log channel":
             "Pubblica e fissa le linee guida sulle priorità nel canale log",
         "Show how many tickets are open right now": "Mostra quanti ticket sono aperti ora",
+        "Open new tickets as channels or as private threads":
+            "Apri i nuovi ticket come canali o come thread privati",
+        "Where new tickets are opened": "Dove vengono aperti i nuovi ticket",
+        "Channels (one per ticket)": "Canali (uno per ticket)",
+        "Private threads in the panel channel": "Thread privati nel canale del pannello",
         "Roles that handle the tickets of a type": "Ruoli che gestiscono i ticket di un tipo",
         "Let a role see and handle the tickets of a type":
             "Fai vedere e gestire a un ruolo i ticket di un tipo",
@@ -1339,6 +1396,11 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Post and pin the priority guidelines in the log channel":
             "Prioritäts-Richtlinien im Log-Kanal posten und anpinnen",
         "Show how many tickets are open right now": "Zeigen, wie viele Tickets gerade offen sind",
+        "Open new tickets as channels or as private threads":
+            "Neue Tickets als Kanäle oder als private Threads öffnen",
+        "Where new tickets are opened": "Wo neue Tickets geöffnet werden",
+        "Channels (one per ticket)": "Kanäle (einer pro Ticket)",
+        "Private threads in the panel channel": "Private Threads im Panel-Kanal",
         "Roles that handle the tickets of a type":
             "Rollen, die die Tickets einer Art bearbeiten",
         "Let a role see and handle the tickets of a type":

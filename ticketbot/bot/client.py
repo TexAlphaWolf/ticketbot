@@ -37,6 +37,7 @@ from .common import (
     priority_label,
     staff_mentions,
     telegram_notify,
+    ticket_channel,
     translator,
 )
 from .tickets import (
@@ -141,6 +142,9 @@ class TicketBot(discord.Client):
                                 source="system", target=f"ticket:{ticket['id']}")
         await self.db.mark_channel_deleted(ticket["id"])
 
+    async def on_raw_thread_delete(self, payload: discord.RawThreadDeleteEvent):
+        await self.on_guild_channel_delete(discord.Object(payload.thread_id))
+
     async def on_guild_remove(self, guild: discord.Guild):
         # The bot was removed from a server: delete all the data stored for it
         if await self.db.delete_guild(guild.id):
@@ -158,10 +162,14 @@ class TicketBot(discord.Client):
         # Inactivity: warn, then close tickets waiting on the user
         for ticket in await self.db.active_tickets():
             guild = self.get_guild(ticket["guild_id"])
-            channel = guild.get_channel(ticket["channel_id"]) if guild else None
+            if guild is None:
+                continue
+            try:
+                channel = await ticket_channel(guild, ticket)
+            except discord.HTTPException:
+                continue  # Discord unreachable: try again later, don't close anything
             if channel is None:
-                if guild is not None:
-                    await self.on_guild_channel_delete(discord.Object(ticket["channel_id"]))
+                await self.on_guild_channel_delete(discord.Object(ticket["channel_id"]))
                 continue
             cfg = await self.db.get_guild(guild.id)
             _ = translator(cfg)
@@ -184,7 +192,10 @@ class TicketBot(discord.Client):
         due = await self.db.closed_channels_due(now - config.CLOSED_CHANNEL_HOURS * 3600)
         for ticket in due:
             guild = self.get_guild(ticket["guild_id"])
-            channel = guild.get_channel(ticket["channel_id"]) if guild else None
+            try:
+                channel = await ticket_channel(guild, ticket) if guild else None
+            except discord.HTTPException:
+                continue
             await self.db.mark_channel_deleted(ticket["id"])
             if channel is not None:
                 try:
@@ -298,7 +309,7 @@ class TicketBot(discord.Client):
                 raise RuntimeError("ticket not found")
             if ticket["status"] == config.STATUS_CLOSED or ticket["channel_deleted"]:
                 return "already closed"
-            channel = guild.get_channel(ticket["channel_id"])
+            channel = await ticket_channel(guild, ticket)
             if channel is None:
                 raise RuntimeError("the ticket channel doesn't exist anymore")
             member = guild.get_member(command["requested_by"])

@@ -26,7 +26,9 @@ Available in **English**, **Italian** and **German**.
   the ticket and posted in the ticket channel; files that can run code (`.exe`, `.bat`,
   `.ps1`, `.jar`...) and files over the server's upload limit are skipped
 - A private channel for every ticket, visible only to the user and the staff role,
-  named after the type, the username and the user's ticket number (e.g. `bug-mario-2`)
+  named after the type, the username and the user's ticket number (e.g. `bug-mario-2`),
+  or, with `/settings mode`, a **private thread** in the panel channel: no channel list
+  full of tickets, new tickets are announced to the staff in the log channel
 - One open ticket per user, with queue info (*waiting* / *in progress*)
 - **Ticket history** with `/mytickets`: open tickets with their status and the latest
   closed ones with dates and ratings; staff members can see the history of any member
@@ -90,7 +92,8 @@ Available in **English**, **Italian** and **German**.
 
 Permissions required by the bot: Manage Channels, Manage Roles, View Channels,
 Send Messages, Manage Messages, Pin Messages, Embed Links, Attach Files,
-Read Message History, Change Nickname.
+Read Message History, Change Nickname. For tickets as private threads, also Create
+Private Threads, Send Messages in Threads and Manage Threads in the panel channel.
 
 ### With Python
 
@@ -263,7 +266,7 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 | `/setup` | Admin | Sets up the ticket system and posts the panel |
 | `/audit member` | Admin | Shows the latest actions done in the server (who, what, when) |
 | `/guidelines` | Admin | Posts and pins the priority guidelines in the log channel |
-| `/settings show` / `language` / `retention` / `archive` / `reminders` / `cooldown` / `autoassign` | Admin | Shows or changes the settings |
+| `/settings show` / `language` / `retention` / `archive` / `reminders` / `cooldown` / `autoassign` / `mode` | Admin | Shows or changes the settings |
 | `/types list` / `add` / `edit` / `remove` | Admin | Manages the ticket types |
 | `/types roles add` / `remove` | Admin | Chooses the roles that handle the tickets of a type |
 | `/types questions list` / `add` / `remove` | Admin | Manages the custom questions of a ticket type |

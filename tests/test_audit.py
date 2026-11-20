@@ -61,6 +61,8 @@ class FakeGuild:
     def get_channel(self, cid):
         return self.channels.get(cid)
 
+    get_channel_or_thread = get_channel
+
     def get_member(self, uid):
         return self._members.get(uid)
 
