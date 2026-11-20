@@ -194,7 +194,7 @@ def fill_reply(content: str, user: str, staff: str, server: str) -> str:
 def activity_changes(ticket: dict, now: float, from_staff: bool) -> dict:
     """Fields to update when someone writes in a ticket."""
     changes = {"last_actor": "staff" if from_staff else "user",
-               "last_activity": now, "warned": 0}
+               "last_activity": now, "warned": False}
     if from_staff:
         if ticket.get("status") == config.STATUS_WAITING:
             changes["status"] = config.STATUS_IN_PROGRESS

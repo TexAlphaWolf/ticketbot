@@ -10,6 +10,7 @@ Start the bot, or manage the database backups:
 """
 
 import argparse
+import sqlite3
 import sys
 
 from .core.settings import SettingsError, get_settings
@@ -49,14 +50,21 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{name.ljust(width)}  {value}")
         return 0
 
+    database = settings.sqlite_path
+    if args.command in ("backup", "restore") and database is None:
+        print("The database is PostgreSQL: back it up with pg_dump and restore it with "
+              "pg_restore (see the PostgreSQL documentation).")
+        return 1
+
     if args.command == "backup":
-        from .db import Database
-        if not settings.db_path.exists():
-            print(f"No database found at {settings.db_path}")
+        if not database.exists():
+            print(f"No database found at {database}")
             return 1
-        db = Database(settings.db_path)
-        path = create_backup(db.conn, settings.backups_path)
-        db.close()
+        source = sqlite3.connect(database)
+        try:
+            path = create_backup(source, settings.backups_path)
+        finally:
+            source.close()
         removed = prune_backups(settings.backups_path, max(settings.backup_keep, 1))
         print(f"Backup saved: {path}" + (f" ({len(removed)} old removed)" if removed else ""))
         return 0
@@ -70,13 +78,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if not args.yes:
-        answer = input(f"Replace {settings.db_path} with {args.file}? "
+        answer = input(f"Replace {database} with {args.file}? "
                        "The bot must be stopped. Type 'yes' to continue: ")
         if answer.strip().lower() != "yes":
             print("Restore cancelled.")
             return 1
     try:
-        safety = restore_backup(args.file, settings.db_path)
+        safety = restore_backup(args.file, database)
     except (OSError, RuntimeError) as e:
         print(f"Restore failed, the database was not changed: {e}")
         return 1

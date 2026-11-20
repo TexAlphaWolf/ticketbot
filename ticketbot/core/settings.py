@@ -80,6 +80,14 @@ class Settings(BaseSettings):
         return normalize_url(url).render_as_string(hide_password=False)
 
     @property
+    def sqlite_path(self) -> Path | None:
+        """The SQLite database file, or None when the database is PostgreSQL."""
+        url = normalize_url(self.db_url)
+        if url.get_backend_name() != "sqlite" or not url.database:
+            return None
+        return Path(url.database)
+
+    @property
     def backups_path(self) -> Path:
         return self.backup_dir or self.data_dir / "backups"
 

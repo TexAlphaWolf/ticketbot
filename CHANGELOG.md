@@ -18,8 +18,19 @@
   SQLAlchemy 2.1 needs 3.11)
 - `aiohttp` 3.14 or newer is required
 
+- **The bot uses the new async storage**: every database call goes through SQLAlchemy and
+  no longer blocks the bot while it waits for the disk. The same code runs on SQLite and
+  PostgreSQL. At startup the database is brought to the latest schema: a new one is
+  created, a TicketBot 2 database is adopted in place after an automatic backup (v2.0 to
+  v2.2 files first get their missing columns), a v1 `config.json` is still imported
+- Automatic backups run in a background thread; with PostgreSQL they are skipped and
+  `python -m ticketbot backup` / `restore` explain to use `pg_dump` / `pg_restore`
+- On/off values are stored as real booleans
+- Quieter startup: no Alembic details and no warnings about voice libraries (the bot
+  never joins voice channels)
+
 ### Added
-- New storage layer for V3, not used by the bot yet: SQLAlchemy 2 models of every table,
+- New storage layer for V3: SQLAlchemy 2 models of every table,
   an async engine for SQLite (default) and PostgreSQL, and Alembic migrations. The first
   migration is exactly the v2.3 schema, so an existing database can be adopted without
   copying data. Discord IDs are stored as 64-bit integers and on/off settings as

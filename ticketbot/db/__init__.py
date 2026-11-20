@@ -1,5 +1,5 @@
-"""Storage: SQLite database, backups and the v1 config import."""
+"""Storage: SQLAlchemy models and migrations, the async Store, backups, v1/v2 imports."""
 
-from .database import Database
+from .store import Store
 
-__all__ = ["Database"]
+__all__ = ["Store"]

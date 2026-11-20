@@ -15,7 +15,7 @@ from sqlalchemy import inspect, select
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from ticketbot.db import Database, migrate  # noqa: E402
+from ticketbot.db import migrate  # noqa: E402
 from ticketbot.db.engine import (  # noqa: E402
     create_engine,
     normalize_url,
@@ -23,6 +23,7 @@ from ticketbot.db.engine import (  # noqa: E402
     session_factory,
 )
 from ticketbot.db.models import Base, Guild, Note, Ticket, TicketType, TypeQuestion  # noqa: E402
+from ticketbot.db.v2 import create_v2_database  # noqa: E402
 
 BIG_ID = 1563556506434019338          # Discord IDs don't fit in 32 bits
 PG_URL = os.getenv("TEST_DATABASE_URL")
@@ -132,7 +133,7 @@ def _structure(sync_conn) -> dict:
 def test_first_migration_is_the_v2_3_schema(tmp_path):
     """A v2.3 database has the same tables, columns and keys as migration 0001."""
     legacy = tmp_path / "legacy.db"
-    Database(legacy).close()
+    create_v2_database(legacy)
 
     def structure(url):
         async def go():
@@ -224,10 +225,14 @@ def test_ticket_ids_are_never_reused(tmp_path):
 
 def test_stamp_adopts_an_existing_v2_database(tmp_path):
     """Step 5 adopts v2.3 files this way: no copy, the data stays where it is."""
+    import sqlite3
+
     path = tmp_path / "ticketbot.db"
-    legacy = Database(path)
-    legacy.save_guild(BIG_ID, language="it")
-    legacy.close()
+    create_v2_database(path)
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute("INSERT INTO guilds (guild_id, language) VALUES (?, 'it')", (BIG_ID,))
+    conn.close()
 
     async def scenario():
         engine = create_engine(sqlite_url(tmp_path))
@@ -239,5 +244,86 @@ def test_stamp_adopts_an_existing_v2_database(tmp_path):
             guild = await s.get(Guild, BIG_ID)
             assert guild.language == "it" and guild.staff_reminders is True
         await engine.dispose()
+
+    run(scenario())
+
+
+# ----------------------------------------------------------------- store ---
+
+def test_store_works_the_same_on_both_databases(url):
+    """The queries that differ between SQLite and PostgreSQL (upserts, RETURNING...)."""
+    from ticketbot.db import Store
+
+    async def scenario():
+        store = Store(create_engine(url))
+        await migrate.prepare(store.engine)
+        g = BIG_ID
+        assert (await store.save_guild(g, language="de"))["language"] == "de"
+        assert (await store.save_guild(g))["language"] == "de"          # no overwrite
+        assert [await store.next_ticket_number(g) for _ in range(2)] == [1, 2]
+
+        await store.add_type(g, "bug", "Bug", "🐞")
+        await store.add_type(g, "pay", "Pay", "💳")
+        assert [t["key"] for t in await store.list_types(g)] == ["bug", "pay"]
+        for label in ("A", "B", "C"):
+            await store.add_question(g, "bug", label)
+        assert await store.remove_question(g, "bug", 1)
+        assert [(q["position"], q["label"]) for q in await store.list_questions(g, "bug")] \
+            == [(1, "B"), (2, "C")]
+
+        fields = dict(guild_id=g, owner_id=BIG_ID + 9, type_key="bug", type_label="Bug",
+                      type_emoji="🐞", opened_at=1.0, last_activity=1.0)
+        first = await store.create_ticket(channel_id=g + 1, assigned_to=7, **fields)
+        await store.create_ticket(channel_id=g + 2, claimed_by=8, status="in_progress",
+                                  **fields)
+        assert await store.queue_counts(g) == (1, 1)
+        assert await store.open_tickets_per_staff(g) == {7: 1, 8: 1}
+        assert (await store.open_ticket_of_owner(g, BIG_ID + 9))["owner_id"] == BIG_ID + 9
+        await store.update_ticket(first, warned=True, status="closed", closed_at=5.0)
+        await store.mark_channel_deleted(first)
+        ticket = await store.get_ticket(first)
+        assert ticket["warned"] is True and ticket["channel_deleted"] is True
+        assert await store.purge_closed_before(10.0) == 1
+
+        for _ in range(2):                                               # upserts
+            await store.set_available(g, 5, True)
+        await store.block_user(g, 6, "spam", 1, 1.0, None)
+        await store.block_user(g, 6, "again", 1, 2.0, 100.0)
+        await store.save_reply(g, "Logs", "one")
+        await store.save_reply(g, "logs", "two")
+        await store.add_transcript_ref(g, 1, 2, "low", 1.0)
+        await store.add_transcript_ref(g, 1, 2, "high", 2.0)
+        assert len(await store.available_staff(g)) == 1
+        assert (await store.get_block(g, 6, 50.0))["reason"] == "again"
+        assert await store.get_block(g, 6, 100.0) is None
+        assert [r["content"] for r in await store.list_replies(g)] == ["two"]
+        assert [r["priority"] for r in await store.transcript_refs(g)] == ["high"]
+
+        assert await store.delete_guild(g)
+        assert await store.guild_ids() == []
+        await store.close()
+
+    run(scenario())
+
+
+def test_prepare_creates_adopts_and_reports(tmp_path):
+    from ticketbot.db.backup import list_backups
+
+    async def scenario():
+        fresh = create_engine(sqlite_url(tmp_path))
+        assert await migrate.prepare(fresh, tmp_path / "backups") == "created"
+        assert await migrate.prepare(fresh, tmp_path / "backups") == "up to date"
+        await fresh.dispose()
+        assert list_backups(tmp_path / "backups") == []          # nothing to protect yet
+
+        legacy = tmp_path / "old" / "ticketbot.db"
+        legacy.parent.mkdir()
+        create_v2_database(legacy)
+        engine = create_engine(f"sqlite:///{legacy.as_posix()}")
+        status = await migrate.prepare(engine, tmp_path / "old-backups")
+        assert status.startswith("adopted the TicketBot 2 database (backup: ticketbot-")
+        assert await migrate.current_revision(engine) == migrate.head_revision()
+        await engine.dispose()
+        assert len(list_backups(tmp_path / "old-backups")) == 1
 
     run(scenario())

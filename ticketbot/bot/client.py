@@ -1,6 +1,7 @@
 """The Discord client: startup, events and background tasks."""
 
 import asyncio
+import logging
 import sqlite3
 import time
 
@@ -20,9 +21,11 @@ from ..core.logic import (
     waiting_for_staff_since,
 )
 from ..core.settings import Settings, get_settings
-from ..db import Database
+from ..db import Store
 from ..db.backup import backup_due, create_backup, prune_backups
+from ..db.engine import create_engine
 from ..db.legacy import migrate_legacy_config
+from ..db.migrate import prepare
 from ..integrations.telegram import TelegramError, TelegramNotifier
 from .commands import all_commands
 from .common import channel_url, esc, is_staff, priority_label, telegram_notify, translator
@@ -31,7 +34,7 @@ from .translator import CommandTranslator
 
 
 class TicketBot(discord.Client):
-    def __init__(self, db: Database, settings: Settings | None = None):
+    def __init__(self, db: Store, settings: Settings | None = None):
         intents = discord.Intents.default()
         intents.message_content = True  # required for transcripts
         super().__init__(intents=intents)
@@ -78,14 +81,14 @@ class TicketBot(discord.Client):
         if self.http_session is not None:
             await self.http_session.close()
         await super().close()
-        self.db.close()
+        await self.db.close()
 
     async def on_ready(self):
         # Servers the bot was removed from while it was offline: delete their data
         current = {g.id for g in self.guilds}
-        for guild_id in self.db.guild_ids():
+        for guild_id in await self.db.guild_ids():
             if guild_id not in current:
-                self.db.delete_guild(guild_id)
+                await self.db.delete_guild(guild_id)
                 self.pending_links.pop(guild_id, None)
                 print(f"Not in server {guild_id} anymore: server data deleted")
         print(f"TicketBot {__version__} online as {self.user} in {len(self.guilds)} server(s)")
@@ -95,25 +98,26 @@ class TicketBot(discord.Client):
     async def on_message(self, message: discord.Message):
         if message.author.bot or message.guild is None:
             return
-        ticket = self.db.ticket_by_channel(message.channel.id)
+        ticket = await self.db.ticket_by_channel(message.channel.id)
         if ticket is None or ticket["status"] == config.STATUS_CLOSED:
             return
-        cfg = self.db.get_guild(message.guild.id)
+        cfg = await self.db.get_guild(message.guild.id)
         from_staff = message.author.id != ticket["owner_id"] and is_staff(message.author, cfg)
-        self.db.update_ticket(ticket["id"], **activity_changes(ticket, time.time(), from_staff))
+        changes = activity_changes(ticket, time.time(), from_staff)
+        await self.db.update_ticket(ticket["id"], **changes)
 
     async def on_guild_channel_delete(self, channel):
-        ticket = self.db.ticket_by_channel(channel.id)
+        ticket = await self.db.ticket_by_channel(channel.id)
         if ticket is None:
             return
         if ticket["status"] != config.STATUS_CLOSED:
-            self.db.update_ticket(ticket["id"], status=config.STATUS_CLOSED,
+            await self.db.update_ticket(ticket["id"], status=config.STATUS_CLOSED,
                                   closed_at=time.time(), close_reason="Channel deleted")
-        self.db.mark_channel_deleted(ticket["id"])
+        await self.db.mark_channel_deleted(ticket["id"])
 
     async def on_guild_remove(self, guild: discord.Guild):
         # The bot was removed from a server: delete all the data stored for it
-        if self.db.delete_guild(guild.id):
+        if await self.db.delete_guild(guild.id):
             print(f"Removed from {guild.name}: server data deleted")
         self.pending_links.pop(guild.id, None)
 
@@ -124,19 +128,19 @@ class TicketBot(discord.Client):
         now = time.time()
 
         # Inactivity: warn, then close tickets waiting on the user
-        for ticket in self.db.active_tickets():
+        for ticket in await self.db.active_tickets():
             guild = self.get_guild(ticket["guild_id"])
             channel = guild.get_channel(ticket["channel_id"]) if guild else None
             if channel is None:
                 if guild is not None:
                     await self.on_guild_channel_delete(discord.Object(ticket["channel_id"]))
                 continue
-            cfg = self.db.get_guild(guild.id)
+            cfg = await self.db.get_guild(guild.id)
             _ = translator(cfg)
             try:
                 action = autoclose_action(ticket, now)
                 if action == "warn":
-                    self.db.update_ticket(ticket["id"], warned=1)
+                    await self.db.update_ticket(ticket["id"], warned=True)
                     await channel.send(_("auto.warning", user=f"<@{ticket['owner_id']}>",
                                          hours=config.WARNING_HOURS_BEFORE))
                 elif action == "close":
@@ -149,11 +153,11 @@ class TicketBot(discord.Client):
                 print(f"Inactivity check failed for #{channel}: {e}")
 
         # Closed tickets are deleted after the reopen window
-        due = self.db.closed_channels_due(now - config.CLOSED_CHANNEL_HOURS * 3600)
+        due = await self.db.closed_channels_due(now - config.CLOSED_CHANNEL_HOURS * 3600)
         for ticket in due:
             guild = self.get_guild(ticket["guild_id"])
             channel = guild.get_channel(ticket["channel_id"]) if guild else None
-            self.db.mark_channel_deleted(ticket["id"])
+            await self.db.mark_channel_deleted(ticket["id"])
             if channel is not None:
                 try:
                     await channel.delete(reason="Closed ticket expired")
@@ -164,7 +168,7 @@ class TicketBot(discord.Client):
                            now: float) -> None:
         """Remind the staff that a ticket has waited too long for a reply."""
         _ = translator(cfg)
-        self.db.update_ticket(ticket["id"], staff_reminded_at=now)
+        await self.db.update_ticket(ticket["id"], staff_reminded_at=now)
         waited = format_duration(now - waiting_for_staff_since(ticket))
         priority = priority_label(_, ticket.get("priority"))
         if ticket.get("claimed_by") or ticket.get("assigned_to"):
@@ -183,15 +187,25 @@ class TicketBot(discord.Client):
             priority=priority, waited=waited, url=channel_url(channel.guild.id, channel.id),
         ))
 
-    def run_backup_if_due(self) -> None:
-        """Back up the database every BACKUP_INTERVAL_HOURS, keeping the last BACKUP_KEEP."""
+    async def run_backup_if_due(self) -> None:
+        """Back up the database every BACKUP_INTERVAL_HOURS, keeping the last BACKUP_KEEP.
+        Only for SQLite: PostgreSQL is backed up with its own tools (pg_dump)."""
         settings = self.settings
-        if settings.backup_keep <= 0:
+        file = self.db.sqlite_file
+        if settings.backup_keep <= 0 or file is None:
             return
         if not backup_due(settings.backups_path, settings.backup_interval_hours):
             return
+
+        def copy():
+            source = sqlite3.connect(file)
+            try:
+                return create_backup(source, settings.backups_path)
+            finally:
+                source.close()
+
         try:
-            path = create_backup(self.db.conn, settings.backups_path)
+            path = await asyncio.to_thread(copy)   # don't block the bot while copying
         except (OSError, RuntimeError, sqlite3.Error) as e:
             print(f"[backup] failed: {e}")
             return
@@ -201,14 +215,14 @@ class TicketBot(discord.Client):
     @tasks.loop(hours=1)
     async def hourly_cleanup(self):
         now = time.time()
-        self.run_backup_if_due()
+        await self.run_backup_if_due()
         # Low/Medium transcripts in the log channel
-        for guild_id in self.db.guild_ids():
+        for guild_id in await self.db.guild_ids():
             guild = self.get_guild(guild_id)
-            cfg = self.db.get_guild(guild_id)
+            cfg = await self.db.get_guild(guild_id)
             if guild is None or cfg is None:
                 continue
-            for ref in expired_refs(self.db.transcript_refs(guild_id), now,
+            for ref in expired_refs(await self.db.transcript_refs(guild_id), now,
                                     cfg["retention_days"]):
                 channel = guild.get_channel(ref["channel_id"])
                 if channel is not None:
@@ -219,10 +233,10 @@ class TicketBot(discord.Client):
                     except discord.HTTPException as e:
                         print(f"Could not delete transcript {ref['message_id']}: {e}")
                         continue  # try again next hour
-                self.db.delete_transcript_ref(ref["channel_id"], ref["message_id"])
+                await self.db.delete_transcript_ref(ref["channel_id"], ref["message_id"])
         # Old closed tickets used only for /stats
-        self.db.purge_expired_blocks(now)
-        purged = self.db.purge_closed_before(now - config.STATS_KEEP_DAYS * 86400)
+        await self.db.purge_expired_blocks(now)
+        purged = await self.db.purge_closed_before(now - config.STATS_KEEP_DAYS * 86400)
         if purged:
             print(f"Purged {purged} old closed ticket(s)")
 
@@ -232,11 +246,46 @@ class TicketBot(discord.Client):
         await self.wait_until_ready()
 
 
+async def open_store(settings: Settings) -> Store:
+    """Connect to the database, bring it to the latest schema, import a v1 config.json."""
+    engine = create_engine(settings.db_url)
+    try:
+        status = await prepare(engine, settings.backups_path)
+    except Exception:
+        await engine.dispose()
+        raise
+    print(f"[database] {status}")
+    store = Store(engine)
+    migrated = await migrate_legacy_config(store, settings.legacy_config)
+    if migrated:
+        print(f"Migrated {migrated} server(s) from {settings.legacy_config}")
+    return store
+
+
+async def run_bot(settings: Settings, token: str) -> None:
+    store = await open_store(settings)
+    async with TicketBot(store, settings) as bot:   # closes the bot and the database
+        await bot.start(token)
+
+
+class _NoVoiceWarnings(logging.Filter):
+    """The bot never joins voice channels: PyNaCl/davey are not needed."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "voice will NOT be supported" not in record.getMessage()
+
+
+def setup_logging() -> None:
+    discord.utils.setup_logging()
+    logging.getLogger("alembic").setLevel(logging.WARNING)  # the [database] line says it all
+    logging.getLogger("discord.client").addFilter(_NoVoiceWarnings())
+
+
 def main(settings: Settings | None = None) -> None:
     settings = settings or get_settings()
     token = settings.require_discord_token()
-    db = Database(settings.db_path)
-    migrated = migrate_legacy_config(db, settings.legacy_config)
-    if migrated:
-        print(f"Migrated {migrated} server(s) from {settings.legacy_config}")
-    TicketBot(db, settings).run(token)
+    setup_logging()
+    try:
+        asyncio.run(run_bot(settings, token))
+    except KeyboardInterrupt:
+        print("Stopped.")

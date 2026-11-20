@@ -51,7 +51,7 @@ def detect_language(guild: discord.Guild) -> str:
 
 
 async def require_setup(interaction: discord.Interaction):
-    cfg = interaction.client.db.get_guild(interaction.guild.id)
+    cfg = await interaction.client.db.get_guild(interaction.guild.id)
     _ = translator(cfg)
     if cfg is None or not cfg.get("category"):
         await respond(interaction, _("error.not_setup"), ephemeral=True)
@@ -77,25 +77,25 @@ async def setup(interaction: discord.Interaction, staff_role: discord.Role,
                 archive_channel: discord.TextChannel | None = None):
     db = interaction.client.db
     guild = interaction.guild
-    existing = db.get_guild(guild.id)
+    existing = await db.get_guild(guild.id)
     lang = existing["language"] if existing else detect_language(guild)
     fields = dict(staff_role=staff_role.id, category=category.id,
                   log_channel=log_channel.id, language=lang)
     if archive_channel is not None:
         fields["archive_channel"] = archive_channel.id
-    cfg = db.save_guild(guild.id, **fields)
-    db.ensure_default_types(guild.id, DEFAULT_TYPES[lang])
+    cfg = await db.save_guild(guild.id, **fields)
+    await db.ensure_default_types(guild.id, DEFAULT_TYPES[lang])
     _ = translator(cfg)
 
     try:
-        message = await panel_channel.send(embed=panel_embed(db.list_types(guild.id), _),
+        message = await panel_channel.send(embed=panel_embed(await db.list_types(guild.id), _),
                                            view=TicketPanel(_))
     except discord.HTTPException:
         await interaction.response.send_message(
             _("setup.panel_failed", channel=panel_channel.mention), ephemeral=True
         )
         return
-    db.save_guild(guild.id, panel_channel=panel_channel.id, panel_message=message.id)
+    await db.save_guild(guild.id, panel_channel=panel_channel.id, panel_message=message.id)
     await interaction.response.send_message(
         _("setup.done", channel=panel_channel.mention, language=LANGUAGES[lang]), ephemeral=True
     )
@@ -124,7 +124,7 @@ async def guidelines(interaction: discord.Interaction):
             pass
 
     message = await channel.send(embed=guidelines_embed(cfg, _))
-    interaction.client.db.save_guild(guild.id, guidelines_channel=channel.id,
+    await interaction.client.db.save_guild(guild.id, guidelines_channel=channel.id,
                                      guidelines_message=message.id)
     try:
         await message.pin(reason="Ticket priority guidelines")
@@ -175,13 +175,13 @@ def ticket_history_embed(tickets: list[dict], title: str, _) -> discord.Embed:
 @app_commands.describe(member="(Staff only) Show the tickets of another member")
 async def mytickets(interaction: discord.Interaction, member: discord.Member | None = None):
     db = interaction.client.db
-    cfg = db.get_guild(interaction.guild.id)
+    cfg = await db.get_guild(interaction.guild.id)
     _ = translator(cfg)
     target = member or interaction.user
     if target.id != interaction.user.id and not is_staff(interaction.user, cfg):
         await interaction.response.send_message(_("mytickets.staff_only"), ephemeral=True)
         return
-    tickets = db.tickets_of_user(interaction.guild.id, target.id)
+    tickets = await db.tickets_of_user(interaction.guild.id, target.id)
     title = (_("mytickets.title_member", user=target.display_name) if member
              else _("mytickets.title"))
     await interaction.response.send_message(embed=ticket_history_embed(tickets, title, _),
@@ -201,11 +201,11 @@ async def available(interaction: discord.Interaction, enabled: bool):
         await interaction.response.send_message(_("error.staff_only"), ephemeral=True)
         return
     db = interaction.client.db
-    db.set_available(interaction.guild.id, interaction.user.id, enabled)
+    await db.set_available(interaction.guild.id, interaction.user.id, enabled)
     text = _("available.on") if enabled else _("available.off")
     if enabled and not cfg.get("auto_assign"):
         text += "\n" + _("available.feature_off")
-    count = len(db.available_staff(interaction.guild.id))
+    count = len(await db.available_staff(interaction.guild.id))
     await interaction.response.send_message(text + "\n" + _("available.count", count=count),
                                             ephemeral=True)
 
@@ -217,7 +217,7 @@ async def queue(interaction: discord.Interaction):
     if ctx is None:
         return
     _ = ctx[1]
-    waiting, in_progress = interaction.client.db.queue_counts(interaction.guild.id)
+    waiting, in_progress = await interaction.client.db.queue_counts(interaction.guild.id)
     await interaction.response.send_message(
         "📊 " + _("queue.line", waiting=waiting, in_progress=in_progress), ephemeral=True
     )
@@ -301,7 +301,7 @@ class NoteGroup(app_commands.Group):
         if ctx is None:
             return
         _, ticket = ctx[1], ctx[2]
-        interaction.client.db.add_note(ticket["id"], interaction.user.id, text, time.time())
+        await interaction.client.db.add_note(ticket["id"], interaction.user.id, text, time.time())
         await interaction.response.send_message(_("note.added"), ephemeral=True)
 
     @app_commands.command(name="list", description="Show the private notes of this ticket")
@@ -310,7 +310,7 @@ class NoteGroup(app_commands.Group):
         if ctx is None:
             return
         _, ticket = ctx[1], ctx[2]
-        notes = interaction.client.db.list_notes(ticket["id"])
+        notes = await interaction.client.db.list_notes(ticket["id"])
         if not notes:
             await interaction.response.send_message(_("note.none"), ephemeral=True)
             return
@@ -352,7 +352,7 @@ async def stats(interaction: discord.Interaction,
     key = period.value if period else "30"
     days = PERIODS[key]
     since = time.time() - days * 86400 if days else 0
-    rows = interaction.client.db.tickets_since(interaction.guild.id, since)
+    rows = await interaction.client.db.tickets_since(interaction.guild.id, since)
     s = compute_stats(rows, member.id if member else None)
 
     period_label = _("stats.period." + key)
@@ -411,7 +411,7 @@ async def export_stats(interaction: discord.Interaction,
     kind = file_format.value if file_format else "xlsx"
     days = PERIODS[key]
     guild = interaction.guild
-    tickets = interaction.client.db.tickets_since(guild.id, time.time() - days * 86400
+    tickets = await interaction.client.db.tickets_since(guild.id, time.time() - days * 86400
                                                   if days else 0)
     if not tickets:
         await interaction.response.send_message(_("stats.empty"), ephemeral=True)
@@ -470,15 +470,15 @@ class SettingsGroup(app_commands.Group):
         embed.add_field(name=_("settings.reminders"),
                         value=_("settings.on") if cfg.get("staff_reminders", 1)
                         else _("settings.off"))
-        available = len(interaction.client.db.available_staff(interaction.guild.id))
+        available = len(await interaction.client.db.available_staff(interaction.guild.id))
         embed.add_field(name=_("settings.autoassign"),
                         value=_("settings.autoassign_on", count=available)
                         if cfg.get("auto_assign") else _("settings.off"))
         cooldown = cfg.get("ticket_cooldown") or 0
         embed.add_field(name=_("settings.cooldown"),
                         value=format_duration(cooldown * 60) if cooldown else _("settings.off"))
-        embed.add_field(name=_("settings.types"),
-                        value=str(len(interaction.client.db.list_types(interaction.guild.id))))
+        types = await interaction.client.db.list_types(interaction.guild.id)
+        embed.add_field(name=_("settings.types"), value=str(len(types)))
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="language", description="Change the language of the bot")
@@ -491,7 +491,7 @@ class SettingsGroup(app_commands.Group):
         ctx = await require_setup(interaction)
         if ctx is None:
             return
-        cfg = interaction.client.db.save_guild(interaction.guild.id, language=language.value)
+        cfg = await interaction.client.db.save_guild(interaction.guild.id, language=language.value)
         _ = translator(cfg)
         await interaction.response.send_message(
             _("settings.language_set", language=language.name), ephemeral=True
@@ -509,7 +509,7 @@ class SettingsGroup(app_commands.Group):
         ctx = await require_setup(interaction)
         if ctx is None:
             return
-        cfg = interaction.client.db.save_guild(interaction.guild.id, retention_days=days)
+        cfg = await interaction.client.db.save_guild(interaction.guild.id, retention_days=days)
         _ = translator(cfg)
         await interaction.response.send_message(_("settings.retention_set", days=days),
                                                 ephemeral=True)
@@ -522,8 +522,8 @@ class SettingsGroup(app_commands.Group):
         ctx = await require_setup(interaction)
         if ctx is None:
             return
-        cfg = interaction.client.db.save_guild(interaction.guild.id,
-                                               staff_reminders=int(enabled))
+        cfg = await interaction.client.db.save_guild(interaction.guild.id,
+                                               staff_reminders=enabled)
         _ = translator(cfg)
         await interaction.response.send_message(
             _("settings.reminders_on") if enabled else _("settings.reminders_off"),
@@ -538,7 +538,7 @@ class SettingsGroup(app_commands.Group):
         if ctx is None:
             return
         _ = ctx[1]
-        interaction.client.db.save_guild(interaction.guild.id, auto_assign=int(enabled))
+        await interaction.client.db.save_guild(interaction.guild.id, auto_assign=enabled)
         await interaction.response.send_message(
             _("settings.autoassign_set_on") if enabled else _("settings.autoassign_set_off"),
             ephemeral=True)
@@ -552,7 +552,7 @@ class SettingsGroup(app_commands.Group):
         if ctx is None:
             return
         _ = ctx[1]
-        interaction.client.db.save_guild(interaction.guild.id, ticket_cooldown=minutes)
+        await interaction.client.db.save_guild(interaction.guild.id, ticket_cooldown=minutes)
         await interaction.response.send_message(
             _("settings.cooldown_set", time=format_duration(minutes * 60)) if minutes
             else _("settings.cooldown_off"), ephemeral=True)
@@ -565,7 +565,7 @@ class SettingsGroup(app_commands.Group):
         if ctx is None:
             return
         _ = ctx[1]
-        interaction.client.db.save_guild(interaction.guild.id,
+        await interaction.client.db.save_guild(interaction.guild.id,
                                          archive_channel=channel.id if channel else None)
         await interaction.response.send_message(
             _("settings.archive_set", channel=channel.mention) if channel
@@ -632,11 +632,12 @@ class BlockGroup(app_commands.Group):
         now = time.time()
         seconds = config.BLOCK_DURATIONS[duration.value if duration else "permanent"]
         until = now + seconds if seconds else None
-        db.block_user(interaction.guild.id, member.id, reason, interaction.user.id, now, until)
+        await db.block_user(interaction.guild.id, member.id, reason, interaction.user.id, now,
+                            until)
 
         when = _("block.until", time=f"<t:{int(until)}:f>") if until else _("block.permanent")
         text = _("block.added", user=member.mention, when=when)
-        existing = db.open_ticket_of_owner(interaction.guild.id, member.id)
+        existing = await db.open_ticket_of_owner(interaction.guild.id, member.id)
         if existing:
             text += "\n" + _("block.has_open", channel=f"<#{existing['channel_id']}>")
         await interaction.response.send_message(text, ephemeral=True)
@@ -654,8 +655,8 @@ class BlockGroup(app_commands.Group):
             return
         cfg, _ = ctx
         db = interaction.client.db
-        active = db.get_block(interaction.guild.id, member.id, time.time())
-        db.unblock_user(interaction.guild.id, member.id)
+        active = await db.get_block(interaction.guild.id, member.id, time.time())
+        await db.unblock_user(interaction.guild.id, member.id)
         if not active:
             await interaction.response.send_message(_("block.not_blocked", user=member.mention),
                                                     ephemeral=True)
@@ -672,7 +673,7 @@ class BlockGroup(app_commands.Group):
         if ctx is None:
             return
         _ = ctx[1]
-        blocks = interaction.client.db.list_blocks(interaction.guild.id, time.time())
+        blocks = await interaction.client.db.list_blocks(interaction.guild.id, time.time())
         embed = discord.Embed(title=_("block.list_title", count=len(blocks)), color=COLOR)
         description = ""
         for b in blocks:
@@ -692,7 +693,7 @@ class BlockGroup(app_commands.Group):
 # ------------------------------------------------------------ ticket types ---
 
 async def type_autocomplete(interaction: discord.Interaction, current: str):
-    types = interaction.client.db.list_types(interaction.guild.id)
+    types = await interaction.client.db.list_types(interaction.guild.id)
     current = current.lower()
     return [
         app_commands.Choice(name=f"{t['emoji']} {t['label']}"[:100], value=t["key"])
@@ -708,8 +709,8 @@ class QuestionsGroup(app_commands.Group):
 
     async def _type(self, interaction: discord.Interaction, key: str):
         db = interaction.client.db
-        _ = translator(db.get_guild(interaction.guild.id))
-        ticket_type = db.get_type(interaction.guild.id, key)
+        _ = translator(await db.get_guild(interaction.guild.id))
+        ticket_type = await db.get_type(interaction.guild.id, key)
         if ticket_type is None:
             await interaction.response.send_message(_("error.type_gone"), ephemeral=True)
         return ticket_type, _
@@ -721,7 +722,7 @@ class QuestionsGroup(app_commands.Group):
         ticket_type, _ = await self._type(interaction, type)
         if ticket_type is None:
             return
-        questions = interaction.client.db.list_questions(interaction.guild.id, type)
+        questions = await interaction.client.db.list_questions(interaction.guild.id, type)
         name = f"{ticket_type['emoji']} {ticket_type['label']}"
         if not questions:
             text = _("questions.none")
@@ -760,11 +761,11 @@ class QuestionsGroup(app_commands.Group):
         if ticket_type is None:
             return
         db = interaction.client.db
-        if len(db.list_questions(interaction.guild.id, type)) >= config.MAX_TYPE_QUESTIONS:
+        if len(await db.list_questions(interaction.guild.id, type)) >= config.MAX_TYPE_QUESTIONS:
             await interaction.response.send_message(
                 _("questions.too_many", max=config.MAX_TYPE_QUESTIONS), ephemeral=True)
             return
-        position = db.add_question(interaction.guild.id, type, question.strip(),
+        position = await db.add_question(interaction.guild.id, type, question.strip(),
                                    (example or "").strip(),
                                    long=bool(length and length.value == "long"),
                                    required=required)
@@ -781,7 +782,7 @@ class QuestionsGroup(app_commands.Group):
         ticket_type, _ = await self._type(interaction, type)
         if ticket_type is None:
             return
-        if interaction.client.db.remove_question(interaction.guild.id, type, number):
+        if await interaction.client.db.remove_question(interaction.guild.id, type, number):
             text = _("questions.removed", number=number,
                      type=f"{ticket_type['emoji']} {ticket_type['label']}")
         else:
@@ -802,7 +803,7 @@ class TypesGroup(app_commands.Group):
         if ctx is None:
             return
         _ = ctx[1]
-        types = interaction.client.db.list_types(interaction.guild.id)
+        types = await interaction.client.db.list_types(interaction.guild.id)
         lines = [f"{t['emoji']} **{t['label']}** (`{t['key']}`)"
                  + (f" – {t['description']}" if t["description"] else "") for t in types]
         embed = discord.Embed(title=_("types.title", count=len(types),
@@ -821,7 +822,7 @@ class TypesGroup(app_commands.Group):
             return
         cfg, _ = ctx
         db = interaction.client.db
-        types = db.list_types(interaction.guild.id)
+        types = await db.list_types(interaction.guild.id)
         if len(types) >= config.MAX_TICKET_TYPES:
             await interaction.response.send_message(
                 _("types.too_many", max=config.MAX_TICKET_TYPES), ephemeral=True)
@@ -835,7 +836,7 @@ class TypesGroup(app_commands.Group):
         while key in existing:
             key = f"{base[:17]}-{n}"
             n += 1
-        db.add_type(interaction.guild.id, key, name.strip(), emoji.strip(),
+        await db.add_type(interaction.guild.id, key, name.strip(), emoji.strip(),
                     (description or "").strip())
         await interaction.response.send_message(
             _("types.added", type=f"{emoji} {name}", key=key), ephemeral=True)
@@ -854,7 +855,7 @@ class TypesGroup(app_commands.Group):
             return
         cfg, _ = ctx
         db = interaction.client.db
-        current = db.get_type(interaction.guild.id, type)
+        current = await db.get_type(interaction.guild.id, type)
         if current is None:
             await interaction.response.send_message(_("error.type_gone"), ephemeral=True)
             return
@@ -871,8 +872,8 @@ class TypesGroup(app_commands.Group):
         if not changes:
             await interaction.response.send_message(_("types.nothing"), ephemeral=True)
             return
-        db.update_type(interaction.guild.id, type, **changes)
-        updated = db.get_type(interaction.guild.id, type)
+        await db.update_type(interaction.guild.id, type, **changes)
+        updated = await db.get_type(interaction.guild.id, type)
         await interaction.response.send_message(
             _("types.edited", type=f"{updated['emoji']} {updated['label']}"), ephemeral=True)
         await refresh_panel(interaction.client, interaction.guild, cfg)
@@ -886,7 +887,7 @@ class TypesGroup(app_commands.Group):
             return
         cfg, _ = ctx
         db = interaction.client.db
-        types = db.list_types(interaction.guild.id)
+        types = await db.list_types(interaction.guild.id)
         target = next((t for t in types if t["key"] == type), None)
         if target is None:
             await interaction.response.send_message(_("error.type_gone"), ephemeral=True)
@@ -894,7 +895,7 @@ class TypesGroup(app_commands.Group):
         if len(types) <= 1:
             await interaction.response.send_message(_("types.last"), ephemeral=True)
             return
-        db.remove_type(interaction.guild.id, type)
+        await db.remove_type(interaction.guild.id, type)
         await interaction.response.send_message(
             _("types.removed", type=f"{target['emoji']} {target['label']}"), ephemeral=True)
         await refresh_panel(interaction.client, interaction.guild, cfg)
@@ -970,7 +971,7 @@ class TelegramGroup(app_commands.Group):
                 await interaction.response.send_message(_("tg.wrong_code", left=left),
                                                         ephemeral=True)
             return
-        cfg = client.db.save_guild(interaction.guild.id, telegram_chat_id=pending["chat_id"])
+        cfg = await client.db.save_guild(interaction.guild.id, telegram_chat_id=pending["chat_id"])
         client.pending_links.pop(interaction.guild.id, None)
         await interaction.response.send_message(_("tg.linked"), ephemeral=True)
         await telegram_notify(client, cfg, _("tg.linked_chat",
@@ -1007,7 +1008,7 @@ class TelegramGroup(app_commands.Group):
         if ctx is None:
             return
         _ = ctx[1]
-        interaction.client.db.save_guild(interaction.guild.id, telegram_chat_id=None)
+        await interaction.client.db.save_guild(interaction.guild.id, telegram_chat_id=None)
         interaction.client.pending_links.pop(interaction.guild.id, None)
         await interaction.response.send_message(_("tg.unlinked"), ephemeral=True)
 
@@ -1019,7 +1020,7 @@ async def reply_autocomplete(interaction: discord.Interaction, current: str):
     return [
         app_commands.Choice(name=f"{r['name']} – {r['content']}".replace("\n", " ")[:100],
                             value=r["name"])
-        for r in interaction.client.db.list_replies(interaction.guild.id)
+        for r in await interaction.client.db.list_replies(interaction.guild.id)
         if current in r["name"]
     ][:25]
 
@@ -1034,7 +1035,7 @@ async def reply(interaction: discord.Interaction, name: str):
         return
     cfg, _, ticket = ctx
     db = interaction.client.db
-    saved = db.get_reply(interaction.guild.id, name)
+    saved = await db.get_reply(interaction.guild.id, name)
     if saved is None:
         await interaction.response.send_message(_("replies.unknown", name=name), ephemeral=True)
         return
@@ -1045,7 +1046,7 @@ async def reply(interaction: discord.Interaction, name: str):
         allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True),
     )
     # A quick reply is a staff answer: it counts for stats and the auto-close timer
-    db.update_ticket(ticket["id"], **activity_changes(ticket, time.time(), from_staff=True))
+    await db.update_ticket(ticket["id"], **activity_changes(ticket, time.time(), from_staff=True))
 
 
 class ReplyModal(discord.ui.Modal):
@@ -1064,12 +1065,12 @@ class ReplyModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         _ = self._
         db = interaction.client.db
-        is_new = db.get_reply(interaction.guild.id, self.name) is None
-        if is_new and len(db.list_replies(interaction.guild.id)) >= config.MAX_REPLIES:
+        is_new = await db.get_reply(interaction.guild.id, self.name) is None
+        if is_new and len(await db.list_replies(interaction.guild.id)) >= config.MAX_REPLIES:
             await interaction.response.send_message(
                 _("replies.too_many", max=config.MAX_REPLIES), ephemeral=True)
             return
-        db.save_reply(interaction.guild.id, self.name, self.content.value)
+        await db.save_reply(interaction.guild.id, self.name, self.content.value)
         preview = fill_reply(self.content.value, user="@User", staff="@Staff",
                              server=interaction.guild.name)
         await interaction.response.send_message(
@@ -1084,8 +1085,8 @@ class RepliesGroup(app_commands.Group):
 
     @app_commands.command(name="list", description="Show the quick replies")
     async def list_replies(self, interaction: discord.Interaction):
-        _ = translator(interaction.client.db.get_guild(interaction.guild.id))
-        replies = interaction.client.db.list_replies(interaction.guild.id)
+        _ = translator(await interaction.client.db.get_guild(interaction.guild.id))
+        replies = await interaction.client.db.list_replies(interaction.guild.id)
         if not replies:
             await interaction.response.send_message(_("replies.none"), ephemeral=True)
             return
@@ -1104,20 +1105,20 @@ class RepliesGroup(app_commands.Group):
     async def add_reply(self, interaction: discord.Interaction,
                         name: app_commands.Range[str, 1, 32]):
         db = interaction.client.db
-        _ = translator(db.get_guild(interaction.guild.id))
+        _ = translator(await db.get_guild(interaction.guild.id))
         key = reply_name(name)
         if not key:
             await interaction.response.send_message(_("replies.bad_name"), ephemeral=True)
             return
-        if db.get_reply(interaction.guild.id, key):
+        if await db.get_reply(interaction.guild.id, key):
             await interaction.response.send_message(_("replies.exists", name=key),
                                                     ephemeral=True)
             return
-        if len(db.list_replies(interaction.guild.id)) >= config.MAX_REPLIES:
+        if len(await db.list_replies(interaction.guild.id)) >= config.MAX_REPLIES:
             await interaction.response.send_message(
                 _("replies.too_many", max=config.MAX_REPLIES), ephemeral=True)
             return
-        db.save_guild(interaction.guild.id)  # make sure the server row exists
+        await db.save_guild(interaction.guild.id)  # make sure the server row exists
         await interaction.response.send_modal(ReplyModal(key, _))
 
     @app_commands.command(name="edit", description="Edit a quick reply")
@@ -1125,8 +1126,8 @@ class RepliesGroup(app_commands.Group):
     @app_commands.autocomplete(name=reply_autocomplete)
     async def edit_reply(self, interaction: discord.Interaction, name: str):
         db = interaction.client.db
-        _ = translator(db.get_guild(interaction.guild.id))
-        saved = db.get_reply(interaction.guild.id, name)
+        _ = translator(await db.get_guild(interaction.guild.id))
+        saved = await db.get_reply(interaction.guild.id, name)
         if saved is None:
             await interaction.response.send_message(_("replies.unknown", name=name),
                                                     ephemeral=True)
@@ -1138,8 +1139,8 @@ class RepliesGroup(app_commands.Group):
     @app_commands.autocomplete(name=reply_autocomplete)
     async def remove_reply(self, interaction: discord.Interaction, name: str):
         db = interaction.client.db
-        _ = translator(db.get_guild(interaction.guild.id))
-        if db.remove_reply(interaction.guild.id, name):
+        _ = translator(await db.get_guild(interaction.guild.id))
+        if await db.remove_reply(interaction.guild.id, name):
             await interaction.response.send_message(_("replies.removed", name=name.lower()),
                                                     ephemeral=True)
         else:
@@ -1158,7 +1159,7 @@ class ProfileGroup(app_commands.Group):
                          default_permissions=discord.Permissions(administrator=True))
 
     async def _apply(self, interaction: discord.Interaction, done: str, **changes) -> None:
-        _ = translator(interaction.client.db.get_guild(interaction.guild.id))
+        _ = translator(await interaction.client.db.get_guild(interaction.guild.id))
         if not interaction.response.is_done():
             await interaction.response.defer(ephemeral=True, thinking=True)
         try:
@@ -1173,7 +1174,7 @@ class ProfileGroup(app_commands.Group):
             await interaction.followup.send(done, ephemeral=True)
 
     async def _image(self, interaction: discord.Interaction, image: discord.Attachment):
-        _ = translator(interaction.client.db.get_guild(interaction.guild.id))
+        _ = translator(await interaction.client.db.get_guild(interaction.guild.id))
         if not valid_profile_image(image.content_type, image.size):
             await interaction.response.send_message(
                 _("profile.bad_image", mb=PROFILE_IMAGE_MAX_MB), ephemeral=True)
@@ -1185,7 +1186,7 @@ class ProfileGroup(app_commands.Group):
     @app_commands.describe(name="New name (up to 32 characters)")
     async def set_name(self, interaction: discord.Interaction,
                    name: app_commands.Range[str, 1, 32]):
-        _ = translator(interaction.client.db.get_guild(interaction.guild.id))
+        _ = translator(await interaction.client.db.get_guild(interaction.guild.id))
         await self._apply(interaction, _("profile.name_set", name=name.strip()),
                           nick=name.strip())
 
@@ -1194,7 +1195,7 @@ class ProfileGroup(app_commands.Group):
     async def set_avatar(self, interaction: discord.Interaction, image: discord.Attachment):
         data = await self._image(interaction, image)
         if data is not None:
-            _ = translator(interaction.client.db.get_guild(interaction.guild.id))
+            _ = translator(await interaction.client.db.get_guild(interaction.guild.id))
             await self._apply(interaction, _("profile.avatar_set"), avatar=data)
 
     @app_commands.command(name="banner", description="Change the bot's banner in this server")
@@ -1202,20 +1203,20 @@ class ProfileGroup(app_commands.Group):
     async def set_banner(self, interaction: discord.Interaction, image: discord.Attachment):
         data = await self._image(interaction, image)
         if data is not None:
-            _ = translator(interaction.client.db.get_guild(interaction.guild.id))
+            _ = translator(await interaction.client.db.get_guild(interaction.guild.id))
             await self._apply(interaction, _("profile.banner_set"), banner=data)
 
     @app_commands.command(name="bio", description="Change the bot's bio in this server")
     @app_commands.describe(text="New bio (up to 190 characters)")
     async def set_bio(self, interaction: discord.Interaction,
                   text: app_commands.Range[str, 1, 190]):
-        _ = translator(interaction.client.db.get_guild(interaction.guild.id))
+        _ = translator(await interaction.client.db.get_guild(interaction.guild.id))
         await self._apply(interaction, _("profile.bio_set"), bio=text.strip())
 
     @app_commands.command(name="reset",
                           description="Restore the bot's original profile in this server")
     async def reset_profile(self, interaction: discord.Interaction):
-        _ = translator(interaction.client.db.get_guild(interaction.guild.id))
+        _ = translator(await interaction.client.db.get_guild(interaction.guild.id))
         await self._apply(interaction, _("profile.reset"),
                           nick=None, avatar=None, banner=None, bio=None)
 

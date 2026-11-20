@@ -44,16 +44,16 @@ def panel_embed(types: list[dict], _: Translate) -> discord.Embed:
     return discord.Embed(title=_("panel.title"), description=description, color=COLOR)
 
 
-def open_problem(db, cfg: dict, member: discord.abc.User, _: Translate) -> str | None:
+async def open_problem(db, cfg: dict, member: discord.abc.User, _: Translate) -> str | None:
     """Why a member can't open a ticket right now (None = they can)."""
     guild_id = cfg["guild_id"]
-    existing = db.open_ticket_of_owner(guild_id, member.id)
+    existing = await db.open_ticket_of_owner(guild_id, member.id)
     if existing:
         return _("open.already", channel=f"<#{existing['channel_id']}>")
     if is_staff(member, cfg):
         return None
     now = time.time()
-    block = db.get_block(guild_id, member.id, now)
+    block = await db.get_block(guild_id, member.id, now)
     if block:
         text = _("open.blocked")
         if block.get("reason"):
@@ -61,7 +61,7 @@ def open_problem(db, cfg: dict, member: discord.abc.User, _: Translate) -> str |
         if block.get("until"):
             text += "\n" + _("open.blocked_until", time=f"<t:{int(block['until'])}:R>")
         return text
-    wait = cooldown_left(db.last_ticket_of_owner(guild_id, member.id),
+    wait = cooldown_left(await db.last_ticket_of_owner(guild_id, member.id),
                          cfg.get("ticket_cooldown") or 0, now)
     if wait:
         return _("open.cooldown", time=f"<t:{int(now + wait) + 1}:R>")
@@ -73,8 +73,8 @@ async def pick_assignee(db, guild: discord.Guild, cfg: dict,
     """Next available staff member for a new ticket (None = ping the staff role)."""
     if not cfg.get("auto_assign"):
         return None
-    available = db.available_staff(guild.id)
-    for user_id in assignment_order(available, db.open_tickets_per_staff(guild.id)):
+    available = await db.available_staff(guild.id)
+    for user_id in assignment_order(available, await db.open_tickets_per_staff(guild.id)):
         if user_id == owner_id:
             continue
         member = guild.get_member(user_id)
@@ -86,7 +86,7 @@ async def pick_assignee(db, guild: discord.Guild, cfg: dict,
             except discord.HTTPException:
                 continue
         if member is None or member.bot or not is_staff(member, cfg):
-            db.set_available(guild.id, user_id, False)  # left the server or the staff
+            await db.set_available(guild.id, user_id, False)  # left the server or the staff
             continue
         return member
     return None
@@ -104,16 +104,16 @@ class TicketPanel(discord.ui.View):
                        style=discord.ButtonStyle.primary, custom_id="ticket:open")
     async def open_btn(self, interaction: discord.Interaction, _button: discord.ui.Button):
         db = interaction.client.db
-        cfg = db.get_guild(interaction.guild.id)
+        cfg = await db.get_guild(interaction.guild.id)
         _ = translator(cfg)
         if cfg is None or not cfg.get("category"):
             await interaction.response.send_message(_("error.not_setup"), ephemeral=True)
             return
-        problem = open_problem(db, cfg, interaction.user, _)
+        problem = await open_problem(db, cfg, interaction.user, _)
         if problem:
             await interaction.response.send_message(problem, ephemeral=True)
             return
-        types = db.list_types(interaction.guild.id)
+        types = await db.list_types(interaction.guild.id)
         if not types:
             await interaction.response.send_message(_("error.no_types"), ephemeral=True)
             return
@@ -130,7 +130,7 @@ async def refresh_panel(client, guild: discord.Guild, cfg: dict) -> None:
     _ = translator(cfg)
     try:
         await channel.get_partial_message(cfg["panel_message"]).edit(
-            embed=panel_embed(client.db.list_types(guild.id), _), view=TicketPanel(_)
+            embed=panel_embed(await client.db.list_types(guild.id), _), view=TicketPanel(_)
         )
     except discord.HTTPException:
         pass
@@ -149,13 +149,13 @@ class TypeSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         db = interaction.client.db
-        cfg = db.get_guild(interaction.guild.id)
+        cfg = await db.get_guild(interaction.guild.id)
         _ = translator(cfg)
-        ticket_type = db.get_type(interaction.guild.id, self.values[0])
+        ticket_type = await db.get_type(interaction.guild.id, self.values[0])
         if ticket_type is None:
             await interaction.response.send_message(_("error.type_gone"), ephemeral=True)
             return
-        questions = db.list_questions(interaction.guild.id, ticket_type["key"])
+        questions = await db.list_questions(interaction.guild.id, ticket_type["key"])
         await interaction.response.send_modal(TicketModal(ticket_type, _, questions))
 
 
@@ -248,7 +248,7 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
     db = client.db
     guild = interaction.guild
     user = interaction.user
-    cfg = db.get_guild(guild.id)
+    cfg = await db.get_guild(guild.id)
     _ = translator(cfg)
 
     category = guild.get_channel(cfg.get("category") or 0)
@@ -257,15 +257,15 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
         await interaction.response.send_message(_("error.bad_setup"), ephemeral=True)
         return
 
-    problem = open_problem(db, cfg, user, _)  # checked again: the form may stay open a while
+    problem = await open_problem(db, cfg, user, _)  # checked again: the form may stay open a while
     if problem:
         await interaction.response.send_message(problem, ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True, thinking=True)
-    waiting, in_progress = db.queue_counts(guild.id)
-    number = db.next_ticket_number(guild.id)
-    user_number = db.next_user_number(guild.id, user.id)
+    waiting, in_progress = await db.queue_counts(guild.id)
+    number = await db.next_ticket_number(guild.id)
+    user_number = await db.next_user_number(guild.id, user.id)
     channel_name = ticket_channel_name(ticket_type["key"], user.name, user.id, user_number)
 
     overwrites = {
@@ -292,8 +292,8 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
     now = time.time()
     assignee = await pick_assignee(db, guild, cfg, user.id)
     if assignee:
-        db.mark_assigned(guild.id, assignee.id, now)
-    ticket_id = db.create_ticket(
+        await db.mark_assigned(guild.id, assignee.id, now)
+    ticket_id = await db.create_ticket(
         guild_id=guild.id, channel_id=channel.id, number=number, user_number=user_number,
         name=channel.name, owner_id=user.id,
         type_key=ticket_type["key"], type_label=ticket_type["label"],
@@ -316,7 +316,7 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
     ping = assignee.mention if assignee else staff_role.mention
     control = await channel.send(content=f"{user.mention} {ping}",
                                  embed=embed, view=TicketControls(_))
-    db.update_ticket(ticket_id, control_message=control.id)
+    await db.update_ticket(ticket_id, control_message=control.id)
     if attachments:
         await forward_attachments(channel, user, attachments, _)
 
@@ -360,9 +360,9 @@ async def get_context(interaction: discord.Interaction, *, staff: bool = False,
                       allow_closed: bool = False):
     """Return (cfg, _, ticket) for a ticket channel, or None after answering with an error."""
     db = interaction.client.db
-    cfg = db.get_guild(interaction.guild.id) if interaction.guild else None
+    cfg = await db.get_guild(interaction.guild.id) if interaction.guild else None
     _ = translator(cfg)
-    ticket = db.ticket_by_channel(interaction.channel.id) if cfg else None
+    ticket = await db.ticket_by_channel(interaction.channel.id) if cfg else None
     if ticket is None:
         await respond(interaction, _("error.not_ticket"), ephemeral=True)
         return None
@@ -400,7 +400,8 @@ async def start_claim(interaction: discord.Interaction) -> None:
         )
         return
     if not ticket.get("control_message") and interaction.message is not None:
-        interaction.client.db.update_ticket(ticket["id"], control_message=interaction.message.id)
+        await interaction.client.db.update_ticket(ticket["id"],
+                                                  control_message=interaction.message.id)
     await interaction.response.send_message(
         _("claim.choose_priority"), view=PriorityView(_, claim=True), ephemeral=True
     )
@@ -447,7 +448,7 @@ async def apply_priority(interaction: discord.Interaction, level: str, claim: bo
         changes.update(claimed_by=interaction.user.id, status=config.STATUS_IN_PROGRESS)
         if not ticket.get("first_response_at"):
             changes["first_response_at"] = time.time()
-    db.update_ticket(ticket["id"], **changes)
+    await db.update_ticket(ticket["id"], **changes)
     ticket.update(changes)
 
     label = priority_label(_, level)
@@ -489,7 +490,7 @@ async def transfer_ticket(interaction: discord.Interaction, member: discord.Memb
     changes = {"claimed_by": member.id}
     if ticket["status"] == config.STATUS_WAITING:
         changes["status"] = config.STATUS_IN_PROGRESS
-    interaction.client.db.update_ticket(ticket["id"], **changes)
+    await interaction.client.db.update_ticket(ticket["id"], **changes)
     ticket.update(changes)
     await interaction.response.send_message(
         _("transfer.done", user=member.mention, by=interaction.user.mention)
@@ -559,20 +560,20 @@ async def close_ticket(client, channel: discord.TextChannel, ticket: dict,
                        closed_by: discord.abc.User, reason: str) -> None:
     db = client.db
     guild = channel.guild
-    cfg = db.get_guild(guild.id)
+    cfg = await db.get_guild(guild.id)
     _ = translator(cfg)
     now = time.time()
 
     messages = await collect_messages(channel)
     notes = [dict(n, author=user_name(guild, n["author_id"], client))
-             for n in db.list_notes(ticket["id"])]
+             for n in await db.list_notes(ticket["id"])]
     meta = ticket_meta(client, guild, channel, ticket, _, closed_by, reason)
     staff_html = render_html(meta, messages, notes, _)
     staff_txt = render_txt(meta, messages, notes, _)
     user_html = render_html(meta, messages, [], _)
 
-    db.update_ticket(ticket["id"], status=config.STATUS_CLOSED, closed_at=now,
-                     closed_by=closed_by.id, close_reason=reason, warned=0)
+    await db.update_ticket(ticket["id"], status=config.STATUS_CLOSED, closed_at=now,
+                     closed_by=closed_by.id, close_reason=reason, warned=False)
     priority = ticket.get("priority")
 
     embed = discord.Embed(title=_("close.log_title", channel=channel.name),
@@ -615,7 +616,7 @@ async def close_ticket(client, channel: discord.TextChannel, ticket: dict,
             print(f"Could not send the transcript to #{target}: {e}")
             continue
         if auto_delete:
-            db.add_transcript_ref(guild.id, target.id, sent.id, priority, now)
+            await db.add_transcript_ref(guild.id, target.id, sent.id, priority, now)
 
     await telegram_notify(
         client, cfg,
@@ -685,9 +686,9 @@ async def reopen_ticket(interaction: discord.Interaction) -> None:
         await interaction.response.send_message(_("reopen.not_closed"), ephemeral=True)
         return
     status = config.STATUS_IN_PROGRESS if ticket.get("claimed_by") else config.STATUS_WAITING
-    interaction.client.db.update_ticket(
+    await interaction.client.db.update_ticket(
         ticket["id"], status=status, closed_at=None, closed_by=None, close_reason=None,
-        last_actor=None, last_activity=time.time(), warned=0,
+        last_actor=None, last_activity=time.time(), warned=False,
         awaiting_staff_since=time.time(), staff_reminded_at=None,
     )
     await interaction.response.send_message(_("reopen.done", user=interaction.user.mention))
@@ -708,7 +709,7 @@ async def delete_ticket_now(interaction: discord.Interaction) -> None:
         await interaction.response.send_message(_("delete.not_closed"), ephemeral=True)
         return
     await interaction.response.send_message(_("delete.deleting"))
-    interaction.client.db.mark_channel_deleted(ticket["id"])
+    await interaction.client.db.mark_channel_deleted(ticket["id"])
     await interaction.channel.delete(reason=f"Ticket deleted by {interaction.user}")
 
 
@@ -732,8 +733,8 @@ class RatingButton(discord.ui.DynamicItem[discord.ui.Button],
 
     async def callback(self, interaction: discord.Interaction):
         db = interaction.client.db
-        ticket = db.get_ticket(self.ticket_id)
-        _ = translator(db.get_guild(ticket["guild_id"]) if ticket else None)
+        ticket = await db.get_ticket(self.ticket_id)
+        _ = translator(await db.get_guild(ticket["guild_id"]) if ticket else None)
         if ticket is None:
             await interaction.response.send_message(_("rating.unavailable"), ephemeral=True)
         elif interaction.user.id != ticket["owner_id"]:
@@ -771,12 +772,12 @@ class RatingModal(discord.ui.Modal):
         _ = self._
         client = interaction.client
         db = client.db
-        ticket = db.get_ticket(self.ticket_id)
+        ticket = await db.get_ticket(self.ticket_id)
         if ticket is None or ticket.get("rating"):
             await interaction.response.send_message(_("rating.already"), ephemeral=True)
             return
         comment = self.comment.value.strip() or None
-        db.update_ticket(ticket["id"], rating=self.value, rating_comment=comment,
+        await db.update_ticket(ticket["id"], rating=self.value, rating_comment=comment,
                          rated_at=time.time())
 
         original = interaction.message.content if interaction.message else ""
@@ -786,7 +787,7 @@ class RatingModal(discord.ui.Modal):
             view=None,
         )
 
-        cfg = db.get_guild(ticket["guild_id"])
+        cfg = await db.get_guild(ticket["guild_id"])
         guild = client.get_guild(ticket["guild_id"])
         if cfg is None or guild is None:
             return

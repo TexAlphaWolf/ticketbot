@@ -11,6 +11,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from conftest import SyncStore, new_store, unused_store  # noqa: E402
+
 from ticketbot.core import config, logic  # noqa: E402
 from ticketbot.core.i18n import COMMAND_TEXT, DEFAULT_TYPES, LANGUAGES, STRINGS, t  # noqa: E402
 from ticketbot.core.transcripts import (  # noqa: E402
@@ -19,18 +21,10 @@ from ticketbot.core.transcripts import (  # noqa: E402
     render_html,
     render_txt,
 )
-from ticketbot.db import Database  # noqa: E402
 from ticketbot.db.legacy import migrate_legacy_config  # noqa: E402
 
 HOUR = 3600
 DAY = 86400
-
-
-@pytest.fixture
-def db():
-    database = Database(":memory:")
-    yield database
-    database.close()
 
 
 def new_ticket(db, guild_id=1, owner_id=10, channel_id=100, now=1_000_000.0, **extra):
@@ -183,7 +177,7 @@ def test_delete_guild_removes_everything(db):
     db.ensure_default_types(1, DEFAULT_TYPES["en"])
     assert db.delete_guild(1)
     for table in ("guilds", "tickets", "notes", "transcript_refs", "ticket_types"):
-        assert db.conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
+        assert db.count(table) == 0
 
 
 def test_migration_from_v1_config(db, tmp_path):
@@ -207,7 +201,7 @@ def test_migration_from_v1_config(db, tmp_path):
     }
     path = tmp_path / "config.json"
     path.write_text(json.dumps(legacy), encoding="utf-8")
-    assert migrate_legacy_config(db, path) == 1
+    assert db.run(migrate_legacy_config(db.store, path)) == 1
     assert not path.exists() and (tmp_path / "config.json.migrated").exists()
     cfg = db.get_guild(42)
     assert (cfg["counter"], cfg["retention_days"], cfg["telegram_chat_id"]) == (12, 14, "-100123")
@@ -217,7 +211,7 @@ def test_migration_from_v1_config(db, tmp_path):
     assert (other["type_key"], other["status"], other["priority"]) == ("other", "in_progress",
                                                                        "high")
     assert db.transcript_refs(42)[0]["message_id"] == 500
-    assert migrate_legacy_config(db, path) == 0  # nothing left to migrate
+    assert db.run(migrate_legacy_config(db.store, path)) == 0  # nothing left to migrate
 
 
 # ------------------------------------------------------------ translations ---
@@ -260,7 +254,7 @@ def test_command_texts_translated():
     from ticketbot.bot.client import TicketBot
     from ticketbot.bot.commands import all_commands
 
-    client = TicketBot(Database(":memory:"))
+    client = TicketBot(unused_store())
     for command in all_commands():
         client.tree.add_command(command)
     texts = set()
@@ -340,19 +334,22 @@ def test_translator_accepts_any_placeholder_name():
     assert "bug" in t("en", "types.added", type="x", key="bug")
 
 
-def test_startup_deletes_servers_the_bot_left():
+def test_startup_deletes_servers_the_bot_left(tmp_path):
     from types import SimpleNamespace
 
     from ticketbot.bot.client import TicketBot
 
-    database = Database(":memory:")
-    database.save_guild(1)
-    database.save_guild(2)
-    client = TicketBot(database)
-    client._connection._guilds = {1: SimpleNamespace(id=1)}
-    asyncio.run(client.on_ready())
-    assert database.guild_ids() == [1]
-    asyncio.run(client.close())
+    async def scenario():
+        store = await new_store(tmp_path / "ticketbot.db")
+        await store.save_guild(1)
+        await store.save_guild(2)
+        client = TicketBot(store)
+        client._connection._guilds = {1: SimpleNamespace(id=1)}
+        await client.on_ready()
+        assert await store.guild_ids() == [1]
+        await client.close()
+
+    asyncio.run(scenario())
 
 
 @pytest.mark.parametrize("content_type, size, ok", [
@@ -374,7 +371,7 @@ def test_command_payloads_build_for_discord():
     from ticketbot.bot.translator import CommandTranslator
 
     async def build():
-        client = TicketBot(Database(":memory:"))
+        client = TicketBot(unused_store())
         for command in all_commands():
             client.tree.add_command(command)
         translator = CommandTranslator()
@@ -524,11 +521,11 @@ def test_existing_database_is_upgraded(tmp_path):
     conn.commit()
     conn.close()
 
-    database = Database(path)
+    database = SyncStore(path)  # adopts the v2.0 file: missing columns are added
     old = database.ticket_by_channel(100)
     assert old["user_number"] is None and old["name"] is None
     assert old["awaiting_staff_since"] is None and old["staff_reminded_at"] is None
-    assert database.get_guild(1)["staff_reminders"] == 1
+    assert database.get_guild(1)["staff_reminders"] is True
     assert database.next_user_number(1, 10) == 1
     database.close()
 
@@ -542,7 +539,7 @@ def test_quick_replies_storage(db):
     assert db.remove_reply(1, "LOGS") and db.list_replies(1) == []
     db.save_reply(1, "x", "y")
     db.delete_guild(1)
-    assert db.conn.execute("SELECT COUNT(*) FROM replies").fetchone()[0] == 0
+    assert db.list_replies(1) == []
 
 
 def test_reply_name_and_placeholders():
@@ -620,21 +617,43 @@ def test_guild_reminder_setting_and_upgrade(db):
 # ----------------------------------------------------------------- backups ---
 
 def _filled_db(path):
-    database = Database(path)
+    database = SyncStore(path)
     database.save_guild(1, language="it")
     new_ticket(database, guild_id=1)
     return database
+
+
+def _backup(path, folder, **kwargs):
+    import sqlite3
+
+    from ticketbot.db.backup import create_backup
+
+    source = sqlite3.connect(path)
+    try:
+        return create_backup(source, folder, **kwargs)
+    finally:
+        source.close()
+
+
+def _guild_ids(path):
+    import sqlite3
+
+    conn = sqlite3.connect(path)
+    try:
+        return sorted(r[0] for r in conn.execute("SELECT guild_id FROM guilds"))
+    finally:
+        conn.close()
 
 
 def test_backup_is_valid_and_compressed(tmp_path):
     import gzip
     import sqlite3
 
-    from ticketbot.db.backup import create_backup, list_backups
+    from ticketbot.db.backup import list_backups
 
     database = _filled_db(tmp_path / "data" / "ticketbot.db")
-    path = create_backup(database.conn, tmp_path / "backups",
-                         now=datetime(2026, 11, 20, 3, 0, tzinfo=UTC))
+    path = _backup(database.path, tmp_path / "backups",
+                   now=datetime(2026, 11, 20, 3, 0, tzinfo=UTC))
     assert path.name == "ticketbot-20261120-030000.db.gz"
     assert list_backups(tmp_path / "backups") == [path]
     restored = tmp_path / "check.db"
@@ -667,21 +686,17 @@ def test_prune_keeps_newest_and_backup_due(tmp_path):
 
 
 def test_restore_replaces_db_and_keeps_safety_copy(tmp_path):
-    from ticketbot.db.backup import create_backup, restore_backup
+    from ticketbot.db.backup import restore_backup
 
     db_path = tmp_path / "data" / "ticketbot.db"
     database = _filled_db(db_path)
-    backup = create_backup(database.conn, tmp_path / "backups")
+    backup = _backup(db_path, tmp_path / "backups")
     database.save_guild(2)  # change after the backup
     database.close()
 
     safety = restore_backup(backup, db_path)
-    restored = Database(db_path)
-    assert restored.guild_ids() == [1]
-    restored.close()
-    before = Database(safety)
-    assert sorted(before.guild_ids()) == [1, 2]
-    before.close()
+    assert _guild_ids(db_path) == [1]
+    assert _guild_ids(safety) == [1, 2]
 
 
 def test_restore_refuses_damaged_backup(tmp_path):
@@ -695,9 +710,7 @@ def test_restore_refuses_damaged_backup(tmp_path):
     damaged.write_bytes(gzip.compress(b"this is not a database" * 100))
     with pytest.raises(Exception):  # noqa: B017
         restore_backup(damaged, db_path)
-    check = Database(db_path)
-    assert check.guild_ids() == [1]  # untouched
-    check.close()
+    assert _guild_ids(db_path) == [1]  # untouched
 
 
 @pytest.fixture
@@ -744,7 +757,7 @@ def test_type_questions_storage(db):
         (1, "Steps to reproduce"), (2, "Screenshot link")]
     assert not db.remove_question(1, "bug", 9)
     db.remove_type(1, "bug")  # questions go with the type
-    assert db.conn.execute("SELECT COUNT(*) FROM type_questions").fetchone()[0] == 0
+    assert db.count("type_questions") == 0
 
 
 def test_answers_text():
@@ -1050,3 +1063,18 @@ def test_settings_database_url(env):
         get_settings()
     assert "unsupported database" in str(error.value)
     assert "very-secret" not in str(error.value)
+
+
+def test_startup_logging_is_quiet(caplog):
+    import logging
+
+    from ticketbot.bot.client import setup_logging
+
+    setup_logging()
+    with caplog.at_level(logging.INFO):
+        logging.getLogger("alembic.runtime.migration").info("Context impl SQLiteImpl.")
+        logging.getLogger("discord.client").warning(
+            "PyNaCl is not installed, voice will NOT be supported")
+        logging.getLogger("discord.client").warning("something else")
+    messages = [r.getMessage() for r in caplog.records]
+    assert messages == ["something else"]

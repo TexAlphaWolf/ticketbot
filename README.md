@@ -64,7 +64,9 @@ Available in **English**, **Italian** and **German**.
 - **Telegram notifications** for new, high priority, closed and rated tickets
 
 **Setup**
-- Settings stored in **SQLite**, with automatic migration from v1 (`config.json`)
+- Data stored in **SQLite** (default, no setup) or **PostgreSQL**, with versioned schema
+  migrations; databases from TicketBot 2 and v1 `config.json` files are imported
+  automatically
 - **Automatic daily backups** of the database, checked and compressed, with commands
   to list and restore them
 - **Multilingual** bot messages and slash command descriptions (EN / IT / DE)
@@ -107,6 +109,21 @@ docker compose logs -f
 ```
 
 The database is saved in the `data/` folder next to `docker-compose.yml`.
+
+### Upgrading from TicketBot 2
+
+Make a backup (`python -m ticketbot backup`), update the files, run
+`python -m pip install -r requirements.txt` and start the bot. On the first start the
+database is adopted by the new migration system: the bot makes another backup, adds the
+migration history and prints `[database] adopted the TicketBot 2 database`. Nothing is
+copied: your data stays in the same file.
+
+### Using PostgreSQL
+
+SQLite needs no setup and is the default. To use PostgreSQL, create an empty database and
+set `DATABASE_URL=postgresql://user:password@host:5432/ticketbot` in `.env`: the tables are
+created at the first start. Back it up with `pg_dump`; the automatic backups and
+`python -m ticketbot backup` are for SQLite only.
 
 ### Upgrading from v1
 
@@ -242,7 +259,8 @@ ticketbot/
 │   ├── engine.py        # async engine: SQLite or PostgreSQL
 │   ├── migrate.py       # runs the Alembic migrations
 │   ├── migrations/      # numbered schema changes
-│   ├── database.py      # v2 SQLite storage (used by the bot until V3 Beta1)
+│   ├── store.py         # async queries used by the bot
+│   ├── v2.py            # recognises and adopts TicketBot 2 databases
 │   ├── backup.py        # backups and restore
 │   └── legacy.py        # v1 config.json import
 ├── bot/
