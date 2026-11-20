@@ -19,6 +19,7 @@ from ..core.logic import (
     staff_reply_hours,
     waiting_for_staff_since,
 )
+from ..core.settings import Settings, get_settings
 from ..db import Database
 from ..db.backup import backup_due, create_backup, prune_backups
 from ..db.legacy import migrate_legacy_config
@@ -30,12 +31,14 @@ from .translator import CommandTranslator
 
 
 class TicketBot(discord.Client):
-    def __init__(self, db: Database):
+    def __init__(self, db: Database, settings: Settings | None = None):
         intents = discord.Intents.default()
         intents.message_content = True  # required for transcripts
         super().__init__(intents=intents)
         self.tree = discord.app_commands.CommandTree(self)
         self.db = db
+        # Without settings (tests, scripts) the .env file is not read
+        self.settings = settings or Settings(_env_file=None)
         self.http_session: aiohttp.ClientSession | None = None
         self.telegram: TelegramNotifier | None = None
         self.pending_links: dict[int, dict] = {}
@@ -54,8 +57,9 @@ class TicketBot(discord.Client):
         await self.tree.sync()
 
         self.http_session = aiohttp.ClientSession()
-        if config.TELEGRAM_TOKEN:
-            notifier = TelegramNotifier(config.TELEGRAM_TOKEN, self.http_session)
+        if self.settings.telegram_bot_token:
+            notifier = TelegramNotifier(self.settings.telegram_bot_token.get_secret_value(),
+                                        self.http_session)
             try:
                 await notifier.get_me()
             except TelegramError as e:
@@ -181,16 +185,17 @@ class TicketBot(discord.Client):
 
     def run_backup_if_due(self) -> None:
         """Back up the database every BACKUP_INTERVAL_HOURS, keeping the last BACKUP_KEEP."""
-        if config.BACKUP_KEEP <= 0:
+        settings = self.settings
+        if settings.backup_keep <= 0:
             return
-        if not backup_due(config.BACKUP_DIR, config.BACKUP_INTERVAL_HOURS):
+        if not backup_due(settings.backups_path, settings.backup_interval_hours):
             return
         try:
-            path = create_backup(self.db.conn, config.BACKUP_DIR)
+            path = create_backup(self.db.conn, settings.backups_path)
         except (OSError, RuntimeError, sqlite3.Error) as e:
             print(f"[backup] failed: {e}")
             return
-        removed = prune_backups(config.BACKUP_DIR, config.BACKUP_KEEP)
+        removed = prune_backups(settings.backups_path, settings.backup_keep)
         print(f"[backup] saved {path.name}" + (f", removed {len(removed)} old" if removed else ""))
 
     @tasks.loop(hours=1)
@@ -227,11 +232,11 @@ class TicketBot(discord.Client):
         await self.wait_until_ready()
 
 
-def main() -> None:
-    if not config.DISCORD_TOKEN:
-        raise SystemExit("DISCORD_TOKEN is missing: create a .env file (see .env.example).")
-    db = Database(config.DB_PATH)
-    migrated = migrate_legacy_config(db, config.LEGACY_CONFIG)
+def main(settings: Settings | None = None) -> None:
+    settings = settings or get_settings()
+    token = settings.require_discord_token()
+    db = Database(settings.db_path)
+    migrated = migrate_legacy_config(db, settings.legacy_config)
     if migrated:
-        print(f"Migrated {migrated} server(s) from {config.LEGACY_CONFIG}")
-    TicketBot(db).run(config.DISCORD_TOKEN)
+        print(f"Migrated {migrated} server(s) from {settings.legacy_config}")
+    TicketBot(db, settings).run(token)

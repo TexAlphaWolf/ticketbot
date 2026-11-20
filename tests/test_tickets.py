@@ -700,14 +700,26 @@ def test_restore_refuses_damaged_backup(tmp_path):
     check.close()
 
 
-def test_command_line(tmp_path, monkeypatch, capsys):
-    from ticketbot import __main__ as cli
-    from ticketbot.core import config as cfg
+@pytest.fixture
+def env(tmp_path, monkeypatch):
+    """Settings from environment variables only, in an empty folder (no .env)."""
+    from ticketbot.core.settings import get_settings
 
-    db_path = tmp_path / "ticketbot.db"
+    monkeypatch.chdir(tmp_path)
+    for name in ("DISCORD_TOKEN", "TELEGRAM_BOT_TOKEN", "DATA_DIR", "LEGACY_CONFIG",
+                 "BACKUP_DIR", "BACKUP_KEEP", "BACKUP_INTERVAL_HOURS"):
+        monkeypatch.delenv(name, raising=False)
+    get_settings.cache_clear()
+    yield monkeypatch
+    get_settings.cache_clear()
+
+
+def test_command_line(tmp_path, env, capsys):
+    from ticketbot import __main__ as cli
+
+    db_path = tmp_path / "data" / "ticketbot.db"
     _filled_db(db_path).close()
-    monkeypatch.setattr(cfg, "DB_PATH", db_path)
-    monkeypatch.setattr(cfg, "BACKUP_DIR", tmp_path / "backups")
+    env.setenv("BACKUP_DIR", str(tmp_path / "backups"))
     assert cli.main(["backup"]) == 0
     assert "Backup saved" in capsys.readouterr().out
     assert cli.main(["backups"]) == 0
@@ -974,3 +986,51 @@ def test_core_and_storage_do_not_depend_on_discord():
         for f in (ROOT / "ticketbot" / package).glob("*.py"):
             source = f.read_text(encoding="utf-8")
             assert not re.search(r"^\s*(import discord|from discord)", source, re.M), f.name
+
+
+def test_settings_defaults_and_secrets(env, tmp_path):
+    from ticketbot.core.settings import Settings, SettingsError
+
+    settings = Settings()
+    assert settings.discord_token is None and settings.backup_keep == 7
+    assert settings.db_path == Path("data") / "ticketbot.db"
+    assert settings.backups_path == Path("data") / "backups"
+    with pytest.raises(SettingsError, match="DISCORD_TOKEN is missing"):
+        settings.require_discord_token()
+
+    (tmp_path / ".env").write_text(
+        "DISCORD_TOKEN=abc.def.ghi\nTELEGRAM_BOT_TOKEN=\nDATA_DIR=/srv/tb\nOTHER=1\n",
+        encoding="utf-8")
+    settings = Settings()
+    assert settings.require_discord_token() == "abc.def.ghi"
+    assert settings.telegram_bot_token is None          # empty = not set
+    assert settings.db_path == Path("/srv/tb") / "ticketbot.db"
+    assert "abc.def.ghi" not in repr(settings)           # secrets never printed
+    assert ("DISCORD_TOKEN", "set") in settings.summary()
+
+
+def test_settings_placeholder_and_invalid_values(env):
+    from ticketbot.core.settings import Settings, SettingsError, get_settings
+
+    env.setenv("DISCORD_TOKEN", "paste_your_bot_token_here")
+    assert Settings().discord_token is None
+    env.setenv("BACKUP_KEEP", "-1")
+    env.setenv("BACKUP_INTERVAL_HOURS", "soon")
+    with pytest.raises(SettingsError) as error:
+        get_settings()
+    message = str(error.value)
+    assert "BACKUP_KEEP" in message and "BACKUP_INTERVAL_HOURS" in message
+
+
+def test_settings_command_hides_secrets(env, capsys):
+    from ticketbot import __main__ as cli
+
+    env.setenv("DISCORD_TOKEN", "very.secret.token")
+    assert cli.main(["settings"]) == 0
+    out = capsys.readouterr().out
+    assert "very.secret.token" not in out and "DISCORD_TOKEN" in out and "set" in out
+    env.setenv("BACKUP_KEEP", "many")
+    from ticketbot.core.settings import get_settings
+    get_settings.cache_clear()
+    assert cli.main(["settings"]) == 2
+    assert "BACKUP_KEEP" in capsys.readouterr().out

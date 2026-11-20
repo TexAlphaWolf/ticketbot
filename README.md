@@ -90,8 +90,11 @@ git clone https://github.com/TexAlphaWolf/ticketbot.git
 cd ticketbot
 python -m pip install -r requirements.txt
 cp .env.example .env   # then add your tokens
+python -m ticketbot settings   # checks the .env file (tokens are never printed)
 python -m ticketbot
 ```
+
+If a value in `.env` is missing or wrong, the bot doesn't start and says which one.
 
 ### With Docker
 
@@ -228,7 +231,8 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 ```
 ticketbot/
 ├── core/                # shared by the bot and (from V3) the web API, no Discord code
-│   ├── config.py        # settings and constants
+│   ├── settings.py      # settings from .env, validated at startup
+│   ├── config.py        # constants
 │   ├── i18n.py          # translations (EN / IT / DE)
 │   ├── logic.py         # pure functions (auto-close, stats, retention...)
 │   ├── export.py        # Excel and CSV export of the statistics
@@ -246,7 +250,7 @@ ticketbot/
 │   └── common.py        # helpers shared by the bot modules
 ├── integrations/
 │   └── telegram.py      # Telegram Bot API client
-└── __main__.py          # command line: bot, backup, backups, restore
+└── __main__.py          # command line: bot, settings, backup, backups, restore
 ```
 
 ## Tests

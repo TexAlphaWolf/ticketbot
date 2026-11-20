@@ -8,6 +8,15 @@
   client, commands, views) and `integrations` (Telegram). Nothing changes for users:
   the bot still starts with `python -m ticketbot` (or the new `python -m ticketbot bot`)
 - CI also runs on the `v3-dev` branch
+- Settings are read and validated with `pydantic-settings` when the program starts: a
+  missing or invalid value in `.env` stops it with a clear message (e.g.
+  `BACKUP_KEEP: Input should be a valid integer`) instead of an error later. Tokens are
+  kept as secrets and never appear in logs or error messages. The `.env` variables
+  are the same as before
+
+### Added
+- `python -m ticketbot settings` checks the `.env` file and shows the settings in use,
+  with the tokens hidden
 
 ## [2.3.0] - 2026-11-20
 
