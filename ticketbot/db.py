@@ -75,6 +75,19 @@ CREATE TABLE IF NOT EXISTS notes (
     created_at REAL    NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS type_questions (
+    guild_id    INTEGER NOT NULL,
+    type_key    TEXT    NOT NULL,
+    position    INTEGER NOT NULL,
+    label       TEXT    NOT NULL,
+    placeholder TEXT    NOT NULL DEFAULT '',
+    long        INTEGER NOT NULL DEFAULT 0,
+    required    INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (guild_id, type_key, position),
+    FOREIGN KEY (guild_id, type_key) REFERENCES ticket_types(guild_id, key)
+        ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS replies (
     guild_id INTEGER NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
     name     TEXT    NOT NULL,
@@ -221,6 +234,35 @@ class Database:
     def remove_type(self, guild_id: int, key: str) -> bool:
         return self._write("DELETE FROM ticket_types WHERE guild_id = ? AND key = ?",
                            (guild_id, key)).rowcount > 0
+
+    def list_questions(self, guild_id: int, type_key: str) -> list[dict]:
+        return self._all("SELECT * FROM type_questions WHERE guild_id = ? AND type_key = ? "
+                         "ORDER BY position", (guild_id, type_key))
+
+    def add_question(self, guild_id: int, type_key: str, label: str, placeholder: str = "",
+                     long: bool = False, required: bool = True) -> int:
+        with self.conn:
+            position = self.conn.execute(
+                "SELECT COALESCE(MAX(position), 0) + 1 FROM type_questions "
+                "WHERE guild_id = ? AND type_key = ?", (guild_id, type_key)).fetchone()[0]
+            self.conn.execute(
+                "INSERT INTO type_questions (guild_id, type_key, position, label, placeholder, "
+                "long, required) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (guild_id, type_key, position, label, placeholder, int(long), int(required)))
+        return position
+
+    def remove_question(self, guild_id: int, type_key: str, position: int) -> bool:
+        """Remove a question and renumber the following ones (1, 2, 3...)."""
+        with self.conn:
+            removed = self.conn.execute(
+                "DELETE FROM type_questions WHERE guild_id = ? AND type_key = ? AND position = ?",
+                (guild_id, type_key, position)).rowcount
+            if removed:
+                self.conn.execute(
+                    "UPDATE type_questions SET position = position - 1 "
+                    "WHERE guild_id = ? AND type_key = ? AND position > ?",
+                    (guild_id, type_key, position))
+        return removed > 0
 
     def ensure_default_types(self, guild_id: int, defaults: list[tuple]) -> None:
         if not self.list_types(guild_id):

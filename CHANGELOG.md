@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Custom questions per ticket type** with `/types questions add`, `remove` and `list`:
+  up to 3 questions per type, with short or long answers, required or optional, and an
+  example shown inside the field. The form shows the subject and the questions of the
+  chosen type (types without questions keep subject + description); the answers become
+  the ticket description and are shown in the ticket, the transcripts and on Telegram
+
 ## [2.1.0] - 2026-11-20
 
 ### Added

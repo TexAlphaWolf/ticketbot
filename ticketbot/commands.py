@@ -419,11 +419,101 @@ async def type_autocomplete(interaction: discord.Interaction, current: str):
     ][:25]
 
 
+class QuestionsGroup(app_commands.Group):
+    """/types questions ...: the custom form of each ticket type."""
+
+    def __init__(self):
+        super().__init__(name="questions", description="Custom questions of the ticket form")
+
+    async def _type(self, interaction: discord.Interaction, key: str):
+        db = interaction.client.db
+        _ = translator(db.get_guild(interaction.guild.id))
+        ticket_type = db.get_type(interaction.guild.id, key)
+        if ticket_type is None:
+            await interaction.response.send_message(_("error.type_gone"), ephemeral=True)
+        return ticket_type, _
+
+    @app_commands.command(name="list", description="Show the questions of a ticket type")
+    @app_commands.describe(type="Ticket type")
+    @app_commands.autocomplete(type=type_autocomplete)
+    async def list_questions(self, interaction: discord.Interaction, type: str):
+        ticket_type, _ = await self._type(interaction, type)
+        if ticket_type is None:
+            return
+        questions = interaction.client.db.list_questions(interaction.guild.id, type)
+        name = f"{ticket_type['emoji']} {ticket_type['label']}"
+        if not questions:
+            text = _("questions.none")
+        else:
+            lines = []
+            for q in questions:
+                kind = _("questions.long") if q["long"] else _("questions.short")
+                need = _("questions.required") if q["required"] else _("questions.optional")
+                example = f"\n   -# {q['placeholder']}" if q["placeholder"] else ""
+                lines.append(f"**{q['position']}.** {q['label']} ({kind}, {need}){example}")
+            text = "\n".join(lines)
+        embed = discord.Embed(title=_("questions.title", type=name,
+                                      count=len(questions), max=config.MAX_TYPE_QUESTIONS),
+                              description=text, color=config.COLOR)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="add", description="Add a question to the form of a ticket type")
+    @app_commands.describe(
+        type="Ticket type",
+        question="Question shown to the user (max 45 characters)",
+        length="Answer length",
+        required="Whether the answer is required",
+        example="(Optional) Example shown inside the field",
+    )
+    @app_commands.autocomplete(type=type_autocomplete)
+    @app_commands.choices(length=[
+        app_commands.Choice(name="Short", value="short"),
+        app_commands.Choice(name="Long", value="long"),
+    ])
+    async def add_question(self, interaction: discord.Interaction, type: str,
+                           question: app_commands.Range[str, 1, 45],
+                           length: app_commands.Choice[str] | None = None,
+                           required: bool = True,
+                           example: app_commands.Range[str, 1, 100] | None = None):
+        ticket_type, _ = await self._type(interaction, type)
+        if ticket_type is None:
+            return
+        db = interaction.client.db
+        if len(db.list_questions(interaction.guild.id, type)) >= config.MAX_TYPE_QUESTIONS:
+            await interaction.response.send_message(
+                _("questions.too_many", max=config.MAX_TYPE_QUESTIONS), ephemeral=True)
+            return
+        position = db.add_question(interaction.guild.id, type, question.strip(),
+                                   (example or "").strip(),
+                                   long=bool(length and length.value == "long"),
+                                   required=required)
+        await interaction.response.send_message(
+            _("questions.added", number=position, question=question.strip(),
+              type=f"{ticket_type['emoji']} {ticket_type['label']}"), ephemeral=True)
+
+    @app_commands.command(name="remove", description="Remove a question from the form")
+    @app_commands.describe(type="Ticket type",
+                           number="Number of the question (see /types questions list)")
+    @app_commands.autocomplete(type=type_autocomplete)
+    async def remove_question(self, interaction: discord.Interaction, type: str,
+                              number: app_commands.Range[int, 1, 10]):
+        ticket_type, _ = await self._type(interaction, type)
+        if ticket_type is None:
+            return
+        if interaction.client.db.remove_question(interaction.guild.id, type, number):
+            text = _("questions.removed", number=number,
+                     type=f"{ticket_type['emoji']} {ticket_type['label']}")
+        else:
+            text = _("questions.bad_number", number=number)
+        await interaction.response.send_message(text, ephemeral=True)
+
+
 class TypesGroup(app_commands.Group):
     def __init__(self):
         super().__init__(name="types", description="Manage the ticket types of this server",
                          guild_only=True,
                          default_permissions=discord.Permissions(administrator=True))
+        self.add_command(QuestionsGroup())
 
     @app_commands.command(name="list", description="Show the ticket types")
     async def list_types(self, interaction: discord.Interaction):

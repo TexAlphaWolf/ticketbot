@@ -52,6 +52,12 @@ def ticket_channel_name(type_key: str, username: str, user_id: int, user_number:
     return f"{type_key}-{user}-{user_number}"[:100]
 
 
+def answers_text(answers: list[tuple[str, str]]) -> str:
+    """Custom form answers as the ticket description: **Question**\nAnswer."""
+    return "\n\n".join(f"**{question}**\n{answer.strip() or '-'}"
+                         for question, answer in answers)
+
+
 def format_duration(seconds: float | None) -> str:
     if seconds is None:
         return "-"

@@ -19,7 +19,7 @@ from .common import (
     type_label,
     user_name,
 )
-from .logic import format_duration, is_kept, stars, ticket_channel_name
+from .logic import answers_text, format_duration, is_kept, stars, ticket_channel_name
 from .transcripts import collect_messages, render_html, render_txt
 
 # ----------------------------------------------------------------- panel ---
@@ -92,7 +92,8 @@ class TypeSelect(discord.ui.Select):
         if ticket_type is None:
             await interaction.response.send_message(_("error.type_gone"), ephemeral=True)
             return
-        await interaction.response.send_modal(TicketModal(ticket_type, _))
+        questions = db.list_questions(interaction.guild.id, ticket_type["key"])
+        await interaction.response.send_modal(TicketModal(ticket_type, _, questions))
 
 
 class TypeView(discord.ui.View):
@@ -104,18 +105,39 @@ class TypeView(discord.ui.View):
 # ------------------------------------------------------------- opening ---
 
 class TicketModal(discord.ui.Modal):
-    def __init__(self, ticket_type: dict, _: Translate):
+    """Subject + description, or subject + the custom questions of the ticket type."""
+
+    def __init__(self, ticket_type: dict, _: Translate, questions: list[dict] | None = None):
         super().__init__(title=_("modal.title", type=ticket_type["label"])[:45])
         self.ticket_type = ticket_type
         self.subject = discord.ui.TextInput(max_length=100)
-        self.description = discord.ui.TextInput(style=discord.TextStyle.paragraph,
-                                                max_length=1000)
         self.add_item(discord.ui.Label(text=_("modal.subject"), component=self.subject))
-        self.add_item(discord.ui.Label(text=_("modal.description"), component=self.description))
+        self.answers: list[tuple[str, discord.ui.TextInput]] = []
+        for q in (questions or [])[:config.MAX_TYPE_QUESTIONS]:
+            field = discord.ui.TextInput(
+                style=discord.TextStyle.paragraph if q["long"] else discord.TextStyle.short,
+                max_length=(config.LONG_ANSWER_LENGTH if q["long"]
+                            else config.SHORT_ANSWER_LENGTH),
+                required=bool(q["required"]),
+                placeholder=q["placeholder"][:100] or None,
+            )
+            self.add_item(discord.ui.Label(text=q["label"][:45], component=field))
+            self.answers.append((q["label"], field))
+        self.description = None
+        if not self.answers:
+            self.description = discord.ui.TextInput(style=discord.TextStyle.paragraph,
+                                                    max_length=1000)
+            self.add_item(discord.ui.Label(text=_("modal.description"),
+                                           component=self.description))
+
+    def description_text(self) -> str:
+        if self.description is not None:
+            return self.description.value
+        return answers_text([(label, field.value) for label, field in self.answers])
 
     async def on_submit(self, interaction: discord.Interaction):
         await open_ticket(interaction, self.ticket_type,
-                          self.subject.value, self.description.value)
+                          self.subject.value, self.description_text())
 
 
 async def open_ticket(interaction: discord.Interaction, ticket_type: dict,

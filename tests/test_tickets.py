@@ -711,3 +711,51 @@ def test_command_line(tmp_path, monkeypatch, capsys):
     assert "Restored" in capsys.readouterr().out
     assert cli.main(["restore", str(tmp_path / "missing.db.gz"), "--yes"]) == 1
     assert "Restore failed" in capsys.readouterr().out
+
+
+# --------------------------------------------------------- form questions ---
+
+def test_type_questions_storage(db):
+    db.save_guild(1)
+    db.ensure_default_types(1, DEFAULT_TYPES["en"])
+    assert db.add_question(1, "bug", "Version", "e.g. 1.4.2") == 1
+    assert db.add_question(1, "bug", "Steps to reproduce", long=True) == 2
+    assert db.add_question(1, "bug", "Screenshot link", required=False) == 3
+    assert db.list_questions(1, "support") == []
+    assert db.remove_question(1, "bug", 1)
+    assert [(q["position"], q["label"]) for q in db.list_questions(1, "bug")] == [
+        (1, "Steps to reproduce"), (2, "Screenshot link")]
+    assert not db.remove_question(1, "bug", 9)
+    db.remove_type(1, "bug")  # questions go with the type
+    assert db.conn.execute("SELECT COUNT(*) FROM type_questions").fetchone()[0] == 0
+
+
+def test_answers_text():
+    text = logic.answers_text([("Version", "1.4.2"), ("Steps", "  open\nclick  "),
+                               ("Link", "")])
+    assert text == "**Version**\n1.4.2\n\n**Steps**\nopen\nclick\n\n**Link**\n-"
+
+
+def test_ticket_modal_uses_type_questions():
+    from ticketbot.tickets import TicketModal
+
+    _ = lambda key, /, **kw: t("en", key, **kw)  # noqa: E731
+    bug = {"key": "bug", "label": "Bug report", "emoji": "🐞"}
+    default = TicketModal(bug, _)
+    assert [c.text for c in default.children] == ["Subject", "Describe your issue"]
+
+    questions = [
+        {"label": "Version", "placeholder": "e.g. 1.4.2", "long": 0, "required": 1},
+        {"label": "Steps to reproduce", "placeholder": "", "long": 1, "required": 1},
+        {"label": "Link", "placeholder": "", "long": 0, "required": 0},
+    ]
+    custom = TicketModal(bug, _, questions)
+    assert [c.text for c in custom.children] == ["Subject", "Version", "Steps to reproduce",
+                                                 "Link"]
+    version, steps, link = (field for _label, field in custom.answers)
+    assert version.placeholder == "e.g. 1.4.2" and version.max_length == 200
+    assert steps.style.name == "paragraph" and steps.max_length == 1000
+    assert link.required is False
+    version._value, steps._value, link._value = "1.4.2", "open the app", ""
+    assert custom.description_text() == ("**Version**\n1.4.2\n\n**Steps to reproduce**\n"
+                                         "open the app\n\n**Link**\n-")

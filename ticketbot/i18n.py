@@ -282,6 +282,19 @@ STRINGS["en"] = {
     "settings.off": "Off",
     "settings.reminders_on": "⏰ Staff reminders enabled.",
     "settings.reminders_off": "⏰ Staff reminders disabled.",
+    "questions.title": "📝 Form of {type} ({count}/{max} questions)",
+    "questions.none":
+        "This type uses the default form: subject and description. Add questions with `/types "
+        "questions add`.",
+    "questions.short": "short answer",
+    "questions.long": "long answer",
+    "questions.required": "required",
+    "questions.optional": "optional",
+    "questions.too_many": "A ticket type can have at most {max} questions.",
+    "questions.added": "✅ Question {number} added to {type}: **{question}**",
+    "questions.removed": "🗑️ Question {number} removed from {type}.",
+    "questions.bad_number":
+        "There's no question number {number}. Check with `/types questions list`.",
 }
 
 STRINGS["it"] = {
@@ -530,6 +543,19 @@ STRINGS["it"] = {
     "settings.off": "Disattivati",
     "settings.reminders_on": "⏰ Promemoria per lo staff attivati.",
     "settings.reminders_off": "⏰ Promemoria per lo staff disattivati.",
+    "questions.title": "📝 Modulo di {type} ({count}/{max} domande)",
+    "questions.none":
+        "Questo tipo usa il modulo predefinito: oggetto e descrizione. Aggiungi domande con "
+        "`/types questions add`.",
+    "questions.short": "risposta breve",
+    "questions.long": "risposta lunga",
+    "questions.required": "obbligatoria",
+    "questions.optional": "facoltativa",
+    "questions.too_many": "Un tipo di ticket può avere al massimo {max} domande.",
+    "questions.added": "✅ Domanda {number} aggiunta a {type}: **{question}**",
+    "questions.removed": "🗑️ Domanda {number} rimossa da {type}.",
+    "questions.bad_number":
+        "Non esiste la domanda numero {number}. Controlla con `/types questions list`.",
 }
 
 STRINGS["de"] = {
@@ -789,6 +815,19 @@ STRINGS["de"] = {
     "settings.off": "Aus",
     "settings.reminders_on": "⏰ Team-Erinnerungen aktiviert.",
     "settings.reminders_off": "⏰ Team-Erinnerungen deaktiviert.",
+    "questions.title": "📝 Formular von {type} ({count}/{max} Fragen)",
+    "questions.none":
+        "Diese Art verwendet das Standardformular: Betreff und Beschreibung. Füge Fragen mit "
+        "`/types questions add` hinzu.",
+    "questions.short": "kurze Antwort",
+    "questions.long": "lange Antwort",
+    "questions.required": "Pflicht",
+    "questions.optional": "optional",
+    "questions.too_many": "Eine Ticket-Art kann höchstens {max} Fragen haben.",
+    "questions.added": "✅ Frage {number} zu {type} hinzugefügt: **{question}**",
+    "questions.removed": "🗑️ Frage {number} aus {type} entfernt.",
+    "questions.bad_number":
+        "Es gibt keine Frage Nummer {number}. Prüfe es mit `/types questions list`.",
 }
 
 
@@ -805,6 +844,22 @@ def t(lang: str, key: str, /, **kwargs) -> str:
 # English text -> translation, used for command, option and choice descriptions.
 COMMAND_TEXT: dict[str, dict[str, str]] = {
     "it": {
+        "Custom questions of the ticket form": "Domande personalizzate del modulo dei ticket",
+        "Show the questions of a ticket type": "Mostra le domande di un tipo di ticket",
+        "Ticket type": "Tipo di ticket",
+        "Add a question to the form of a ticket type":
+            "Aggiungi una domanda al modulo di un tipo di ticket",
+        "Question shown to the user (max 45 characters)":
+            "Domanda mostrata all'utente (max 45 caratteri)",
+        "Answer length": "Lunghezza della risposta",
+        "Short": "Breve",
+        "Long": "Lunga",
+        "Whether the answer is required": "Se la risposta è obbligatoria",
+        "(Optional) Example shown inside the field":
+            "(Facoltativo) Esempio mostrato dentro il campo",
+        "Remove a question from the form": "Rimuovi una domanda dal modulo",
+        "Number of the question (see /types questions list)":
+            "Numero della domanda (vedi /types questions list)",
         "Turn the staff reminders on or off": "Attiva o disattiva i promemoria per lo staff",
         "Remind the staff when a ticket waits too long for a reply":
             "Avvisa lo staff quando un ticket aspetta troppo una risposta",
@@ -904,6 +959,21 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Stop sending notifications to Telegram": "Smetti di inviare notifiche su Telegram",
     },
     "de": {
+        "Custom questions of the ticket form": "Eigene Fragen des Ticket-Formulars",
+        "Show the questions of a ticket type": "Fragen einer Ticket-Art anzeigen",
+        "Ticket type": "Ticket-Art",
+        "Add a question to the form of a ticket type":
+            "Eine Frage zum Formular einer Ticket-Art hinzufügen",
+        "Question shown to the user (max 45 characters)":
+            "Frage, die der Nutzer sieht (max. 45 Zeichen)",
+        "Answer length": "Länge der Antwort",
+        "Short": "Kurz",
+        "Long": "Lang",
+        "Whether the answer is required": "Ob die Antwort Pflicht ist",
+        "(Optional) Example shown inside the field": "(Optional) Beispiel im Feld",
+        "Remove a question from the form": "Eine Frage aus dem Formular entfernen",
+        "Number of the question (see /types questions list)":
+            "Nummer der Frage (siehe /types questions list)",
         "Turn the staff reminders on or off": "Team-Erinnerungen ein- oder ausschalten",
         "Remind the staff when a ticket waits too long for a reply":
             "Das Team erinnern, wenn ein Ticket zu lange auf eine Antwort wartet",

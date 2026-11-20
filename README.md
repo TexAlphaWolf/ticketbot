@@ -15,6 +15,9 @@ Available in **English**, **Italian** and **German**.
 
 **Tickets**
 - Panel with an **Open ticket** button, a menu of **custom ticket types** and a form
+- **Custom questions per type**: up to 3 questions for each ticket type (e.g. *Version*
+  and *Steps to reproduce* for bug reports), with short or long answers, required or
+  optional, and an example inside the field
 - A private channel for every ticket, visible only to the user and the staff role,
   named after the type, the username and the user's ticket number (e.g. `bug-mario-2`)
 - One open ticket per user, with queue info (*waiting* / *in progress*)
@@ -186,6 +189,7 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 | `/guidelines` | Admin | Posts and pins the priority guidelines in the log channel |
 | `/settings show` / `language` / `retention` / `archive` / `reminders` | Admin | Shows or changes the settings |
 | `/types list` / `add` / `edit` / `remove` | Admin | Manages the ticket types |
+| `/types questions list` / `add` / `remove` | Admin | Manages the custom questions of a ticket type |
 | `/telegram link` / `verify` / `status` / `test` / `unlink` | Admin | Manages Telegram notifications |
 | `/profile name` / `avatar` / `banner` / `bio` / `reset` | Admin | Changes the bot's profile in this server only |
 | `/stats period member` | Staff | Shows ticket statistics |
