@@ -227,17 +227,26 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 
 ```
 ticketbot/
-├── bot.py               # Discord client, events and background tasks
-├── commands.py          # slash commands
-├── tickets.py           # panel, opening, claiming, closing, reopening, ratings
-├── transcripts.py       # HTML and text transcripts
-├── db.py                # SQLite storage
-├── logic.py             # pure functions (auto-close, stats, retention...)
-├── export.py            # Excel and CSV export of the statistics
-├── i18n.py              # translations (EN / IT / DE)
-├── telegram_notifier.py # Telegram Bot API client
-├── migrate.py           # v1 config.json import
-└── config.py            # settings and constants
+├── core/                # shared by the bot and (from V3) the web API, no Discord code
+│   ├── config.py        # settings and constants
+│   ├── i18n.py          # translations (EN / IT / DE)
+│   ├── logic.py         # pure functions (auto-close, stats, retention...)
+│   ├── export.py        # Excel and CSV export of the statistics
+│   └── transcripts.py   # HTML and text transcripts
+├── db/
+│   ├── database.py      # SQLite storage
+│   ├── backup.py        # backups and restore
+│   └── legacy.py        # v1 config.json import
+├── bot/
+│   ├── client.py        # Discord client, events and background tasks
+│   ├── commands.py      # slash commands
+│   ├── tickets.py       # panel, opening, claiming, closing, reopening, ratings
+│   ├── collect.py       # reads a ticket's messages for the transcripts
+│   ├── translator.py    # slash command translations
+│   └── common.py        # helpers shared by the bot modules
+├── integrations/
+│   └── telegram.py      # Telegram Bot API client
+└── __main__.py          # command line: bot, backup, backups, restore
 ```
 
 ## Tests

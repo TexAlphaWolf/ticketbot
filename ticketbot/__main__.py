@@ -2,6 +2,7 @@
 Start the bot, or manage the database backups:
 
     python -m ticketbot                    start the bot
+    python -m ticketbot bot                start the bot (same as above)
     python -m ticketbot backup             make a backup now
     python -m ticketbot backups            list the backups
     python -m ticketbot restore <file>     restore a backup (stop the bot first)
@@ -10,13 +11,14 @@ Start the bot, or manage the database backups:
 import argparse
 import sys
 
-from . import config
-from .backup import create_backup, list_backups, prune_backups, restore_backup
+from .core import config
+from .db.backup import create_backup, list_backups, prune_backups, restore_backup
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m ticketbot", description="TicketBot")
     sub = parser.add_subparsers(dest="command")
+    sub.add_parser("bot", help="start the Discord bot (default)")
     sub.add_parser("backup", help="make a database backup now")
     sub.add_parser("backups", help="list the database backups")
     restore = sub.add_parser("restore", help="restore a backup (stop the bot first)")
@@ -24,8 +26,8 @@ def main(argv: list[str] | None = None) -> int:
     restore.add_argument("--yes", action="store_true", help="don't ask for confirmation")
     args = parser.parse_args(argv)
 
-    if args.command is None:
-        from .bot import main as run_bot
+    if args.command in (None, "bot"):
+        from .bot.client import main as run_bot
         run_bot()
         return 0
 

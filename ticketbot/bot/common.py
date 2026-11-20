@@ -6,13 +6,15 @@ from typing import TYPE_CHECKING
 
 import discord
 
-from . import config
-from .i18n import t
+from ..core import config
+from ..core.i18n import t
 
 if TYPE_CHECKING:
-    from .bot import TicketBot
+    from .client import TicketBot
 
 Translate = Callable[..., str]
+
+COLOR = discord.Color.blurple()  # embeds
 
 
 def lang_of(cfg: dict | None) -> str:
@@ -67,7 +69,7 @@ async def telegram_notify(client: "TicketBot", cfg: dict | None, text: str,
     chat_id = (cfg or {}).get("telegram_chat_id")
     if tg is None or not chat_id:
         return
-    from .telegram_notifier import TelegramError
+    from ..integrations.telegram import TelegramError
     try:
         if document is not None:
             await tg.send_document(chat_id, document, filename or "transcript.html", caption=text)

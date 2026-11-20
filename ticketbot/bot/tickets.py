@@ -6,8 +6,21 @@ from datetime import datetime, timezone
 
 import discord
 
-from . import config
+from ..core import config
+from ..core.logic import (
+    answers_text,
+    assignment_order,
+    attachment_problem,
+    cooldown_left,
+    format_duration,
+    is_kept,
+    stars,
+    ticket_channel_name,
+)
+from ..core.transcripts import render_html, render_txt
+from .collect import collect_messages
 from .common import (
+    COLOR,
     Translate,
     channel_url,
     esc,
@@ -19,17 +32,6 @@ from .common import (
     type_label,
     user_name,
 )
-from .logic import (
-    answers_text,
-    assignment_order,
-    attachment_problem,
-    cooldown_left,
-    format_duration,
-    is_kept,
-    stars,
-    ticket_channel_name,
-)
-from .transcripts import collect_messages, render_html, render_txt
 
 # ----------------------------------------------------------------- panel ---
 
@@ -39,7 +41,7 @@ def panel_embed(types: list[dict], _: Translate) -> discord.Embed:
         for t in types
     )
     description = _("panel.description") + (f"\n\n{lines}" if lines else "")
-    return discord.Embed(title=_("panel.title"), description=description, color=config.COLOR)
+    return discord.Embed(title=_("panel.title"), description=description, color=COLOR)
 
 
 def open_problem(db, cfg: dict, member: discord.abc.User, _: Translate) -> str | None:
@@ -303,7 +305,7 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
     queue = (_("queue.line", waiting=waiting, in_progress=in_progress)
              if waiting or in_progress else _("queue.first"))
     embed = discord.Embed(title=f"🎫 {subject}", description=description,
-                          color=config.COLOR, timestamp=datetime.now(timezone.utc))
+                          color=COLOR, timestamp=datetime.now(timezone.utc))
     embed.set_author(name=str(user), icon_url=user.display_avatar.url)
     embed.add_field(name=_("field.type"), value=f"{ticket_type['emoji']} {ticket_type['label']}")
     embed.add_field(name=_("field.queue"), value=queue)
@@ -814,7 +816,7 @@ class RatingModal(discord.ui.Modal):
 
 def guidelines_embed(cfg: dict, _: Translate) -> discord.Embed:
     embed = discord.Embed(title=_("guidelines.title"),
-                          description=_("guidelines.intro"), color=config.COLOR)
+                          description=_("guidelines.intro"), color=COLOR)
     for p in config.PRIORITIES:
         embed.add_field(
             name=priority_label(_, p),

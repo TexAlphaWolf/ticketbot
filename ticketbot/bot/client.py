@@ -8,13 +8,9 @@ import aiohttp
 import discord
 from discord.ext import tasks
 
-from . import __version__, config
-from .backup import backup_due, create_backup, prune_backups
-from .commands import all_commands
-from .common import channel_url, esc, is_staff, priority_label, telegram_notify, translator
-from .db import Database
-from .i18n import CommandTranslator
-from .logic import (
+from .. import __version__
+from ..core import config
+from ..core.logic import (
     activity_changes,
     autoclose_action,
     expired_refs,
@@ -23,9 +19,14 @@ from .logic import (
     staff_reply_hours,
     waiting_for_staff_since,
 )
-from .migrate import migrate_legacy_config
-from .telegram_notifier import TelegramError, TelegramNotifier
+from ..db import Database
+from ..db.backup import backup_due, create_backup, prune_backups
+from ..db.legacy import migrate_legacy_config
+from ..integrations.telegram import TelegramError, TelegramNotifier
+from .commands import all_commands
+from .common import channel_url, esc, is_staff, priority_label, telegram_notify, translator
 from .tickets import ClosedControls, RatingButton, TicketControls, TicketPanel, close_ticket
+from .translator import CommandTranslator
 
 
 class TicketBot(discord.Client):

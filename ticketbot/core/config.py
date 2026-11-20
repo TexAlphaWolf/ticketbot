@@ -3,7 +3,6 @@
 import os
 from pathlib import Path
 
-import discord
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -19,7 +18,6 @@ BACKUP_DIR = Path(os.getenv("BACKUP_DIR", DATA_DIR / "backups"))
 BACKUP_KEEP = int(os.getenv("BACKUP_KEEP", "7"))          # 0 disables automatic backups
 BACKUP_INTERVAL_HOURS = float(os.getenv("BACKUP_INTERVAL_HOURS", "24"))
 
-COLOR = discord.Color.blurple()
 TOPIC_PREFIX = "ticket-owner:"
 DEFAULT_LANGUAGE = "en"
 

@@ -9,10 +9,9 @@ from datetime import datetime, timezone
 import discord
 from discord import app_commands
 
-from . import config, export
-from .common import esc, is_staff, priority_label, respond, telegram_notify, translator
-from .i18n import DEFAULT_TYPES, LANGUAGES
-from .logic import (
+from ..core import config, export
+from ..core.i18n import DEFAULT_TYPES, LANGUAGES
+from ..core.logic import (
     PROFILE_IMAGE_MAX_MB,
     activity_changes,
     compute_stats,
@@ -24,7 +23,8 @@ from .logic import (
     valid_emoji,
     valid_profile_image,
 )
-from .telegram_notifier import TelegramError
+from ..integrations.telegram import TelegramError
+from .common import COLOR, esc, is_staff, priority_label, respond, telegram_notify, translator
 from .tickets import (
     TicketPanel,
     apply_priority,
@@ -152,7 +152,7 @@ def ticket_history_embed(tickets: list[dict], title: str, _) -> discord.Embed:
                 line += f"\n-# {t['close_reason'][:90]}"
             closed_lines.append(line)
 
-    embed = discord.Embed(title=title, color=config.COLOR)
+    embed = discord.Embed(title=title, color=COLOR)
     if open_lines:
         embed.add_field(name=_("mytickets.open", count=len(open_lines)),
                         value="\n".join(open_lines)[:1024], inline=False)
@@ -358,7 +358,7 @@ async def stats(interaction: discord.Interaction,
     period_label = _("stats.period." + key)
     title = (_("stats.title_member", member=member.display_name, period=period_label)
              if member else _("stats.title", period=period_label))
-    embed = discord.Embed(title=title, color=config.COLOR)
+    embed = discord.Embed(title=title, color=COLOR)
     embed.add_field(name=_("stats.tickets"),
                     value=_("stats.tickets_value", opened=s["opened"], closed=s["closed"],
                             open=s["open"]), inline=False)
@@ -454,7 +454,7 @@ class SettingsGroup(app_commands.Group):
         def ch(cid):
             return f"<#{cid}>" if cid else "-"
 
-        embed = discord.Embed(title=_("settings.title"), color=config.COLOR)
+        embed = discord.Embed(title=_("settings.title"), color=COLOR)
         embed.add_field(name=_("settings.language"), value=LANGUAGES[cfg["language"]])
         embed.add_field(name=_("settings.staff_role"),
                         value=f"<@&{cfg['staff_role']}>" if cfg.get("staff_role") else "-")
@@ -590,7 +590,7 @@ async def log_event(guild: discord.Guild, cfg: dict, text: str) -> None:
     if channel is None:
         return
     try:
-        await channel.send(embed=discord.Embed(description=text, color=config.COLOR),
+        await channel.send(embed=discord.Embed(description=text, color=COLOR),
                            allowed_mentions=discord.AllowedMentions.none())
     except discord.HTTPException:
         pass
@@ -673,7 +673,7 @@ class BlockGroup(app_commands.Group):
             return
         _ = ctx[1]
         blocks = interaction.client.db.list_blocks(interaction.guild.id, time.time())
-        embed = discord.Embed(title=_("block.list_title", count=len(blocks)), color=config.COLOR)
+        embed = discord.Embed(title=_("block.list_title", count=len(blocks)), color=COLOR)
         description = ""
         for b in blocks:
             when = (_("block.until", time=f"<t:{int(b['until'])}:R>") if b["until"]
@@ -735,7 +735,7 @@ class QuestionsGroup(app_commands.Group):
             text = "\n".join(lines)
         embed = discord.Embed(title=_("questions.title", type=name,
                                       count=len(questions), max=config.MAX_TYPE_QUESTIONS),
-                              description=text, color=config.COLOR)
+                              description=text, color=COLOR)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="add", description="Add a question to the form of a ticket type")
@@ -807,7 +807,7 @@ class TypesGroup(app_commands.Group):
                  + (f" – {t['description']}" if t["description"] else "") for t in types]
         embed = discord.Embed(title=_("types.title", count=len(types),
                                       max=config.MAX_TICKET_TYPES),
-                              description="\n".join(lines) or "-", color=config.COLOR)
+                              description="\n".join(lines) or "-", color=COLOR)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="add", description="Add a ticket type")
@@ -1096,7 +1096,7 @@ class RepliesGroup(app_commands.Group):
             lines.append(f"**`{r['name']}`** – {preview}")
         embed = discord.Embed(
             title=_("replies.title", count=len(replies), max=config.MAX_REPLIES),
-            description="\n".join(lines)[:4096], color=config.COLOR)
+            description="\n".join(lines)[:4096], color=COLOR)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="add", description="Add a quick reply")

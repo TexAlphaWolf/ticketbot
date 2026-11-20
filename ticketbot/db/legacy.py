@@ -4,9 +4,9 @@ import json
 import time
 from pathlib import Path
 
-from . import config
-from .db import Database
-from .i18n import DEFAULT_TYPES
+from ..core import config
+from ..core.i18n import DEFAULT_TYPES
+from .database import Database
 
 
 def migrate_legacy_config(db: Database, path: Path) -> int:

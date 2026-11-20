@@ -11,11 +11,16 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from ticketbot import config, logic  # noqa: E402
+from ticketbot.core import config, logic  # noqa: E402
+from ticketbot.core.i18n import COMMAND_TEXT, DEFAULT_TYPES, LANGUAGES, STRINGS, t  # noqa: E402
+from ticketbot.core.transcripts import (  # noqa: E402
+    TMessage,
+    markdown_to_html,
+    render_html,
+    render_txt,
+)
 from ticketbot.db import Database  # noqa: E402
-from ticketbot.i18n import COMMAND_TEXT, DEFAULT_TYPES, LANGUAGES, STRINGS, t  # noqa: E402
-from ticketbot.migrate import migrate_legacy_config  # noqa: E402
-from ticketbot.transcripts import TMessage, markdown_to_html, render_html, render_txt  # noqa: E402
+from ticketbot.db.legacy import migrate_legacy_config  # noqa: E402
 
 HOUR = 3600
 DAY = 86400
@@ -231,7 +236,7 @@ def test_translations_complete_and_consistent():
 
 def test_all_keys_used_in_code_exist():
     used = set()
-    for f in (ROOT / "ticketbot").glob("*.py"):
+    for f in (ROOT / "ticketbot").rglob("*.py"):
         source = f.read_text(encoding="utf-8")
         used |= set(re.findall(r"""_\(\s*["']([a-z_.]+)["']\s*[,)]""", source))
     assert used - set(STRINGS["en"]) == set()
@@ -252,8 +257,8 @@ def test_default_types_have_same_keys():
 def test_command_texts_translated():
     from discord import app_commands
 
-    from ticketbot.bot import TicketBot
-    from ticketbot.commands import all_commands
+    from ticketbot.bot.client import TicketBot
+    from ticketbot.bot.commands import all_commands
 
     client = TicketBot(Database(":memory:"))
     for command in all_commands():
@@ -329,7 +334,7 @@ def test_txt_transcript():
 
 
 def test_translator_accepts_any_placeholder_name():
-    from ticketbot.common import translator
+    from ticketbot.bot.common import translator
     _ = translator({"language": "en"})
     assert "`bug`" in _("types.added", type="🐞 Bug", key="bug")
     assert "bug" in t("en", "types.added", type="x", key="bug")
@@ -338,7 +343,7 @@ def test_translator_accepts_any_placeholder_name():
 def test_startup_deletes_servers_the_bot_left():
     from types import SimpleNamespace
 
-    from ticketbot.bot import TicketBot
+    from ticketbot.bot.client import TicketBot
 
     database = Database(":memory:")
     database.save_guild(1)
@@ -364,9 +369,9 @@ def test_command_payloads_build_for_discord():
     """Builds exactly what tree.sync() sends to Discord, translations included."""
     import json as _json
 
-    from ticketbot.bot import TicketBot
-    from ticketbot.commands import all_commands
-    from ticketbot.i18n import CommandTranslator
+    from ticketbot.bot.client import TicketBot
+    from ticketbot.bot.commands import all_commands
+    from ticketbot.bot.translator import CommandTranslator
 
     async def build():
         client = TicketBot(Database(":memory:"))
@@ -426,7 +431,7 @@ def test_collect_messages_reads_stickers_and_reactions():
 
     import discord
 
-    from ticketbot.transcripts import collect_messages
+    from ticketbot.bot.collect import collect_messages
 
     class Users:
         def __init__(self, names):
@@ -625,7 +630,7 @@ def test_backup_is_valid_and_compressed(tmp_path):
     import gzip
     import sqlite3
 
-    from ticketbot.backup import create_backup, list_backups
+    from ticketbot.db.backup import create_backup, list_backups
 
     database = _filled_db(tmp_path / "data" / "ticketbot.db")
     path = create_backup(database.conn, tmp_path / "backups",
@@ -644,7 +649,7 @@ def test_backup_is_valid_and_compressed(tmp_path):
 def test_prune_keeps_newest_and_backup_due(tmp_path):
     import os
 
-    from ticketbot.backup import backup_due, list_backups, prune_backups
+    from ticketbot.db.backup import backup_due, list_backups, prune_backups
 
     folder = tmp_path / "backups"
     assert backup_due(folder, 24)  # no backups yet
@@ -662,7 +667,7 @@ def test_prune_keeps_newest_and_backup_due(tmp_path):
 
 
 def test_restore_replaces_db_and_keeps_safety_copy(tmp_path):
-    from ticketbot.backup import create_backup, restore_backup
+    from ticketbot.db.backup import create_backup, restore_backup
 
     db_path = tmp_path / "data" / "ticketbot.db"
     database = _filled_db(db_path)
@@ -682,7 +687,7 @@ def test_restore_replaces_db_and_keeps_safety_copy(tmp_path):
 def test_restore_refuses_damaged_backup(tmp_path):
     import gzip
 
-    from ticketbot.backup import restore_backup
+    from ticketbot.db.backup import restore_backup
 
     db_path = tmp_path / "ticketbot.db"
     _filled_db(db_path).close()
@@ -697,7 +702,7 @@ def test_restore_refuses_damaged_backup(tmp_path):
 
 def test_command_line(tmp_path, monkeypatch, capsys):
     from ticketbot import __main__ as cli
-    from ticketbot import config as cfg
+    from ticketbot.core import config as cfg
 
     db_path = tmp_path / "ticketbot.db"
     _filled_db(db_path).close()
@@ -737,7 +742,7 @@ def test_answers_text():
 
 
 def test_ticket_modal_uses_type_questions():
-    from ticketbot.tickets import TicketModal
+    from ticketbot.bot.tickets import TicketModal
 
     _ = lambda key, /, **kw: t("en", key, **kw)  # noqa: E731
     bug = {"key": "bug", "label": "Bug report", "emoji": "🐞"}
@@ -781,7 +786,7 @@ def test_forward_attachments_resends_safe_files_only():
 
     import discord
 
-    from ticketbot.tickets import forward_attachments
+    from ticketbot.bot.tickets import forward_attachments
 
     sent = []
 
@@ -822,7 +827,7 @@ def test_tickets_of_user_newest_first_and_per_server(db):
 
 
 def test_ticket_history_embed():
-    from ticketbot.commands import ticket_history_embed
+    from ticketbot.bot.commands import ticket_history_embed
 
     _ = lambda key, /, **kw: t("en", key, **kw)  # noqa: E731
     base = {"type_emoji": "🐞", "type_label": "Bug", "channel_deleted": 0, "rating": None,
@@ -913,7 +918,7 @@ def _export_tickets():
 
 
 def test_safe_text_blocks_formulas():
-    from ticketbot.export import safe_text
+    from ticketbot.core.export import safe_text
 
     assert safe_text("=1+1") == "'=1+1"
     assert safe_text("@SUM(A1)") == "'@SUM(A1)"
@@ -925,7 +930,7 @@ def test_safe_text_blocks_formulas():
 def test_export_csv():
     import csv as _csv
 
-    from ticketbot import export
+    from ticketbot.core import export
 
     _ = lambda key, /, **kw: t("en", key, **kw)  # noqa: E731
     rows = export.ticket_rows(_export_tickets(), {10: "mario", 20: "mod"}, _)
@@ -947,7 +952,7 @@ def test_export_xlsx():
     import io as _io
 
     openpyxl = pytest.importorskip("openpyxl")
-    from ticketbot import export
+    from ticketbot.core import export
 
     _ = lambda key, /, **kw: t("it", key, **kw)  # noqa: E731
     tickets = _export_tickets()
@@ -961,3 +966,11 @@ def test_export_xlsx():
     assert ws["O2"].value.startswith("'=")
     summary = {r[0]: r[1] for r in wb["Riepilogo"].iter_rows(values_only=True) if r and r[0]}
     assert summary["Aperti"] == 2 and summary["Chiusi"] == 1 and summary["mod"] == 1
+
+
+def test_core_and_storage_do_not_depend_on_discord():
+    """The core, the storage and the integrations are shared with the web API (V3)."""
+    for package in ("core", "db", "integrations"):
+        for f in (ROOT / "ticketbot" / package).glob("*.py"):
+            source = f.read_text(encoding="utf-8")
+            assert not re.search(r"^\s*(import discord|from discord)", source, re.M), f.name

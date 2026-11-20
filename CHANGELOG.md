@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased] - V3
+
+### Changed
+- The code is split into packages: `core` (settings, translations, rules, statistics,
+  transcripts; no Discord code), `db` (storage, backups, v1 import), `bot` (Discord
+  client, commands, views) and `integrations` (Telegram). Nothing changes for users:
+  the bot still starts with `python -m ticketbot` (or the new `python -m ticketbot bot`)
+- CI also runs on the `v3-dev` branch
+
 ## [2.3.0] - 2026-11-20
 
 ### Added
