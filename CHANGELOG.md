@@ -26,6 +26,7 @@
 - Automatic backups run in a background thread; with PostgreSQL they are skipped and
   `python -m ticketbot backup` / `restore` explain to use `pg_dump` / `pg_restore`
 - On/off values are stored as real booleans
+- A Telegram chat ID imported from a v1 `config.json` is always stored as text
 - Quieter startup: no Alembic details and no warnings about voice libraries (the bot
   never joins voice channels)
 
@@ -40,6 +41,11 @@
 - Storage tests on SQLite and, in CI, on PostgreSQL: the migrations must build exactly
   the models, a v2.3 database must have the same tables and keys as the first
   migration, Discord IDs over 32 bits and cascading deletes must work
+- `python -m ticketbot db copy <url>` copies all the data to an empty database, e.g. from
+  SQLite to PostgreSQL: schema and data in one transaction, same ids, PostgreSQL id
+  sequences continued after the copied tickets and notes, row counts checked for every
+  table. `python -m ticketbot db status` shows the database in use (password hidden)
+  and its schema version
 - `python -m ticketbot settings` checks the `.env` file and shows the settings in use,
   with the tokens hidden
 

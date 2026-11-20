@@ -7,9 +7,12 @@ Start the bot, or manage the database backups:
     python -m ticketbot backups            list the backups
     python -m ticketbot restore <file>     restore a backup (stop the bot first)
     python -m ticketbot settings           check the .env file (secrets hidden)
+    python -m ticketbot db status          database in use and schema version
+    python -m ticketbot db copy <url>      copy all the data to another (empty) database
 """
 
 import argparse
+import asyncio
 import sqlite3
 import sys
 
@@ -27,6 +30,13 @@ def main(argv: list[str] | None = None) -> int:
     restore.add_argument("file", help="backup file, e.g. data/backups/ticketbot-...db.gz")
     restore.add_argument("--yes", action="store_true", help="don't ask for confirmation")
     sub.add_parser("settings", help="check the .env file and show the settings in use")
+    db_cmd = sub.add_parser("db", help="database tools")
+    db_sub = db_cmd.add_subparsers(dest="db_command", required=True)
+    db_sub.add_parser("status", help="show the database in use and its schema version")
+    copy = db_sub.add_parser("copy", help="copy all the data to another, empty database "
+                                          "(e.g. from SQLite to PostgreSQL)")
+    copy.add_argument("target", help="e.g. postgresql://user:password@host:5432/ticketbot")
+    copy.add_argument("--yes", action="store_true", help="don't ask for confirmation")
     args = parser.parse_args(argv)
 
     try:
@@ -49,6 +59,15 @@ def main(argv: list[str] | None = None) -> int:
         for name, value in settings.summary():
             print(f"{name.ljust(width)}  {value}")
         return 0
+
+    if args.command == "db":
+        if args.db_command == "copy" and not confirm_copy(args, settings):
+            return 1 if args.target_ok else 2
+        try:
+            return asyncio.run(database_command(args, settings))
+        except KeyboardInterrupt:
+            print("Cancelled.")
+            return 1
 
     database = settings.sqlite_path
     if args.command in ("backup", "restore") and database is None:
@@ -92,6 +111,59 @@ def main(argv: list[str] | None = None) -> int:
     if safety:
         print(f"The previous database was saved as {safety}")
     return 0
+
+
+def confirm_copy(args, settings) -> bool:
+    """Show what will be copied where and ask, before any database is opened."""
+    from .db.engine import safe_url
+
+    args.target_ok = False
+    try:
+        target = safe_url(args.target)
+    except Exception as e:  # noqa: BLE001 - a wrong URL, shown to the user
+        print(str(e).splitlines()[0])
+        return False
+    args.target_ok = True
+    print(f"From: {safe_url(settings.db_url)}\nTo:   {target}")
+    if args.yes:
+        return True
+    answer = input("Stop the bot first. Type 'yes' to copy all the data: ")
+    if answer.strip().lower() == "yes":
+        return True
+    print("Copy cancelled.")
+    return False
+
+
+async def database_command(args, settings) -> int:
+    from .db import migrate
+    from .db.engine import create_engine, safe_url
+    from .db.transfer import TransferError, copy_database
+
+    source = create_engine(settings.db_url)
+    try:
+        if args.db_command == "status":
+            revision = await migrate.current_revision(source)
+            head = migrate.head_revision()
+            print(f"database  {safe_url(source.url)}")
+            print(f"schema    {revision or 'none'}"
+                  + ("  (latest)" if revision == head else f"  (latest is {head})"))
+            return 0
+
+        target = create_engine(args.target)
+        try:
+            copied = await copy_database(source, target)
+        except TransferError as e:
+            print(f"Copy failed: {e}")
+            return 1
+        finally:
+            await target.dispose()
+        for table, rows in copied.items():
+            print(f"  {table:<20} {rows} row(s)")
+        print("Done, the row counts match. To use the new database, set in .env:\n"
+              "  DATABASE_URL=<the same URL>\nand start the bot.")
+        return 0
+    finally:
+        await source.dispose()
 
 
 if __name__ == "__main__":

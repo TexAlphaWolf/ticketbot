@@ -125,6 +125,17 @@ set `DATABASE_URL=postgresql://user:password@host:5432/ticketbot` in `.env`: the
 created at the first start. Back it up with `pg_dump`; the automatic backups and
 `python -m ticketbot backup` are for SQLite only.
 
+To move an existing SQLite database to PostgreSQL, stop the bot, create an empty
+PostgreSQL database and run:
+
+```bash
+python -m ticketbot db status        # database in use and schema version
+python -m ticketbot db copy postgresql://user:password@host:5432/ticketbot
+```
+
+The copy runs in a single transaction and checks that every table has the same number of
+rows; your SQLite file is not changed. Then set `DATABASE_URL` in `.env` and start the bot.
+
 ### Upgrading from v1
 
 Stop the bot, update the files and start it with `python -m ticketbot`. On the first
@@ -261,6 +272,7 @@ ticketbot/
 │   ├── migrations/      # numbered schema changes
 │   ├── store.py         # async queries used by the bot
 │   ├── v2.py            # recognises and adopts TicketBot 2 databases
+│   ├── transfer.py      # copies all the data to another database
 │   ├── backup.py        # backups and restore
 │   └── legacy.py        # v1 config.json import
 ├── bot/
@@ -272,7 +284,7 @@ ticketbot/
 │   └── common.py        # helpers shared by the bot modules
 ├── integrations/
 │   └── telegram.py      # Telegram Bot API client
-└── __main__.py          # command line: bot, settings, backup, backups, restore
+└── __main__.py          # command line: bot, settings, db, backup, backups, restore
 ```
 
 ## Tests

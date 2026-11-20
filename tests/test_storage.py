@@ -327,3 +327,97 @@ def test_prepare_creates_adopts_and_reports(tmp_path):
         assert len(list_backups(tmp_path / "old-backups")) == 1
 
     run(scenario())
+
+
+# -------------------------------------------------------------- transfer ---
+
+async def _fill(store):
+    g = BIG_ID
+    await store.save_guild(g, language="it", telegram_chat_id="-100123")
+    await store.ensure_default_types(g, [("bug", "Bug", "🐞", "")])
+    await store.add_question(g, "bug", "Version", long=True)
+    fields = dict(guild_id=g, owner_id=BIG_ID + 9, type_key="bug", type_label="Bug",
+                  type_emoji="🐞", opened_at=1.0, last_activity=1.0)
+    first = await store.create_ticket(channel_id=g + 1, **fields)
+    second = await store.create_ticket(channel_id=g + 2, **fields)
+    await store.update_ticket(first, status="closed", closed_at=2.0, rating=5)
+    await store.add_note(second, 7, "nota", 3.0)
+    await store.save_reply(g, "logs", "Send the logs")
+    await store.set_available(g, 8, True)
+    await store.block_user(g, 9, "spam", 7, 1.0, None)
+    await store.add_transcript_ref(g, 1, 2, "low", 2.0)
+    return second
+
+
+def test_copy_to_another_database(url, tmp_path):
+    from ticketbot.db import Store
+    from ticketbot.db.transfer import TransferError, copy_database, count_rows
+
+    async def scenario():
+        source = Store(create_engine(f"sqlite:///{(tmp_path / 'source.db').as_posix()}"))
+        await migrate.prepare(source.engine)
+        last_id = await _fill(source)
+        target_url = url if "postgresql" in url else \
+            f"sqlite:///{(tmp_path / 'target.db').as_posix()}"
+        target = Store(create_engine(target_url))
+
+        copied = await copy_database(source.engine, target.engine)
+        assert copied["tickets"] == 2 and copied["notes"] == 1 and copied["guilds"] == 1
+        assert await count_rows(target.engine) == copied
+        assert await migrate.current_revision(target.engine) == migrate.head_revision()
+
+        guild = await target.get_guild(BIG_ID)
+        assert guild["language"] == "it" and guild["telegram_chat_id"] == "-100123"
+        assert (await target.list_questions(BIG_ID, "bug"))[0]["long"] is True
+        assert (await target.get_ticket(last_id))["owner_id"] == BIG_ID + 9   # same ids
+        new_id = await target.create_ticket(                                  # ids go on
+            guild_id=BIG_ID, channel_id=BIG_ID + 3, owner_id=1, type_key="bug",
+            type_label="Bug", type_emoji="🐞", opened_at=4.0, last_activity=4.0)
+        assert new_id > last_id
+
+        with pytest.raises(TransferError, match="not empty"):
+            await copy_database(source.engine, target.engine)
+        with pytest.raises(TransferError, match="same database"):
+            await copy_database(source.engine, source.engine)
+        await source.close()
+        await target.close()
+
+    run(scenario())
+
+
+def test_db_commands(tmp_path, monkeypatch, capsys):
+    from ticketbot import __main__ as cli
+    from ticketbot.core.settings import get_settings
+
+    monkeypatch.chdir(tmp_path)
+    for name in ("DATABASE_URL", "DATA_DIR"):
+        monkeypatch.delenv(name, raising=False)
+    get_settings.cache_clear()
+    try:
+        async def make():
+            engine = create_engine(sqlite_url(tmp_path / "data"))
+            await migrate.prepare(engine)
+            await engine.dispose()
+        (tmp_path / "data").mkdir()
+        run(make())
+        assert cli.main(["db", "status"]) == 0
+        out = capsys.readouterr().out
+        assert "sqlite+aiosqlite:///data/ticketbot.db" in out and "(latest)" in out
+
+        target = f"sqlite:///{(tmp_path / 'copy.db').as_posix()}"
+        assert cli.main(["db", "copy", target, "--yes"]) == 0
+        assert "the row counts match" in capsys.readouterr().out
+        assert cli.main(["db", "copy", target, "--yes"]) == 1
+        assert "not empty" in capsys.readouterr().out
+        assert cli.main(["db", "copy", "mysql://x@y/z", "--yes"]) == 2
+        # The question comes before any database is opened (Windows: no input() inside
+        # the event loop)
+        other = f"sqlite:///{(tmp_path / 'other.db').as_posix()}"
+        monkeypatch.setattr("builtins.input", lambda _prompt: "no")
+        assert cli.main(["db", "copy", other]) == 1
+        assert "Copy cancelled" in capsys.readouterr().out
+        assert not (tmp_path / "other.db").exists()
+        monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
+        assert cli.main(["db", "copy", other]) == 0
+    finally:
+        get_settings.cache_clear()

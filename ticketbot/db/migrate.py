@@ -29,6 +29,11 @@ def head_revision() -> str:
     return ScriptDirectory.from_config(alembic_config()).get_current_head()
 
 
+def upgrade_connection(connection: Connection, revision: str = "head") -> None:
+    """Upgrade inside a transaction the caller already opened."""
+    command.upgrade(alembic_config(connection), revision)
+
+
 async def upgrade(engine: AsyncEngine, revision: str = "head") -> None:
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: command.upgrade(alembic_config(c), revision))
@@ -51,7 +56,7 @@ async def current_revision(engine: AsyncEngine) -> str | None:
             lambda c: MigrationContext.configure(c).get_current_revision())
 
 
-async def _tables(engine: AsyncEngine) -> set[str]:
+async def table_names(engine: AsyncEngine) -> set[str]:
     async with engine.connect() as conn:
         return set(await conn.run_sync(lambda c: inspect(c).get_table_names()))
 
@@ -74,7 +79,7 @@ async def prepare(engine: AsyncEngine, backup_dir: Path | None = None) -> str:
     if revision == head:
         return "up to date"
 
-    tables = await _tables(engine) - {"alembic_version"}
+    tables = await table_names(engine) - {"alembic_version"}
     file = _sqlite_file(engine)
     note = ""
     if tables and file is not None and file.exists() and backup_dir is not None:

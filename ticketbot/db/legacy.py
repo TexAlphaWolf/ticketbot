@@ -36,7 +36,8 @@ async def migrate_legacy_config(db: Store, path: Path) -> int:
             retention_days=cfg.get("retention_days", config.DEFAULT_RETENTION_DAYS),
             guidelines_channel=guidelines.get("channel"),
             guidelines_message=guidelines.get("message"),
-            telegram_chat_id=telegram.get("chat_id") if telegram.get("verified") else None,
+            telegram_chat_id=(str(telegram["chat_id"]) if telegram.get("verified")
+                              and telegram.get("chat_id") else None),
         )
         await db.ensure_default_types(guild_id, DEFAULT_TYPES["en"])
 
