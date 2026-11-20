@@ -3,7 +3,7 @@ import json
 import re
 import string
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -289,7 +289,7 @@ def test_command_texts_translated():
 def _msg(author_id, content, minutes=0, **extra):
     return TMessage(author=f"user{author_id}", author_id=author_id, avatar="https://a/b.png",
                     color=None, bot=False,
-                    created_at=datetime(2026, 1, 1, tzinfo=timezone.utc)
+                    created_at=datetime(2026, 1, 1, tzinfo=UTC)
                     + timedelta(minutes=minutes),
                     content=content, **extra)
 
@@ -454,7 +454,7 @@ def test_collect_messages_reads_stickers_and_reactions():
                               format=discord.StickerFormatType.png)
     author = SimpleNamespace(display_name="User", id=4, bot=False,
                              display_avatar=SimpleNamespace(url="https://a"))
-    msg = SimpleNamespace(author=author, created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    msg = SimpleNamespace(author=author, created_at=datetime(2026, 1, 1, tzinfo=UTC),
                           clean_content="hi", embeds=[], attachments=[], stickers=[sticker],
                           reactions=reactions)
 
@@ -634,7 +634,7 @@ def test_backup_is_valid_and_compressed(tmp_path):
 
     database = _filled_db(tmp_path / "data" / "ticketbot.db")
     path = create_backup(database.conn, tmp_path / "backups",
-                         now=datetime(2026, 11, 20, 3, 0, tzinfo=timezone.utc))
+                         now=datetime(2026, 11, 20, 3, 0, tzinfo=UTC))
     assert path.name == "ticketbot-20261120-030000.db.gz"
     assert list_backups(tmp_path / "backups") == [path]
     restored = tmp_path / "check.db"
@@ -706,8 +706,8 @@ def env(tmp_path, monkeypatch):
     from ticketbot.core.settings import get_settings
 
     monkeypatch.chdir(tmp_path)
-    for name in ("DISCORD_TOKEN", "TELEGRAM_BOT_TOKEN", "DATA_DIR", "LEGACY_CONFIG",
-                 "BACKUP_DIR", "BACKUP_KEEP", "BACKUP_INTERVAL_HOURS"):
+    for name in ("DISCORD_TOKEN", "TELEGRAM_BOT_TOKEN", "DATABASE_URL", "DATA_DIR",
+                 "LEGACY_CONFIG", "BACKUP_DIR", "BACKUP_KEEP", "BACKUP_INTERVAL_HOURS"):
         monkeypatch.delenv(name, raising=False)
     get_settings.cache_clear()
     yield monkeypatch
@@ -1034,3 +1034,19 @@ def test_settings_command_hides_secrets(env, capsys):
     get_settings.cache_clear()
     assert cli.main(["settings"]) == 2
     assert "BACKUP_KEEP" in capsys.readouterr().out
+
+
+def test_settings_database_url(env):
+    from ticketbot.core.settings import Settings, SettingsError, get_settings
+
+    assert Settings().db_url == "sqlite+aiosqlite:///data/ticketbot.db"
+    env.setenv("DATABASE_URL", "postgresql://tb:very-secret@db:5432/tickets")
+    settings = Settings()
+    assert settings.db_url == "postgresql+asyncpg://tb:very-secret@db:5432/tickets"
+    assert ("DATABASE_URL", "postgresql+asyncpg://tb:***@db:5432/tickets") in settings.summary()
+    assert "very-secret" not in repr(settings)
+    env.setenv("DATABASE_URL", "mysql://tb:very-secret@db/tickets")
+    with pytest.raises(SettingsError) as error:
+        get_settings()
+    assert "unsupported database" in str(error.value)
+    assert "very-secret" not in str(error.value)

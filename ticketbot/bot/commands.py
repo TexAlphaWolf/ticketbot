@@ -4,7 +4,7 @@ import io
 import re
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import discord
 from discord import app_commands
@@ -428,7 +428,7 @@ async def export_stats(interaction: discord.Interaction,
     if len(data) > guild.filesize_limit:
         await interaction.followup.send(_("export.too_big"), ephemeral=True)
         return
-    day = datetime.now(timezone.utc).strftime("%Y%m%d")
+    day = datetime.now(UTC).strftime("%Y%m%d")
     filename = f"tickets-{key}-{day}.{kind}"
     await interaction.followup.send(
         _("export.done", count=len(rows), period=period_label),

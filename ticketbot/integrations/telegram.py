@@ -30,7 +30,7 @@ class TelegramNotifier:
                 timeout=aiohttp.ClientTimeout(total=timeout),
             ) as resp:
                 payload = await resp.json(content_type=None)
-        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+        except (TimeoutError, aiohttp.ClientError) as e:
             raise TelegramError(f"network error: {e}") from e
         if not payload.get("ok"):
             raise TelegramError(payload.get("description", "unknown error"))

@@ -4,7 +4,7 @@ import html
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 @dataclass
@@ -34,8 +34,8 @@ def _ts(value: datetime | float | None) -> str:
     if value is None:
         return "-"
     if not isinstance(value, datetime):
-        value = datetime.fromtimestamp(value, timezone.utc)
-    return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        value = datetime.fromtimestamp(value, UTC)
+    return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
 
 # ------------------------------------------------------------- plain text ---

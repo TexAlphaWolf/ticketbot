@@ -1,7 +1,7 @@
 # TicketBot 🎫
 
 [![Tests](https://github.com/TexAlphaWolf/ticketbot/actions/workflows/tests.yml/badge.svg)](https://github.com/TexAlphaWolf/ticketbot/actions/workflows/tests.yml)
-![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 A Discord ticket bot written in Python with [discord.py](https://discordpy.readthedocs.io/).
@@ -75,7 +75,7 @@ Available in **English**, **Italian** and **German**.
 ## Installation
 
 ### Requirements
-- Python 3.10+ (or Docker)
+- Python 3.11+ (or Docker)
 - A bot created in the [Discord Developer Portal](https://discord.com/developers/applications)
   with **Message Content Intent** enabled (under **Bot**), required for transcripts
 
@@ -238,7 +238,11 @@ ticketbot/
 │   ├── export.py        # Excel and CSV export of the statistics
 │   └── transcripts.py   # HTML and text transcripts
 ├── db/
-│   ├── database.py      # SQLite storage
+│   ├── models.py        # V3 tables (SQLAlchemy 2)
+│   ├── engine.py        # async engine: SQLite or PostgreSQL
+│   ├── migrate.py       # runs the Alembic migrations
+│   ├── migrations/      # numbered schema changes
+│   ├── database.py      # v2 SQLite storage (used by the bot until V3 Beta1)
 │   ├── backup.py        # backups and restore
 │   └── legacy.py        # v1 config.json import
 ├── bot/
@@ -261,7 +265,8 @@ python -m pytest     # unit tests
 ruff check .         # code style and common mistakes
 ```
 
-Both run automatically on GitHub Actions at every push, on Python 3.10 to 3.14.
+Both run automatically on GitHub Actions at every push, on Python 3.11 to 3.14, and the
+storage tests also run on PostgreSQL.
 
 ## Terms and privacy
 

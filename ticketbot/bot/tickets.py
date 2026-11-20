@@ -2,7 +2,7 @@
 
 import io
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import discord
 
@@ -305,7 +305,7 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
     queue = (_("queue.line", waiting=waiting, in_progress=in_progress)
              if waiting or in_progress else _("queue.first"))
     embed = discord.Embed(title=f"🎫 {subject}", description=description,
-                          color=COLOR, timestamp=datetime.now(timezone.utc))
+                          color=COLOR, timestamp=datetime.now(UTC))
     embed.set_author(name=str(user), icon_url=user.display_avatar.url)
     embed.add_field(name=_("field.type"), value=f"{ticket_type['emoji']} {ticket_type['label']}")
     embed.add_field(name=_("field.queue"), value=queue)
@@ -520,7 +520,7 @@ def ticket_meta(client, guild: discord.Guild, channel: discord.TextChannel, tick
     def ts(value):
         if not value:
             return "-"
-        return datetime.fromtimestamp(value, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        return datetime.fromtimestamp(value, UTC).strftime("%Y-%m-%d %H:%M UTC")
 
     fields = [
         (_("field.type"), type_label(ticket)),
@@ -576,7 +576,7 @@ async def close_ticket(client, channel: discord.TextChannel, ticket: dict,
     priority = ticket.get("priority")
 
     embed = discord.Embed(title=_("close.log_title", channel=channel.name),
-                          color=discord.Color.red(), timestamp=datetime.now(timezone.utc))
+                          color=discord.Color.red(), timestamp=datetime.now(UTC))
     embed.add_field(name=_("field.type"), value=type_label(ticket))
     embed.add_field(name=_("field.priority"), value=priority_label(_, priority))
     embed.add_field(name=_("field.opened_by"), value=f"<@{ticket['owner_id']}>")
@@ -793,7 +793,7 @@ class RatingModal(discord.ui.Modal):
         embed = discord.Embed(
             title=_("rating.log_title", ticket=ticket_label(ticket)),
             description=f"{stars(self.value)}" + (f"\n> {comment}" if comment else ""),
-            color=discord.Color.gold(), timestamp=datetime.now(timezone.utc),
+            color=discord.Color.gold(), timestamp=datetime.now(UTC),
         )
         embed.add_field(name=_("field.type"), value=type_label(ticket))
         embed.add_field(name=_("field.opened_by"), value=f"<@{ticket['owner_id']}>")

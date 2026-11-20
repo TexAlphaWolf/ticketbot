@@ -5,6 +5,9 @@ from pathlib import Path
 
 from pydantic import Field, SecretStr, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.exc import ArgumentError
+
+from ..db.engine import normalize_url, safe_url
 
 
 class SettingsError(Exception):
@@ -24,6 +27,11 @@ class Settings(BaseSettings):
     discord_token: SecretStr | None = None
     telegram_bot_token: SecretStr | None = None
 
+    # Database: SQLite file in data_dir unless DATABASE_URL says otherwise
+    # (e.g. postgresql://ticketbot:password@localhost/ticketbot). A secret: it can hold
+    # the password.
+    database_url: SecretStr | None = None
+
     # Files
     data_dir: Path = Path("data")
     legacy_config: Path = Path("config.json")      # v1 config.json, imported once
@@ -32,6 +40,19 @@ class Settings(BaseSettings):
     backup_dir: Path | None = None                  # default: <data_dir>/backups
     backup_keep: int = Field(default=7, ge=0)        # 0 disables automatic backups
     backup_interval_hours: float = Field(default=24, gt=0)
+
+    @field_validator("database_url")
+    @classmethod
+    def _supported_database(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
+        try:
+            normalize_url(value.get_secret_value())
+        except ValueError as e:
+            raise ValueError(str(e)) from None
+        except ArgumentError:
+            raise ValueError("not a valid database URL") from None
+        return value
 
     @field_validator("discord_token", "telegram_bot_token")
     @classmethod
@@ -48,6 +69,15 @@ class Settings(BaseSettings):
     @property
     def db_path(self) -> Path:
         return self.data_dir / "ticketbot.db"
+
+    @property
+    def db_url(self) -> str:
+        """Async SQLAlchemy URL of the database (V3 storage), password included."""
+        if self.database_url is not None:
+            url = self.database_url.get_secret_value()
+        else:
+            url = f"sqlite:///{self.db_path.as_posix()}"
+        return normalize_url(url).render_as_string(hide_password=False)
 
     @property
     def backups_path(self) -> Path:
@@ -69,7 +99,7 @@ class Settings(BaseSettings):
             ("DISCORD_TOKEN", secret(self.discord_token)),
             ("TELEGRAM_BOT_TOKEN", secret(self.telegram_bot_token)),
             ("DATA_DIR", str(self.data_dir)),
-            ("database", str(self.db_path)),
+            ("DATABASE_URL", safe_url(self.db_url)),
             ("LEGACY_CONFIG", str(self.legacy_config)),
             ("BACKUP_DIR", str(self.backups_path)),
             ("BACKUP_KEEP", str(self.backup_keep)),

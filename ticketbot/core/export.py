@@ -2,7 +2,7 @@
 
 import csv
 import io
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from . import config
 from .logic import compute_stats
@@ -28,7 +28,7 @@ def safe_text(value):
 def _utc(ts: float | None) -> datetime | None:
     if ts is None:
         return None
-    return datetime.fromtimestamp(ts, timezone.utc).replace(tzinfo=None)
+    return datetime.fromtimestamp(ts, UTC).replace(tzinfo=None)
 
 
 def _minutes(start: float | None, end: float | None) -> float | None:
@@ -126,7 +126,7 @@ def to_xlsx(rows: list[dict], tickets: list[dict], names: dict[int, str], period
 
     for label, value in (
         (_("export.sum.period"), period),
-        (_("export.sum.generated"), _utc(datetime.now(timezone.utc).timestamp())),
+        (_("export.sum.generated"), _utc(datetime.now(UTC).timestamp())),
         (_("export.sum.opened"), s["opened"]),
         (_("export.sum.closed"), s["closed"]),
         (_("export.sum.open"), s["open"]),

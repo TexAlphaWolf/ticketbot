@@ -14,7 +14,21 @@
   kept as secrets and never appear in logs or error messages. The `.env` variables
   are the same as before
 
+- **Python 3.11 or newer is required** (Python 3.10 reached end of life in October 2026;
+  SQLAlchemy 2.1 needs 3.11)
+- `aiohttp` 3.14 or newer is required
+
 ### Added
+- New storage layer for V3, not used by the bot yet: SQLAlchemy 2 models of every table,
+  an async engine for SQLite (default) and PostgreSQL, and Alembic migrations. The first
+  migration is exactly the v2.3 schema, so an existing database can be adopted without
+  copying data. Discord IDs are stored as 64-bit integers and on/off settings as
+  booleans, so the same schema works on PostgreSQL
+- `DATABASE_URL` setting (e.g. `postgresql://user:password@host/ticketbot`); the
+  password is hidden in `python -m ticketbot settings` and in error messages
+- Storage tests on SQLite and, in CI, on PostgreSQL: the migrations must build exactly
+  the models, a v2.3 database must have the same tables and keys as the first
+  migration, Discord IDs over 32 bits and cascading deletes must work
 - `python -m ticketbot settings` checks the `.env` file and shows the settings in use,
   with the tokens hidden
 

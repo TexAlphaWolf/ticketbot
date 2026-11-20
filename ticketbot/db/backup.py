@@ -4,7 +4,7 @@ import gzip
 import shutil
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 PREFIX = "ticketbot-"
@@ -20,7 +20,7 @@ def create_backup(source: sqlite3.Connection, backup_dir: Path,
     """Copy the database with SQLite's backup API, verify it and save it gzip-compressed."""
     backup_dir = Path(backup_dir)
     backup_dir.mkdir(parents=True, exist_ok=True)
-    stamp = (now or datetime.now(timezone.utc)).strftime("%Y%m%d-%H%M%S")
+    stamp = (now or datetime.now(UTC)).strftime("%Y%m%d-%H%M%S")
     target = backup_dir / f"{PREFIX}{stamp}{SUFFIX}"
     tmp = backup_dir / f".{PREFIX}{stamp}.tmp"
     try:
