@@ -1,6 +1,20 @@
 # Changelog
 
-## [Unreleased] - V3
+## [3.0.0-beta.1] - 2026-11-20
+
+First beta of TicketBot V3: new foundations (storage, migrations, encryption, audit log)
+under the same bot. Every feature of 2.3 works as before. Test it on a test server
+before using it in production.
+
+### Upgrading from 2.3
+1. Stop the bot and make a backup: `python -m ticketbot backup`
+2. Update the files and run `python -m pip install -r requirements.txt` (Python 3.11+)
+3. Create the encryption key with `python -m ticketbot keygen`, add the line to `.env`
+   and keep a copy somewhere safe
+4. Check the settings with `python -m ticketbot settings` and start the bot: it adopts
+   the database (after another backup), applies the migrations and encrypts the
+   sensitive data
+
 
 ### Changed
 - The code is split into packages: `core` (settings, translations, rules, statistics,
