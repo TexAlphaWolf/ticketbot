@@ -37,6 +37,10 @@ Available in **English**, **Italian** and **German**.
 - **Staff reminders**: if a ticket waits too long for a staff reply (🔴 2h, 🟡 24h,
   🟢 48h, ⚪ 12h without a priority), the bot pings the staff member who claimed it, or
   the staff role, and sends a Telegram notification; it can be turned off per server
+- **Auto-assign**: new tickets are assigned in turn to the staff members who joined the
+  rotation with `/available` (whoever has the fewest open tickets first, then whoever
+  has waited longest), and only the assigned member is pinged; turn it on with
+  `/settings autoassign`
 - **Transfer** a ticket to another staff member
 - **Abuse protection**: block members from opening tickets with `/block` (for 1 hour,
   1 day, 7 days, 30 days or permanently, with a reason shown to them and a note in the log
@@ -196,11 +200,12 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 |---|---|---|
 | `/setup` | Admin | Sets up the ticket system and posts the panel |
 | `/guidelines` | Admin | Posts and pins the priority guidelines in the log channel |
-| `/settings show` / `language` / `retention` / `archive` / `reminders` / `cooldown` | Admin | Shows or changes the settings |
+| `/settings show` / `language` / `retention` / `archive` / `reminders` / `cooldown` / `autoassign` | Admin | Shows or changes the settings |
 | `/types list` / `add` / `edit` / `remove` | Admin | Manages the ticket types |
 | `/types questions list` / `add` / `remove` | Admin | Manages the custom questions of a ticket type |
 | `/telegram link` / `verify` / `status` / `test` / `unlink` | Admin | Manages Telegram notifications |
 | `/profile name` / `avatar` / `banner` / `bio` / `reset` | Admin | Changes the bot's profile in this server only |
+| `/available enabled` | Staff | Joins or leaves the auto-assign rotation |
 | `/block add` / `remove` / `list` | Staff | Blocks members from opening tickets |
 | `/stats period member` | Staff | Shows ticket statistics |
 | `/replies list` / `add` / `edit` / `remove` | Admin | Manages the quick replies |

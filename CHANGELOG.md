@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Auto-assign**: with `/settings autoassign` on, every new ticket is assigned to one of
+  the staff members who joined the rotation with `/available`: whoever has the fewest
+  open tickets, then whoever has waited longest since their last assignment. Only the
+  assigned member is pinged (instead of the whole staff role) and is shown in the
+  ticket; the staff reminders go to them too. Any staff member can still claim the
+  ticket. Members who left the server or the staff role are removed from the rotation,
+  and if nobody is available the staff role is pinged as before
+
 ## [2.2.0] - 2026-11-20
 
 ### Added

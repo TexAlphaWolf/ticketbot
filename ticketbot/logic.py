@@ -89,6 +89,14 @@ def cooldown_left(last_ticket: dict | None, minutes: int, now: float) -> float:
     return max(0.0, last_ticket["opened_at"] + minutes * 60 - now)
 
 
+def assignment_order(available: list[dict], open_counts: dict[int, int]) -> list[int]:
+    """Staff in the order they should get the next ticket: fewest open tickets first,
+    then whoever has waited longest since their last assignment (round-robin)."""
+    ranked = sorted(available, key=lambda s: (open_counts.get(s["user_id"], 0),
+                                              s.get("last_assigned_at") or 0, s["user_id"]))
+    return [s["user_id"] for s in ranked]
+
+
 def stars(n: int | None) -> str:
     return "⭐" * n if n else "-"
 

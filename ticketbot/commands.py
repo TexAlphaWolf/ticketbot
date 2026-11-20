@@ -186,6 +186,28 @@ async def mytickets(interaction: discord.Interaction, member: discord.Member | N
                                             ephemeral=True)
 
 
+@app_commands.command(name="available",
+                      description="Choose whether you get automatically assigned tickets")
+@app_commands.guild_only()
+@app_commands.describe(enabled="True to join the rotation, False to leave it")
+async def available(interaction: discord.Interaction, enabled: bool):
+    ctx = await require_setup(interaction)
+    if ctx is None:
+        return
+    cfg, _ = ctx
+    if not is_staff(interaction.user, cfg):
+        await interaction.response.send_message(_("error.staff_only"), ephemeral=True)
+        return
+    db = interaction.client.db
+    db.set_available(interaction.guild.id, interaction.user.id, enabled)
+    text = _("available.on") if enabled else _("available.off")
+    if enabled and not cfg.get("auto_assign"):
+        text += "\n" + _("available.feature_off")
+    count = len(db.available_staff(interaction.guild.id))
+    await interaction.response.send_message(text + "\n" + _("available.count", count=count),
+                                            ephemeral=True)
+
+
 @app_commands.command(name="queue", description="Show how many tickets are open right now")
 @app_commands.guild_only()
 async def queue(interaction: discord.Interaction):
@@ -395,6 +417,10 @@ class SettingsGroup(app_commands.Group):
         embed.add_field(name=_("settings.reminders"),
                         value=_("settings.on") if cfg.get("staff_reminders", 1)
                         else _("settings.off"))
+        available = len(interaction.client.db.available_staff(interaction.guild.id))
+        embed.add_field(name=_("settings.autoassign"),
+                        value=_("settings.autoassign_on", count=available)
+                        if cfg.get("auto_assign") else _("settings.off"))
         cooldown = cfg.get("ticket_cooldown") or 0
         embed.add_field(name=_("settings.cooldown"),
                         value=format_duration(cooldown * 60) if cooldown else _("settings.off"))
@@ -450,6 +476,19 @@ class SettingsGroup(app_commands.Group):
             _("settings.reminders_on") if enabled else _("settings.reminders_off"),
             ephemeral=True)
         await refresh_guidelines(interaction.guild, cfg)
+
+    @app_commands.command(name="autoassign",
+                          description="Assign new tickets automatically to the available staff")
+    @app_commands.describe(enabled="Staff members join the rotation with /available")
+    async def autoassign(self, interaction: discord.Interaction, enabled: bool):
+        ctx = await require_setup(interaction)
+        if ctx is None:
+            return
+        _ = ctx[1]
+        interaction.client.db.save_guild(interaction.guild.id, auto_assign=int(enabled))
+        await interaction.response.send_message(
+            _("settings.autoassign_set_on") if enabled else _("settings.autoassign_set_off"),
+            ephemeral=True)
 
     @app_commands.command(name="cooldown",
                           description="Minimum time between two tickets of the same member")
@@ -1129,6 +1168,6 @@ class ProfileGroup(app_commands.Group):
 
 
 def all_commands() -> list:
-    return [setup, guidelines, queue, mytickets, add, remove, close, reopen, priority,
+    return [setup, guidelines, queue, mytickets, available, add, remove, close, reopen, priority,
             transfer, stats, reply, NoteGroup(), SettingsGroup(), TypesGroup(), TelegramGroup(),
             ProfileGroup(), RepliesGroup(), BlockGroup()]

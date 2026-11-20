@@ -24,6 +24,7 @@ TicketBot only collects the data it needs to run the ticket system.
 **Tickets**:
 - Discord user ID of the member who opened the ticket and of the staff member who
   claimed it or closed it
+- Discord user ID of the staff member the ticket was automatically assigned to
 - Ticket type, subject, description, status, priority and closing reason
 - Timestamps of when the ticket was opened, first answered by the staff and closed, and
   of the last message and who sent it (member or staff), used for the automatic closing
@@ -35,6 +36,10 @@ with `/note add`.
 
 **Attachments**: files uploaded in the ticket form are posted in the ticket channel on
 Discord; the bot does not keep a copy.
+
+**Staff rotation**: Discord user ID of the staff members who joined the auto-assign
+rotation with `/available` and when they were last assigned a ticket; removed when they
+leave the rotation, the staff role or the server.
 
 **Blocked members**: Discord user ID of the member blocked from opening tickets, the
 reason, the ID of the staff member who blocked them and when the block started and ends.

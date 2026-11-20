@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS guilds (
     retention_days     INTEGER NOT NULL DEFAULT 30,
     telegram_chat_id   TEXT,
     staff_reminders    INTEGER NOT NULL DEFAULT 1,
-    ticket_cooldown    INTEGER NOT NULL DEFAULT 0
+    ticket_cooldown    INTEGER NOT NULL DEFAULT 0,
+    auto_assign        INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS ticket_types (
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS tickets (
     status            TEXT    NOT NULL DEFAULT 'waiting',
     priority          TEXT,
     claimed_by        INTEGER,
+    assigned_to       INTEGER,
     control_message   INTEGER,
     opened_at         REAL    NOT NULL,
     first_response_at REAL,
@@ -96,6 +98,13 @@ CREATE TABLE IF NOT EXISTS replies (
     PRIMARY KEY (guild_id, name)
 );
 
+CREATE TABLE IF NOT EXISTS staff_availability (
+    guild_id         INTEGER NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    user_id          INTEGER NOT NULL,
+    last_assigned_at REAL,
+    PRIMARY KEY (guild_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS blocked_users (
     guild_id   INTEGER NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
     user_id    INTEGER NOT NULL,
@@ -120,14 +129,15 @@ GUILD_FIELDS = {
     "language", "staff_role", "category", "log_channel", "archive_channel",
     "panel_channel", "panel_message", "guidelines_channel", "guidelines_message",
     "counter", "retention_days", "telegram_chat_id", "staff_reminders", "ticket_cooldown",
+    "auto_assign",
 }
 TYPE_FIELDS = {"label", "emoji", "description", "position"}
 TICKET_FIELDS = {
-    "guild_id", "channel_id", "number", "user_number", "name", "owner_id", "type_key",
-    "type_label", "type_emoji", "subject", "description", "status", "priority", "claimed_by",
-    "control_message", "opened_at", "first_response_at", "last_actor", "last_activity",
-    "warned", "awaiting_staff_since", "staff_reminded_at", "closed_at", "closed_by",
-    "close_reason", "channel_deleted", "rating", "rating_comment", "rated_at",
+    "guild_id", "channel_id", "number", "user_number", "name", "owner_id", "type_key", "type_label",
+    "type_emoji", "subject", "description", "status", "priority", "claimed_by", "assigned_to",
+    "control_message", "opened_at", "first_response_at", "last_actor", "last_activity", "warned",
+    "awaiting_staff_since", "staff_reminded_at", "closed_at", "closed_by", "close_reason",
+    "channel_deleted", "rating", "rating_comment", "rated_at",
 }
 
 
@@ -155,9 +165,11 @@ class Database:
         """Add columns introduced after a database was first created."""
         added = {
             "tickets": (("user_number", "INTEGER"), ("name", "TEXT"),
-                        ("awaiting_staff_since", "REAL"), ("staff_reminded_at", "REAL")),
+                        ("awaiting_staff_since", "REAL"), ("staff_reminded_at", "REAL"),
+                        ("assigned_to", "INTEGER")),
             "guilds": (("staff_reminders", "INTEGER NOT NULL DEFAULT 1"),
-                       ("ticket_cooldown", "INTEGER NOT NULL DEFAULT 0")),
+                       ("ticket_cooldown", "INTEGER NOT NULL DEFAULT 0"),
+                       ("auto_assign", "INTEGER NOT NULL DEFAULT 0")),
         }
         for table, new_columns in added.items():
             columns = {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}
@@ -345,6 +357,32 @@ class Database:
     def purge_closed_before(self, before: float) -> int:
         return self._write("DELETE FROM tickets WHERE status = 'closed' AND channel_deleted = 1 "
                            "AND closed_at < ?", (before,)).rowcount
+
+    # ------------------------------------------------- staff rotation ---
+
+    def set_available(self, guild_id: int, user_id: int, available: bool) -> None:
+        if available:
+            self._write("INSERT OR IGNORE INTO staff_availability (guild_id, user_id) "
+                        "VALUES (?, ?)", (guild_id, user_id))
+        else:
+            self._write("DELETE FROM staff_availability WHERE guild_id = ? AND user_id = ?",
+                        (guild_id, user_id))
+
+    def available_staff(self, guild_id: int) -> list[dict]:
+        return self._all("SELECT * FROM staff_availability WHERE guild_id = ? ORDER BY user_id",
+                         (guild_id,))
+
+    def mark_assigned(self, guild_id: int, user_id: int, now: float) -> None:
+        self._write("UPDATE staff_availability SET last_assigned_at = ? "
+                    "WHERE guild_id = ? AND user_id = ?", (now, guild_id, user_id))
+
+    def open_tickets_per_staff(self, guild_id: int) -> dict[int, int]:
+        """Open tickets handled by each staff member (claimed, or assigned and not claimed)."""
+        rows = self._all("SELECT COALESCE(claimed_by, assigned_to) AS staff, COUNT(*) AS n "
+                         "FROM tickets WHERE guild_id = ? AND status != 'closed' "
+                         "AND channel_deleted = 0 AND COALESCE(claimed_by, assigned_to) "
+                         "IS NOT NULL GROUP BY staff", (guild_id,))
+        return {r["staff"]: r["n"] for r in rows}
 
     # ---------------------------------------------------- blocked users ---
 

@@ -53,6 +53,17 @@ STRINGS["en"] = {
                    "closed automatically.",
     "queue.line": "**{waiting}** waiting · **{in_progress}** in progress",
     "queue.first": "none, you're first in line!",
+    "field.assigned": "Assigned to",
+    "settings.autoassign": "Auto-assign",
+    "settings.autoassign_on": "On ({count} available)",
+    "settings.autoassign_set_on": "✅ New tickets are now assigned in turn to the available "
+        "staff. Staff members join the rotation with /available.",
+    "settings.autoassign_set_off": "✅ New tickets are no longer assigned automatically.",
+    "available.on": "✅ You are in the rotation: you will be assigned new tickets in turn.",
+    "available.off": "✅ You left the rotation: you won't be assigned new tickets.",
+    "available.feature_off": "ℹ️ Auto-assign is off in this server: an admin can turn it on "
+        "with /settings autoassign.",
+    "available.count": "Staff members in the rotation: **{count}**",
     "open.blocked": "🚫 You can't open tickets in this server.",
     "open.blocked_reason": "**Reason:** {reason}",
     "open.blocked_until": "The block ends {time}.",
@@ -354,6 +365,18 @@ STRINGS["it"] = {
                    "chiuso automaticamente.",
     "queue.line": "**{waiting}** in attesa · **{in_progress}** in lavorazione",
     "queue.first": "nessuno, sei il primo della fila!",
+    "field.assigned": "Assegnato a",
+    "settings.autoassign": "Assegnazione automatica",
+    "settings.autoassign_on": "Attiva ({count} disponibili)",
+    "settings.autoassign_set_on": "✅ I nuovi ticket ora vengono assegnati a turno allo staff "
+        "disponibile. Lo staff entra nella rotazione con /available.",
+    "settings.autoassign_set_off": "✅ I nuovi ticket non vengono più assegnati "
+        "automaticamente.",
+    "available.on": "✅ Sei nella rotazione: ti verranno assegnati i nuovi ticket a turno.",
+    "available.off": "✅ Sei uscito dalla rotazione: non ti verranno assegnati nuovi ticket.",
+    "available.feature_off": "ℹ️ L'assegnazione automatica è disattivata in questo server: un "
+        "admin può attivarla con /settings autoassign.",
+    "available.count": "Membri dello staff nella rotazione: **{count}**",
     "open.blocked": "🚫 Non puoi aprire ticket in questo server.",
     "open.blocked_reason": "**Motivo:** {reason}",
     "open.blocked_until": "Il blocco termina {time}.",
@@ -649,6 +672,19 @@ STRINGS["de"] = {
                    "das Ticket automatisch geschlossen.",
     "queue.line": "**{waiting}** wartend · **{in_progress}** in Bearbeitung",
     "queue.first": "keine, du bist als Erster dran!",
+    "field.assigned": "Zugewiesen an",
+    "settings.autoassign": "Automatische Zuweisung",
+    "settings.autoassign_on": "An ({count} verfügbar)",
+    "settings.autoassign_set_on": "✅ Neue Tickets werden jetzt abwechselnd dem verfügbaren "
+        "Team zugewiesen. Teammitglieder treten der Rotation mit /available bei.",
+    "settings.autoassign_set_off": "✅ Neue Tickets werden nicht mehr automatisch zugewiesen.",
+    "available.on": "✅ Du bist in der Rotation: Dir werden abwechselnd neue Tickets "
+        "zugewiesen.",
+    "available.off": "✅ Du hast die Rotation verlassen: Dir werden keine neuen Tickets "
+        "zugewiesen.",
+    "available.feature_off": "ℹ️ Die automatische Zuweisung ist auf diesem Server aus: Ein "
+        "Admin kann sie mit /settings autoassign einschalten.",
+    "available.count": "Teammitglieder in der Rotation: **{count}**",
     "open.blocked": "🚫 Du kannst auf diesem Server keine Tickets öffnen.",
     "open.blocked_reason": "**Grund:** {reason}",
     "open.blocked_until": "Die Sperre endet {time}.",
@@ -1000,6 +1036,14 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Post and pin the priority guidelines in the log channel":
             "Pubblica e fissa le linee guida sulle priorità nel canale log",
         "Show how many tickets are open right now": "Mostra quanti ticket sono aperti ora",
+        "Choose whether you get automatically assigned tickets":
+            "Scegli se ricevere i ticket assegnati automaticamente",
+        "True to join the rotation, False to leave it":
+            "True per entrare nella rotazione, False per uscirne",
+        "Assign new tickets automatically to the available staff":
+            "Assegna automaticamente i nuovi ticket allo staff disponibile",
+        "Staff members join the rotation with /available":
+            "Lo staff entra nella rotazione con /available",
         "Block members from opening tickets": "Blocca l'apertura di ticket ai membri",
         "Block a member from opening tickets": "Impedisci a un membro di aprire ticket",
         "Member to block": "Membro da bloccare",
@@ -1134,6 +1178,14 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Post and pin the priority guidelines in the log channel":
             "Prioritäts-Richtlinien im Log-Kanal posten und anpinnen",
         "Show how many tickets are open right now": "Zeigen, wie viele Tickets gerade offen sind",
+        "Choose whether you get automatically assigned tickets":
+            "Wählen, ob dir Tickets automatisch zugewiesen werden",
+        "True to join the rotation, False to leave it":
+            "True, um der Rotation beizutreten, False, um sie zu verlassen",
+        "Assign new tickets automatically to the available staff":
+            "Neue Tickets automatisch dem verfügbaren Team zuweisen",
+        "Staff members join the rotation with /available":
+            "Teammitglieder treten der Rotation mit /available bei",
         "Block members from opening tickets": "Mitglieder für das Öffnen von Tickets sperren",
         "Block a member from opening tickets": "Ein Mitglied für das Öffnen von Tickets sperren",
         "Member to block": "Zu sperrendes Mitglied",

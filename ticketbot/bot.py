@@ -162,8 +162,8 @@ class TicketBot(discord.Client):
         self.db.update_ticket(ticket["id"], staff_reminded_at=now)
         waited = format_duration(now - waiting_for_staff_since(ticket))
         priority = priority_label(_, ticket.get("priority"))
-        if ticket.get("claimed_by"):
-            target = f"<@{ticket['claimed_by']}>"
+        if ticket.get("claimed_by") or ticket.get("assigned_to"):
+            target = f"<@{ticket.get('claimed_by') or ticket['assigned_to']}>"
         elif cfg.get("staff_role"):
             target = f"<@&{cfg['staff_role']}>"
         else:

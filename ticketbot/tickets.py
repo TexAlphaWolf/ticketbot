@@ -21,6 +21,7 @@ from .common import (
 )
 from .logic import (
     answers_text,
+    assignment_order,
     attachment_problem,
     cooldown_left,
     format_duration,
@@ -62,6 +63,30 @@ def open_problem(db, cfg: dict, member: discord.abc.User, _: Translate) -> str |
                          cfg.get("ticket_cooldown") or 0, now)
     if wait:
         return _("open.cooldown", time=f"<t:{int(now + wait) + 1}:R>")
+    return None
+
+
+async def pick_assignee(db, guild: discord.Guild, cfg: dict,
+                        owner_id: int) -> discord.Member | None:
+    """Next available staff member for a new ticket (None = ping the staff role)."""
+    if not cfg.get("auto_assign"):
+        return None
+    available = db.available_staff(guild.id)
+    for user_id in assignment_order(available, db.open_tickets_per_staff(guild.id)):
+        if user_id == owner_id:
+            continue
+        member = guild.get_member(user_id)
+        if member is None:
+            try:
+                member = await guild.fetch_member(user_id)
+            except discord.NotFound:
+                member = None
+            except discord.HTTPException:
+                continue
+        if member is None or member.bot or not is_staff(member, cfg):
+            db.set_available(guild.id, user_id, False)  # left the server or the staff
+            continue
+        return member
     return None
 
 
@@ -263,13 +288,16 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
     )
 
     now = time.time()
+    assignee = await pick_assignee(db, guild, cfg, user.id)
+    if assignee:
+        db.mark_assigned(guild.id, assignee.id, now)
     ticket_id = db.create_ticket(
         guild_id=guild.id, channel_id=channel.id, number=number, user_number=user_number,
         name=channel.name, owner_id=user.id,
         type_key=ticket_type["key"], type_label=ticket_type["label"],
         type_emoji=ticket_type["emoji"], subject=subject, description=description,
         status=config.STATUS_WAITING, opened_at=now, last_activity=now,
-        awaiting_staff_since=now,
+        awaiting_staff_since=now, assigned_to=assignee.id if assignee else None,
     )
 
     queue = (_("queue.line", waiting=waiting, in_progress=in_progress)
@@ -279,9 +307,12 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
     embed.set_author(name=str(user), icon_url=user.display_avatar.url)
     embed.add_field(name=_("field.type"), value=f"{ticket_type['emoji']} {ticket_type['label']}")
     embed.add_field(name=_("field.queue"), value=queue)
+    if assignee:
+        embed.add_field(name=_("field.assigned"), value=assignee.mention)
     embed.set_footer(text=_("open.footer", hours=config.AUTO_CLOSE_HOURS))
 
-    control = await channel.send(content=f"{user.mention} {staff_role.mention}",
+    ping = assignee.mention if assignee else staff_role.mention
+    control = await channel.send(content=f"{user.mention} {ping}",
                                  embed=embed, view=TicketControls(_))
     db.update_ticket(ticket_id, control_message=control.id)
     if attachments:

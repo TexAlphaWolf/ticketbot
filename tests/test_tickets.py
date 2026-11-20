@@ -868,3 +868,31 @@ def test_last_ticket_of_owner(db):
     second = new_ticket(db, owner_id=10, channel_id=2, now=2_000.0)
     assert db.last_ticket_of_owner(1, 10)["id"] == second
     assert db.last_ticket_of_owner(1, 11) is None
+
+
+def test_assignment_order_balances_then_rotates():
+    available = [{"user_id": 1, "last_assigned_at": 300.0},
+                 {"user_id": 2, "last_assigned_at": 100.0},
+                 {"user_id": 3, "last_assigned_at": None}]
+    assert logic.assignment_order(available, {}) == [3, 2, 1]
+    assert logic.assignment_order(available, {3: 2, 2: 1}) == [1, 2, 3]
+    assert logic.assignment_order([], {}) == []
+
+
+def test_staff_rotation_in_db(db):
+    db.save_guild(1)
+    db.set_available(1, 5, True)
+    db.set_available(1, 5, True)  # no duplicates
+    db.set_available(1, 6, True)
+    db.mark_assigned(1, 5, 1_000.0)
+    assert [(s["user_id"], s["last_assigned_at"]) for s in db.available_staff(1)] == \
+        [(5, 1_000.0), (6, None)]
+    db.set_available(1, 6, False)
+    assert [s["user_id"] for s in db.available_staff(1)] == [5]
+
+    new_ticket(db, channel_id=1, assigned_to=5)
+    new_ticket(db, channel_id=2, assigned_to=5, claimed_by=6)  # the claim counts
+    closed = new_ticket(db, channel_id=3, assigned_to=5)
+    db.update_ticket(closed, status="closed")
+    new_ticket(db, channel_id=4)
+    assert db.open_tickets_per_staff(1) == {5: 1, 6: 1}
