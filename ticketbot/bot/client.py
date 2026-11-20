@@ -10,7 +10,7 @@ import discord
 from discord.ext import tasks
 
 from .. import __version__
-from ..core import config
+from ..core import config, crypto
 from ..core.logic import (
     activity_changes,
     autoclose_action,
@@ -23,6 +23,7 @@ from ..core.logic import (
 from ..core.settings import Settings, get_settings
 from ..db import Store
 from ..db.backup import backup_due, create_backup, prune_backups
+from ..db.encryption import encrypt_pending
 from ..db.engine import create_engine
 from ..db.legacy import migrate_legacy_config
 from ..db.migrate import prepare
@@ -248,13 +249,17 @@ class TicketBot(discord.Client):
 
 async def open_store(settings: Settings) -> Store:
     """Connect to the database, bring it to the latest schema, import a v1 config.json."""
+    crypto.configure(settings.keyring())
     engine = create_engine(settings.db_url)
     try:
         status = await prepare(engine, settings.backups_path)
+        encrypted = await encrypt_pending(engine)
     except Exception:
         await engine.dispose()
         raise
     print(f"[database] {status}")
+    if encrypted:
+        print(f"[database] encrypted the sensitive data of {encrypted} row(s)")
     store = Store(engine)
     migrated = await migrate_legacy_config(store, settings.legacy_config)
     if migrated:
@@ -284,6 +289,7 @@ def setup_logging() -> None:
 def main(settings: Settings | None = None) -> None:
     settings = settings or get_settings()
     token = settings.require_discord_token()
+    settings.keyring()  # fail before connecting when ENCRYPTION_KEY is missing
     setup_logging()
     try:
         asyncio.run(run_bot(settings, token))

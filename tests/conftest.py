@@ -11,8 +11,13 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from ticketbot.core import crypto  # noqa: E402
 from ticketbot.db import Store, migrate  # noqa: E402
 from ticketbot.db.engine import create_engine  # noqa: E402
+
+# A fixed test key: the database encrypts the sensitive columns in every test
+TEST_KEY = bytes(range(32))
+crypto.configure(crypto.Keyring(TEST_KEY))
 
 
 class SyncStore:

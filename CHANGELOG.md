@@ -14,6 +14,7 @@
   kept as secrets and never appear in logs or error messages. The `.env` variables
   are the same as before
 
+- **`ENCRYPTION_KEY` is required** in `.env` (see *Encryption* in the README)
 - **Python 3.11 or newer is required** (Python 3.10 reached end of life in October 2026;
   SQLAlchemy 2.1 needs 3.11)
 - `aiohttp` 3.14 or newer is required
@@ -41,6 +42,16 @@
 - Storage tests on SQLite and, in CI, on PostgreSQL: the migrations must build exactly
   the models, a v2.3 database must have the same tables and keys as the first
   migration, Discord IDs over 32 bits and cascading deletes must work
+- **Encryption of the sensitive data**: ticket subject, description and form answers,
+  staff notes, closing reason, rating comment and block reason are stored encrypted with
+  AES-256-GCM. Each value carries the id of its key and is tied to its column, so a
+  changed or moved value is detected. The key is the new required `ENCRYPTION_KEY`
+  setting (`python -m ticketbot keygen` creates one); data from TicketBot 2 is encrypted
+  at the first start and, on SQLite, no plain copy is left in the file
+  (`secure_delete` and a one-time `VACUUM`)
+- **Key rotation**: with the new key in `ENCRYPTION_KEY` and the old one in
+  `ENCRYPTION_OLD_KEYS`, the bot re-encrypts everything at start (or run
+  `python -m ticketbot db encrypt`)
 - `python -m ticketbot db copy <url>` copies all the data to an empty database, e.g. from
   SQLite to PostgreSQL: schema and data in one transaction, same ids, PostgreSQL id
   sequences continued after the copied tickets and notes, row counts checked for every

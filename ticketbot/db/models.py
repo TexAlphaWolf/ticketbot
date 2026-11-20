@@ -6,7 +6,9 @@ database can be adopted by the migrations without copying anything. Every later 
 is a numbered Alembic migration in db/migrations/versions.
 
 Types: Discord IDs are BigInteger (64 bit; Postgres INTEGER is only 32), on/off flags
-are Boolean, times are Unix timestamps in seconds (Double), like in v2.
+are Boolean, times are Unix timestamps in seconds (Double), like in v2. Text written by
+users or staff about a ticket (subject, description and form answers, notes, close
+reason, rating comment, block reason) is EncryptedText: AES-256-GCM in the database.
 """
 
 from sqlalchemy import (
@@ -24,6 +26,8 @@ from sqlalchemy import (
     true,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from .types import EncryptedText
 
 # Predictable constraint names, so migrations can refer to them on every database
 NAMING_CONVENTION = {
@@ -109,8 +113,8 @@ class Ticket(Base):
     type_key: Mapped[str] = mapped_column(Text)
     type_label: Mapped[str] = mapped_column(Text)
     type_emoji: Mapped[str] = mapped_column(Text)
-    subject: Mapped[str | None] = mapped_column(Text)
-    description: Mapped[str | None] = mapped_column(Text)
+    subject: Mapped[str | None] = mapped_column(EncryptedText("tickets.subject"))
+    description: Mapped[str | None] = mapped_column(EncryptedText("tickets.description"))
     status: Mapped[str] = mapped_column(Text, server_default=text("'waiting'"))
     priority: Mapped[str | None] = mapped_column(Text)
     claimed_by: Mapped[int | None] = mapped_column(BigInteger)
@@ -125,10 +129,10 @@ class Ticket(Base):
     staff_reminded_at: Mapped[float | None] = mapped_column(Double)
     closed_at: Mapped[float | None] = mapped_column(Double)
     closed_by: Mapped[int | None] = mapped_column(BigInteger)
-    close_reason: Mapped[str | None] = mapped_column(Text)
+    close_reason: Mapped[str | None] = mapped_column(EncryptedText("tickets.close_reason"))
     channel_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
     rating: Mapped[int | None] = mapped_column(Integer)
-    rating_comment: Mapped[str | None] = mapped_column(Text)
+    rating_comment: Mapped[str | None] = mapped_column(EncryptedText("tickets.rating_comment"))
     rated_at: Mapped[float | None] = mapped_column(Double)
 
 
@@ -139,7 +143,7 @@ class Note(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     ticket_id: Mapped[int] = mapped_column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"))
     author_id: Mapped[int] = mapped_column(BigInteger)
-    text: Mapped[str] = mapped_column(Text)
+    text: Mapped[str] = mapped_column(EncryptedText("notes.text"))
     created_at: Mapped[float] = mapped_column(Double)
 
 
@@ -164,7 +168,7 @@ class BlockedUser(Base):
 
     guild_id: Mapped[int] = mapped_column(BigInteger, guild_fk(), primary_key=True)
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
-    reason: Mapped[str | None] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(EncryptedText("blocked_users.reason"))
     blocked_by: Mapped[int] = mapped_column(BigInteger)
     blocked_at: Mapped[float] = mapped_column(Double)
     until: Mapped[float | None] = mapped_column(Double)

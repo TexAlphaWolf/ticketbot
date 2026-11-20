@@ -9,6 +9,8 @@ Start the bot, or manage the database backups:
     python -m ticketbot settings           check the .env file (secrets hidden)
     python -m ticketbot db status          database in use and schema version
     python -m ticketbot db copy <url>      copy all the data to another (empty) database
+    python -m ticketbot db encrypt         encrypt with the current key (after a key change)
+    python -m ticketbot keygen             make a new ENCRYPTION_KEY
 """
 
 import argparse
@@ -37,7 +39,17 @@ def main(argv: list[str] | None = None) -> int:
                                           "(e.g. from SQLite to PostgreSQL)")
     copy.add_argument("target", help="e.g. postgresql://user:password@host:5432/ticketbot")
     copy.add_argument("--yes", action="store_true", help="don't ask for confirmation")
+    db_sub.add_parser("encrypt", help="encrypt everything with the current ENCRYPTION_KEY "
+                                      "(after changing it; the bot also does it at start)")
+    sub.add_parser("keygen", help="make a new random ENCRYPTION_KEY for the .env file")
     args = parser.parse_args(argv)
+
+    if args.command == "keygen":
+        from .core.crypto import generate_key
+        print(f"ENCRYPTION_KEY={generate_key()}")
+        print("Add this line to .env and keep a copy somewhere safe (e.g. a password "
+              "manager): without it the encrypted data can't be read.")
+        return 0
 
     try:
         settings = get_settings()
@@ -61,6 +73,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "db":
+        if args.db_command in ("copy", "encrypt"):
+            from .core import crypto
+            try:
+                crypto.configure(settings.keyring())
+            except SettingsError as e:
+                print(e)
+                return 2
         if args.db_command == "copy" and not confirm_copy(args, settings):
             return 1 if args.target_ok else 2
         try:
@@ -147,6 +166,21 @@ async def database_command(args, settings) -> int:
             print(f"database  {safe_url(source.url)}")
             print(f"schema    {revision or 'none'}"
                   + ("  (latest)" if revision == head else f"  (latest is {head})"))
+            return 0
+
+        if args.db_command == "encrypt":
+            from .core.crypto import CryptoError
+            from .db.encryption import encrypt_pending
+            if await migrate.current_revision(source) != migrate.head_revision():
+                print("Start the bot once first, so that the database has the latest schema.")
+                return 1
+            try:
+                changed = await encrypt_pending(source)
+            except CryptoError as e:
+                print(f"Encryption failed, nothing was changed: {e}")
+                return 1
+            print(f"Encrypted {changed} row(s) with key {settings.keyring().current_id}."
+                  if changed else "Everything is already encrypted with the current key.")
             return 0
 
         target = create_engine(args.target)

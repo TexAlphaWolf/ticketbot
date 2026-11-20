@@ -5,6 +5,7 @@ PostgreSQL tests run when TEST_DATABASE_URL points to an empty test database
 """
 
 import asyncio
+import base64
 import os
 import sys
 from pathlib import Path
@@ -14,6 +15,8 @@ from sqlalchemy import inspect, select
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+
+from conftest import TEST_KEY  # noqa: E402
 
 from ticketbot.db import migrate  # noqa: E402
 from ticketbot.db.engine import (  # noqa: E402
@@ -390,8 +393,9 @@ def test_db_commands(tmp_path, monkeypatch, capsys):
     from ticketbot.core.settings import get_settings
 
     monkeypatch.chdir(tmp_path)
-    for name in ("DATABASE_URL", "DATA_DIR"):
+    for name in ("DATABASE_URL", "DATA_DIR", "ENCRYPTION_OLD_KEYS"):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("ENCRYPTION_KEY", base64.urlsafe_b64encode(TEST_KEY).decode())
     get_settings.cache_clear()
     try:
         async def make():

@@ -110,9 +110,11 @@ Discord and Telegram process this data under their own privacy policies.
 
 ## 6. Security
 
-The data is stored on the bot's host in a local database that is not shared
-publicly. Access tokens are kept separate from the code. Only the developer has
-access to the host.
+The data is stored on the bot's host in a database that is not shared publicly. The
+text written about a ticket (subject, description and form answers, staff notes, closing
+reason, rating comment and the reason of a block) is **encrypted** in the database with
+AES-256-GCM; the key is kept outside the database and the code. Access tokens are kept
+separate from the code. Only the developer has access to the host.
 
 ## 7. Your rights
 

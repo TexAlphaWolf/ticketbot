@@ -92,6 +92,7 @@ git clone https://github.com/TexAlphaWolf/ticketbot.git
 cd ticketbot
 python -m pip install -r requirements.txt
 cp .env.example .env   # then add your tokens
+python -m ticketbot keygen     # prints ENCRYPTION_KEY=...: add it to .env
 python -m ticketbot settings   # checks the .env file (tokens are never printed)
 python -m ticketbot
 ```
@@ -113,10 +114,13 @@ The database is saved in the `data/` folder next to `docker-compose.yml`.
 ### Upgrading from TicketBot 2
 
 Make a backup (`python -m ticketbot backup`), update the files, run
-`python -m pip install -r requirements.txt` and start the bot. On the first start the
+`python -m pip install -r requirements.txt`, add an `ENCRYPTION_KEY` to `.env`
+(`python -m ticketbot keygen`) and start the bot. On the first start the
 database is adopted by the new migration system: the bot makes another backup, adds the
-migration history and prints `[database] adopted the TicketBot 2 database`. Nothing is
-copied: your data stays in the same file.
+migration history and prints `[database] adopted the TicketBot 2 database`, then encrypts
+the sensitive text. Nothing is copied: your data stays in the same file. Backups made
+before the upgrade still contain that text unencrypted: delete them when you no longer
+need them.
 
 ### Using PostgreSQL
 
@@ -207,6 +211,23 @@ journalctl -u ticketbot -f                       # logs
 systemd starts the bot at boot and automatically restarts it if it crashes.
 With Docker, `restart: unless-stopped` in `docker-compose.yml` does the same.
 
+## Encryption
+
+The text people write about a ticket (subject, description and form answers, staff notes,
+closing reason, rating comment, block reason) is encrypted in the database with
+AES-256-GCM. IDs, dates, types and priorities stay readable, so statistics and searches
+work as before. Each value is tied to its column: a value copied elsewhere can't be
+decrypted.
+
+The key is `ENCRYPTION_KEY` in `.env` (`python -m ticketbot keygen` creates one).
+**Keep a copy of it outside the server**, for example in a password manager: backups
+are encrypted too, and without the key they can't be read.
+
+Data from an older version is encrypted automatically at the first start. To change the
+key, put the new one in `ENCRYPTION_KEY`, the old one in `ENCRYPTION_OLD_KEYS`, and
+restart the bot (or run `python -m ticketbot db encrypt`); when it says everything is
+encrypted with the new key, remove `ENCRYPTION_OLD_KEYS`.
+
 ## Backups
 
 The bot backs up its database every 24 hours in `data/backups/` and keeps the last 7
@@ -260,6 +281,7 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 ticketbot/
 ├── core/                # shared by the bot and (from V3) the web API, no Discord code
 │   ├── settings.py      # settings from .env, validated at startup
+│   ├── crypto.py        # AES-256-GCM encryption and key rotation
 │   ├── config.py        # constants
 │   ├── i18n.py          # translations (EN / IT / DE)
 │   ├── logic.py         # pure functions (auto-close, stats, retention...)
@@ -273,6 +295,8 @@ ticketbot/
 │   ├── store.py         # async queries used by the bot
 │   ├── v2.py            # recognises and adopts TicketBot 2 databases
 │   ├── transfer.py      # copies all the data to another database
+│   ├── types.py         # encrypted text column
+│   ├── encryption.py    # encrypts old data, re-encrypts after a key change
 │   ├── backup.py        # backups and restore
 │   └── legacy.py        # v1 config.json import
 ├── bot/

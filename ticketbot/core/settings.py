@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.exc import ArgumentError
 
 from ..db.engine import normalize_url, safe_url
+from .crypto import Keyring, parse_key
 
 
 class SettingsError(Exception):
@@ -32,6 +33,11 @@ class Settings(BaseSettings):
     # the password.
     database_url: SecretStr | None = None
 
+    # Encryption of the sensitive text in the database (python -m ticketbot keygen).
+    # Old keys, comma-separated, are only needed while values are re-encrypted.
+    encryption_key: SecretStr | None = None
+    encryption_old_keys: SecretStr | None = None
+
     # Files
     data_dir: Path = Path("data")
     legacy_config: Path = Path("config.json")      # v1 config.json, imported once
@@ -52,6 +58,16 @@ class Settings(BaseSettings):
             raise ValueError(str(e)) from None
         except ArgumentError:
             raise ValueError("not a valid database URL") from None
+        return value
+
+    @field_validator("encryption_key", "encryption_old_keys")
+    @classmethod
+    def _valid_keys(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
+        for key in value.get_secret_value().split(","):
+            if key.strip():
+                parse_key(key)
         return value
 
     @field_validator("discord_token", "telegram_bot_token")
@@ -97,6 +113,18 @@ class Settings(BaseSettings):
                                 "(see .env.example).")
         return self.discord_token.get_secret_value()
 
+    def keyring(self) -> Keyring:
+        if self.encryption_key is None:
+            raise SettingsError(
+                "ENCRYPTION_KEY is missing: create one with `python -m ticketbot keygen`, "
+                "add it to .env and keep a copy somewhere safe (without it the encrypted "
+                "data can't be read).")
+        old = []
+        if self.encryption_old_keys is not None:
+            old = [parse_key(k) for k in self.encryption_old_keys.get_secret_value().split(",")
+                   if k.strip()]
+        return Keyring(parse_key(self.encryption_key.get_secret_value()), old)
+
     def summary(self) -> list[tuple[str, str]]:
         """What the program will use, with the secrets hidden."""
 
@@ -106,6 +134,9 @@ class Settings(BaseSettings):
         return [
             ("DISCORD_TOKEN", secret(self.discord_token)),
             ("TELEGRAM_BOT_TOKEN", secret(self.telegram_bot_token)),
+            ("ENCRYPTION_KEY", f"set (id {self.keyring().current_id})"
+             if self.encryption_key else "not set"),
+            ("ENCRYPTION_OLD_KEYS", secret(self.encryption_old_keys)),
             ("DATA_DIR", str(self.data_dir)),
             ("DATABASE_URL", safe_url(self.db_url)),
             ("LEGACY_CONFIG", str(self.legacy_config)),

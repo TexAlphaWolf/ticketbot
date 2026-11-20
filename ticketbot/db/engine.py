@@ -35,6 +35,7 @@ def _sqlite_pragmas(dbapi_connection, _record) -> None:
     cursor.execute("PRAGMA foreign_keys = ON")    # ON DELETE CASCADE needs it on SQLite
     cursor.execute("PRAGMA busy_timeout = 5000")  # bot and web API share the file
     cursor.execute("PRAGMA journal_mode = WAL")   # readers don't block the writer
+    cursor.execute("PRAGMA secure_delete = ON")   # overwrite deleted data with zeros
     cursor.close()
 
 
