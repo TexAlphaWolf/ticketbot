@@ -742,7 +742,9 @@ def test_ticket_modal_uses_type_questions():
     _ = lambda key, /, **kw: t("en", key, **kw)  # noqa: E731
     bug = {"key": "bug", "label": "Bug report", "emoji": "🐞"}
     default = TicketModal(bug, _)
-    assert [c.text for c in default.children] == ["Subject", "Describe your issue"]
+    assert [c.text for c in default.children] == ["Subject", "Describe your issue",
+                                                  "Attachments (optional)"]
+    assert default.upload.required is False and default.upload.max_values == 5
 
     questions = [
         {"label": "Version", "placeholder": "e.g. 1.4.2", "long": 0, "required": 1},
@@ -751,7 +753,8 @@ def test_ticket_modal_uses_type_questions():
     ]
     custom = TicketModal(bug, _, questions)
     assert [c.text for c in custom.children] == ["Subject", "Version", "Steps to reproduce",
-                                                 "Link"]
+                                                 "Link", "Attachments (optional)"]
+    assert len(custom.children) <= 5  # Discord's limit for a modal
     version, steps, link = (field for _label, field in custom.answers)
     assert version.placeholder == "e.g. 1.4.2" and version.max_length == 200
     assert steps.style.name == "paragraph" and steps.max_length == 1000
@@ -759,3 +762,51 @@ def test_ticket_modal_uses_type_questions():
     version._value, steps._value, link._value = "1.4.2", "open the app", ""
     assert custom.description_text() == ("**Version**\n1.4.2\n\n**Steps to reproduce**\n"
                                          "open the app\n\n**Link**\n-")
+
+
+
+# ------------------------------------------------------------- attachments ---
+
+@pytest.mark.parametrize("name, size, problem", [
+    ("screenshot.png", 1000, None), ("log.txt", 10, None), ("LOGS.ZIP", 10, None),
+    ("setup.exe", 10, "blocked"), ("photo.jpg.exe", 10, "blocked"), ("run.PS1", 10, "blocked"),
+    ("README", 10, None), ("video.mp4", 11 * 1024 * 1024, "too_big"),
+])
+def test_attachment_problem(name, size, problem):
+    assert logic.attachment_problem(name, size, 10 * 1024 * 1024) == problem
+
+
+def test_forward_attachments_resends_safe_files_only():
+    from types import SimpleNamespace
+
+    import discord
+
+    from ticketbot.tickets import forward_attachments
+
+    sent = []
+
+    class Channel:
+        guild = SimpleNamespace(filesize_limit=10 * 1024 * 1024)
+
+        async def send(self, content=None, files=None, **kwargs):
+            sent.append((content, [f.filename for f in files or []]))
+
+    class Attachment:
+        def __init__(self, filename, size, fail=False):
+            self.filename, self.size, self.fail = filename, size, fail
+
+        async def read(self):
+            if self.fail:
+                raise discord.HTTPException(SimpleNamespace(status=404, reason="gone"), "gone")
+            return b"data"
+
+    files = [Attachment("screen.png", 100), Attachment("virus.exe", 100),
+             Attachment("huge.zip", 50 * 1024 * 1024), Attachment("expired.txt", 10, fail=True)]
+    _ = lambda key, /, **kw: t("en", key, **kw)  # noqa: E731
+    user = SimpleNamespace(mention="<@4>")
+    asyncio.run(forward_attachments(Channel(), user, files, _))
+    assert sent[0] == ("📎 Attachments from <@4>", ["screen.png"])
+    assert sent[1][0].startswith("⚠️ Some files were not added:")
+    for part in ("`virus.exe` (file type not allowed)", "`huge.zip` (larger than 10 MB)",
+                 "`expired.txt` (upload failed)"):
+        assert part in sent[1][0]

@@ -295,6 +295,13 @@ STRINGS["en"] = {
     "questions.removed": "🗑️ Question {number} removed from {type}.",
     "questions.bad_number":
         "There's no question number {number}. Check with `/types questions list`.",
+    "modal.attachments": "Attachments (optional)",
+    "modal.attachments_hint": "Screenshots, logs or other files, up to {max}",
+    "attachments.from": "📎 Attachments from {user}",
+    "attachments.skipped": "⚠️ Some files were not added: {files}",
+    "attachments.blocked": "file type not allowed",
+    "attachments.too_big": "larger than {mb} MB",
+    "attachments.failed": "upload failed",
 }
 
 STRINGS["it"] = {
@@ -556,6 +563,13 @@ STRINGS["it"] = {
     "questions.removed": "🗑️ Domanda {number} rimossa da {type}.",
     "questions.bad_number":
         "Non esiste la domanda numero {number}. Controlla con `/types questions list`.",
+    "modal.attachments": "Allegati (facoltativo)",
+    "modal.attachments_hint": "Screenshot, log o altri file, fino a {max}",
+    "attachments.from": "📎 Allegati di {user}",
+    "attachments.skipped": "⚠️ Alcuni file non sono stati aggiunti: {files}",
+    "attachments.blocked": "tipo di file non consentito",
+    "attachments.too_big": "più grande di {mb} MB",
+    "attachments.failed": "caricamento non riuscito",
 }
 
 STRINGS["de"] = {
@@ -828,6 +842,13 @@ STRINGS["de"] = {
     "questions.removed": "🗑️ Frage {number} aus {type} entfernt.",
     "questions.bad_number":
         "Es gibt keine Frage Nummer {number}. Prüfe es mit `/types questions list`.",
+    "modal.attachments": "Anhänge (optional)",
+    "modal.attachments_hint": "Screenshots, Logs oder andere Dateien, bis zu {max}",
+    "attachments.from": "📎 Anhänge von {user}",
+    "attachments.skipped": "⚠️ Einige Dateien wurden nicht hinzugefügt: {files}",
+    "attachments.blocked": "Dateityp nicht erlaubt",
+    "attachments.too_big": "größer als {mb} MB",
+    "attachments.failed": "Hochladen fehlgeschlagen",
 }
 
 

@@ -34,6 +34,13 @@ MAX_TICKET_TYPES = 25          # Discord select menus allow up to 25 options
 MAX_TYPE_QUESTIONS = 3         # modal: subject + 3 questions + 1 attachment = 5 (Discord max)
 SHORT_ANSWER_LENGTH = 200
 LONG_ANSWER_LENGTH = 1000
+MAX_FORM_ATTACHMENTS = 5       # files a user can attach in the ticket form (Discord max: 10)
+# File types that can run code: never forwarded into a ticket
+BLOCKED_EXTENSIONS = {
+    "apk", "app", "bat", "cmd", "com", "cpl", "dll", "exe", "hta", "iso", "img", "jar",
+    "js", "jse", "lnk", "msc", "msi", "msp", "pif", "ps1", "psm1", "reg", "scr", "sh",
+    "sys", "vb", "vbe", "vbs", "vhd", "vhdx", "wsf", "wsh",
+}
 MAX_REPLIES = 100              # quick replies per server
 MAX_REPLY_LENGTH = 1800        # leaves room for the signature (Discord: 2000)
 

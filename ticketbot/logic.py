@@ -58,6 +58,16 @@ def answers_text(answers: list[tuple[str, str]]) -> str:
                          for question, answer in answers)
 
 
+def attachment_problem(filename: str, size: int, max_bytes: int) -> str | None:
+    """Why a form attachment can't be forwarded ("blocked", "too_big"), or None if it's fine."""
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if extension in config.BLOCKED_EXTENSIONS:
+        return "blocked"
+    if size > max_bytes:
+        return "too_big"
+    return None
+
+
 def format_duration(seconds: float | None) -> str:
     if seconds is None:
         return "-"

@@ -18,6 +18,9 @@ Available in **English**, **Italian** and **German**.
 - **Custom questions per type**: up to 3 questions for each ticket type (e.g. *Version*
   and *Steps to reproduce* for bug reports), with short or long answers, required or
   optional, and an example inside the field
+- **Attachments in the form**: up to 5 files (screenshots, logs...) uploaded together with
+  the ticket and posted in the ticket channel; files that can run code (`.exe`, `.bat`,
+  `.ps1`, `.jar`...) and files over the server's upload limit are skipped
 - A private channel for every ticket, visible only to the user and the staff role,
   named after the type, the username and the user's ticket number (e.g. `bug-mario-2`)
 - One open ticket per user, with queue info (*waiting* / *in progress*)

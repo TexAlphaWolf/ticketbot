@@ -19,7 +19,14 @@ from .common import (
     type_label,
     user_name,
 )
-from .logic import answers_text, format_duration, is_kept, stars, ticket_channel_name
+from .logic import (
+    answers_text,
+    attachment_problem,
+    format_duration,
+    is_kept,
+    stars,
+    ticket_channel_name,
+)
 from .transcripts import collect_messages, render_html, render_txt
 
 # ----------------------------------------------------------------- panel ---
@@ -129,6 +136,12 @@ class TicketModal(discord.ui.Modal):
                                                     max_length=1000)
             self.add_item(discord.ui.Label(text=_("modal.description"),
                                            component=self.description))
+        self.upload = discord.ui.FileUpload(required=False,
+                                            max_values=config.MAX_FORM_ATTACHMENTS)
+        self.add_item(discord.ui.Label(text=_("modal.attachments"),
+                                       description=_("modal.attachments_hint",
+                                                     max=config.MAX_FORM_ATTACHMENTS),
+                                       component=self.upload))
 
     def description_text(self) -> str:
         if self.description is not None:
@@ -136,12 +149,45 @@ class TicketModal(discord.ui.Modal):
         return answers_text([(label, field.value) for label, field in self.answers])
 
     async def on_submit(self, interaction: discord.Interaction):
-        await open_ticket(interaction, self.ticket_type,
-                          self.subject.value, self.description_text())
+        await open_ticket(interaction, self.ticket_type, self.subject.value,
+                          self.description_text(), list(self.upload.values))
+
+
+async def forward_attachments(channel: discord.TextChannel, user: discord.abc.User,
+                              attachments: list[discord.Attachment], _: Translate) -> None:
+    """
+    Files uploaded in a form are only kept by Discord for a while: send them again into the
+    ticket so that they stay in the channel and in the transcripts. Files that can run code,
+    or that are too big for the server, are skipped and listed.
+    """
+    max_bytes = channel.guild.filesize_limit
+    files, skipped = [], []
+    for attachment in attachments:
+        problem = attachment_problem(attachment.filename, attachment.size, max_bytes)
+        if problem:
+            reason = (_("attachments.blocked") if problem == "blocked"
+                      else _("attachments.too_big", mb=max_bytes // (1024 * 1024)))
+            skipped.append(f"`{attachment.filename}` ({reason})")
+            continue
+        try:
+            data = await attachment.read()
+        except discord.HTTPException:
+            skipped.append(f"`{attachment.filename}` ({_('attachments.failed')})")
+            continue
+        files.append(discord.File(io.BytesIO(data), filename=attachment.filename))
+    if files:
+        try:
+            await channel.send(_("attachments.from", user=user.mention), files=files,
+                               allowed_mentions=discord.AllowedMentions.none())
+        except discord.HTTPException:
+            skipped += [f"`{f.filename}` ({_('attachments.failed')})" for f in files]
+    if skipped:
+        await channel.send(_("attachments.skipped", files=", ".join(skipped)))
 
 
 async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
-                      subject: str, description: str) -> None:
+                      subject: str, description: str,
+                      attachments: list[discord.Attachment] | None = None) -> None:
     client = interaction.client
     db = client.db
     guild = interaction.guild
@@ -211,6 +257,8 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
     control = await channel.send(content=f"{user.mention} {staff_role.mention}",
                                  embed=embed, view=TicketControls(_))
     db.update_ticket(ticket_id, control_message=control.id)
+    if attachments:
+        await forward_attachments(channel, user, attachments, _)
 
     await interaction.followup.send(
         _("open.created", channel=channel.mention) + "\n📊 " + queue, ephemeral=True

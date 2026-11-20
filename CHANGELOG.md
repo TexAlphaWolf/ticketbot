@@ -8,6 +8,11 @@
   example shown inside the field. The form shows the subject and the questions of the
   chosen type (types without questions keep subject + description); the answers become
   the ticket description and are shown in the ticket, the transcripts and on Telegram
+- **Attachments in the ticket form**: an optional field to upload up to 5 files when
+  opening a ticket. Discord keeps form uploads only for a while, so the bot posts them
+  again in the ticket channel (and therefore in the transcripts). For safety, files that
+  can run code (`.exe`, `.bat`, `.ps1`, `.js`, `.jar`, `.apk`...) and files over the
+  server's upload limit are skipped and listed in the ticket
 
 ## [2.1.0] - 2026-11-20
 

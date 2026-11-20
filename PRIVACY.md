@@ -1,6 +1,6 @@
 # TicketBot Privacy Policy
 
-_Last updated: November 19, 2026_
+_Last updated: November 20, 2026_
 
 This Privacy Policy explains what data TicketBot ("the bot") collects, why, and
 how long it is kept. TicketBot is an open source project maintained by
@@ -32,6 +32,9 @@ TicketBot only collects the data it needs to run the ticket system.
 
 **Staff notes**: text, author ID and date of the private notes written by the staff
 with `/note add`.
+
+**Attachments**: files uploaded in the ticket form are posted in the ticket channel on
+Discord; the bot does not keep a copy.
 
 **Ratings**: the score from 1 to 5 and the optional comment the user gives after a
 ticket is closed.
