@@ -317,6 +317,11 @@ class Database:
                     "WHERE id = ?", (ticket_id,))
         self._write("DELETE FROM notes WHERE ticket_id = ?", (ticket_id,))
 
+    def tickets_of_user(self, guild_id: int, owner_id: int) -> list[dict]:
+        """All the tickets of a member in a server, newest first."""
+        return self._all("SELECT * FROM tickets WHERE guild_id = ? AND owner_id = ? "
+                         "ORDER BY opened_at DESC, id DESC", (guild_id, owner_id))
+
     def tickets_since(self, guild_id: int, since: float) -> list[dict]:
         return self._all("SELECT * FROM tickets WHERE guild_id = ? AND opened_at >= ?",
                          (guild_id, since))

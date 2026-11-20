@@ -810,3 +810,29 @@ def test_forward_attachments_resends_safe_files_only():
     for part in ("`virus.exe` (file type not allowed)", "`huge.zip` (larger than 10 MB)",
                  "`expired.txt` (upload failed)"):
         assert part in sent[1][0]
+
+
+def test_tickets_of_user_newest_first_and_per_server(db):
+    first = new_ticket(db, owner_id=10, channel_id=1, now=1_000.0)
+    second = new_ticket(db, owner_id=10, channel_id=2, now=2_000.0)
+    new_ticket(db, owner_id=11, channel_id=3, now=3_000.0)
+    new_ticket(db, guild_id=2, owner_id=10, channel_id=4, now=4_000.0)
+    assert [t["id"] for t in db.tickets_of_user(1, 10)] == [second, first]
+    assert db.tickets_of_user(1, 99) == []
+
+
+def test_ticket_history_embed():
+    from ticketbot.commands import ticket_history_embed
+
+    _ = lambda key, /, **kw: t("en", key, **kw)  # noqa: E731
+    base = {"type_emoji": "🐞", "type_label": "Bug", "channel_deleted": 0, "rating": None,
+            "close_reason": None, "closed_at": None, "number": 1}
+    tickets = [dict(base, status="waiting", channel_id=5, name="bug-mario-3", opened_at=300)]
+    tickets += [dict(base, status="closed", channel_id=i, name=f"bug-mario-{i}", opened_at=i,
+                     closed_at=i + 10, rating=5, close_reason="Solved")
+                for i in range(1, 15)]
+    embed = ticket_history_embed(tickets, "Your tickets", _)
+    assert "<#5>" in embed.fields[0].value
+    assert embed.fields[1].name == "Closed (latest 10 of 14)"
+    assert "⭐" in embed.fields[1].value and len(embed.fields[1].value) <= 1024
+    assert ticket_history_embed([], "x", _).description == t("en", "mytickets.none")

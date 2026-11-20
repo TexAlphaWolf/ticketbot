@@ -24,6 +24,8 @@ Available in **English**, **Italian** and **German**.
 - A private channel for every ticket, visible only to the user and the staff role,
   named after the type, the username and the user's ticket number (e.g. `bug-mario-2`)
 - One open ticket per user, with queue info (*waiting* / *in progress*)
+- **Ticket history** with `/mytickets`: open tickets with their status and the latest
+  closed ones with dates and ratings; staff members can see the history of any member
 - Auto-close after **24 hours without a reply from the user** (with a reminder 4 hours
   before); tickets waiting for the staff are never closed automatically
 
@@ -205,6 +207,7 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 | `/reopen` | Staff | Reopens a closed ticket |
 | `/close reason` | Staff or ticket owner | Closes the ticket |
 | `/queue` | Everyone | Shows how many tickets are waiting / in progress |
+| `/mytickets member` | Everyone (`member`: staff only) | Shows your open and closed tickets |
 
 ## Project structure
 

@@ -34,6 +34,7 @@ MAX_TICKET_TYPES = 25          # Discord select menus allow up to 25 options
 MAX_TYPE_QUESTIONS = 3         # modal: subject + 3 questions + 1 attachment = 5 (Discord max)
 SHORT_ANSWER_LENGTH = 200
 LONG_ANSWER_LENGTH = 1000
+MYTICKETS_CLOSED_SHOWN = 10    # closed tickets listed by /mytickets
 MAX_FORM_ATTACHMENTS = 5       # files a user can attach in the ticket form (Discord max: 10)
 # File types that can run code: never forwarded into a ticket
 BLOCKED_EXTENSIONS = {

@@ -13,6 +13,9 @@
   again in the ticket channel (and therefore in the transcripts). For safety, files that
   can run code (`.exe`, `.bat`, `.ps1`, `.js`, `.jar`, `.apk`...) and files over the
   server's upload limit are skipped and listed in the ticket
+- **`/mytickets`**: shows your open tickets (status and channel link) and your latest
+  10 closed tickets with type, dates and rating. Staff members can use the `member`
+  option to see the history of another member
 
 ## [2.1.0] - 2026-11-20
 

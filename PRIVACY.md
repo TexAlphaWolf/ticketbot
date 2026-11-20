@@ -64,7 +64,9 @@ The data is used only to:
 - create, manage, close and reopen tickets;
 - send transcripts, ratings and notifications to the server's staff;
 - close inactive tickets and delete old transcripts automatically;
-- show ticket statistics to the server's staff with `/stats`.
+- show ticket statistics to the server's staff with `/stats`;
+- show members their own ticket history with `/mytickets` (the staff can see the history
+  of any member of their server).
 
 The data is **never sold, shared for advertising or used for any other purpose**.
 

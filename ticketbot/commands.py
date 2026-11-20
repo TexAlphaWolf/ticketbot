@@ -18,6 +18,7 @@ from .logic import (
     format_duration,
     reply_name,
     slugify,
+    stars,
     valid_emoji,
     valid_profile_image,
 )
@@ -32,6 +33,7 @@ from .tickets import (
     refresh_panel,
     reopen_ticket,
     request_close,
+    ticket_label,
     transfer_ticket,
 )
 
@@ -128,6 +130,60 @@ async def guidelines(interaction: discord.Interaction):
     except discord.HTTPException:
         text = _("guidelines.posted_not_pinned", channel=channel.mention)
     await interaction.response.send_message(text, ephemeral=True)
+
+
+def ticket_history_embed(tickets: list[dict], title: str, _) -> discord.Embed:
+    """Open tickets first, then the latest closed ones."""
+    open_lines, closed_lines = [], []
+    for t in tickets:
+        kind = f"{t['type_emoji']} {t['type_label']}"
+        if t["status"] != config.STATUS_CLOSED:
+            status = _("mytickets.status." + t["status"])
+            where = f"<#{t['channel_id']}>" if not t["channel_deleted"] else ticket_label(t)
+            open_lines.append(f"{status} · {where} · {kind} · <t:{int(t['opened_at'])}:R>")
+        else:
+            line = (f"✅ **{ticket_label(t)}** · {kind} · <t:{int(t['opened_at'])}:d>"
+                    f" → <t:{int(t['closed_at'] or t['opened_at'])}:d>")
+            if t.get("rating"):
+                line += f" · {stars(t['rating'])}"
+            if t.get("close_reason"):
+                line += f"\n-# {t['close_reason'][:90]}"
+            closed_lines.append(line)
+
+    embed = discord.Embed(title=title, color=config.COLOR)
+    if open_lines:
+        embed.add_field(name=_("mytickets.open", count=len(open_lines)),
+                        value="\n".join(open_lines)[:1024], inline=False)
+    if closed_lines:
+        shown = closed_lines[:config.MYTICKETS_CLOSED_SHOWN]
+        value = ""
+        for line in shown:  # keep whole lines within Discord's 1024 characters
+            if len(value) + len(line) + 1 > 1024:
+                break
+            value += line + "\n"
+        embed.add_field(name=_("mytickets.closed", shown=len(shown), total=len(closed_lines)),
+                        value=value.strip(), inline=False)
+    if not tickets:
+        embed.description = _("mytickets.none")
+    return embed
+
+
+@app_commands.command(name="mytickets", description="Show your tickets in this server")
+@app_commands.guild_only()
+@app_commands.describe(member="(Staff only) Show the tickets of another member")
+async def mytickets(interaction: discord.Interaction, member: discord.Member | None = None):
+    db = interaction.client.db
+    cfg = db.get_guild(interaction.guild.id)
+    _ = translator(cfg)
+    target = member or interaction.user
+    if target.id != interaction.user.id and not is_staff(interaction.user, cfg):
+        await interaction.response.send_message(_("mytickets.staff_only"), ephemeral=True)
+        return
+    tickets = db.tickets_of_user(interaction.guild.id, target.id)
+    title = (_("mytickets.title_member", user=target.display_name) if member
+             else _("mytickets.title"))
+    await interaction.response.send_message(embed=ticket_history_embed(tickets, title, _),
+                                            ephemeral=True)
 
 
 @app_commands.command(name="queue", description="Show how many tickets are open right now")
@@ -940,6 +996,6 @@ class ProfileGroup(app_commands.Group):
 
 
 def all_commands() -> list:
-    return [setup, guidelines, queue, add, remove, close, reopen, priority, transfer, stats,
-            reply, NoteGroup(), SettingsGroup(), TypesGroup(), TelegramGroup(),
+    return [setup, guidelines, queue, mytickets, add, remove, close, reopen, priority,
+            transfer, stats, reply, NoteGroup(), SettingsGroup(), TypesGroup(), TelegramGroup(),
             ProfileGroup(), RepliesGroup()]
