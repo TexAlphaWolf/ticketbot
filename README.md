@@ -46,6 +46,8 @@ Available in **English**, **Italian** and **German**.
 
 **Setup**
 - Settings stored in **SQLite**, with automatic migration from v1 (`config.json`)
+- **Automatic daily backups** of the database, checked and compressed, with commands
+  to list and restore them
 - **Multilingual** bot messages and slash command descriptions (EN / IT / DE)
 - **Per-server profile**: each server can give the bot its own name, avatar, banner
   and bio with `/profile`
@@ -154,6 +156,27 @@ journalctl -u ticketbot -f                       # logs
 
 systemd starts the bot at boot and automatically restarts it if it crashes.
 With Docker, `restart: unless-stopped` in `docker-compose.yml` does the same.
+
+## Backups
+
+The bot backs up its database every 24 hours in `data/backups/` and keeps the last 7
+copies. Each backup is made while the bot is running, checked for integrity and
+compressed. You can change this in `.env` with `BACKUP_KEEP` (0 disables backups),
+`BACKUP_INTERVAL_HOURS` and `BACKUP_DIR`.
+
+```bash
+python -m ticketbot backup                 # make a backup now
+python -m ticketbot backups                # list the backups, newest first
+python -m ticketbot restore data/backups/ticketbot-20261120-030000.db.gz
+```
+
+Stop the bot before restoring. The restore checks the backup first and keeps the
+current database as `data/ticketbot.db.before-restore`. With Docker, run the same
+commands with `docker compose exec ticketbot python -m ticketbot backup` (and
+`docker compose run --rm ticketbot python -m ticketbot restore ...` with the bot stopped).
+
+> Backups protect against mistakes and damaged files, not against losing the whole disk:
+> copy the `data/backups/` folder to another device from time to time.
 
 ## Commands
 

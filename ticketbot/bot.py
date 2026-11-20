@@ -1,6 +1,7 @@
 """The Discord client: startup, events and background tasks."""
 
 import asyncio
+import sqlite3
 import time
 
 import aiohttp
@@ -8,6 +9,7 @@ import discord
 from discord.ext import tasks
 
 from . import __version__, config
+from .backup import backup_due, create_backup, prune_backups
 from .commands import all_commands
 from .common import channel_url, esc, is_staff, priority_label, telegram_notify, translator
 from .db import Database
@@ -176,9 +178,24 @@ class TicketBot(discord.Client):
             priority=priority, waited=waited, url=channel_url(channel.guild.id, channel.id),
         ))
 
+    def run_backup_if_due(self) -> None:
+        """Back up the database every BACKUP_INTERVAL_HOURS, keeping the last BACKUP_KEEP."""
+        if config.BACKUP_KEEP <= 0:
+            return
+        if not backup_due(config.BACKUP_DIR, config.BACKUP_INTERVAL_HOURS):
+            return
+        try:
+            path = create_backup(self.db.conn, config.BACKUP_DIR)
+        except (OSError, RuntimeError, sqlite3.Error) as e:
+            print(f"[backup] failed: {e}")
+            return
+        removed = prune_backups(config.BACKUP_DIR, config.BACKUP_KEEP)
+        print(f"[backup] saved {path.name}" + (f", removed {len(removed)} old" if removed else ""))
+
     @tasks.loop(hours=1)
     async def hourly_cleanup(self):
         now = time.time()
+        self.run_backup_if_due()
         # Low/Medium transcripts in the log channel
         for guild_id in self.db.guild_ids():
             guild = self.get_guild(guild_id)

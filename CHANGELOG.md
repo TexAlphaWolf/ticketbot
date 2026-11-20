@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [2.1.0] - 2026-11-20
 
 ### Added
 - GitHub Actions workflow: `ruff` lint and tests on Python 3.10, 3.11, 3.12, 3.13 and 3.14
@@ -15,6 +15,12 @@
   reminder repeats every same interval until the staff answers. The wait starts from
   the first unanswered user message. Turn it on or off with `/settings reminders`;
   the times are shown in the pinned guidelines
+- **Automatic backups** of the database every 24 hours, made with SQLite's backup API
+  while the bot is running, verified with an integrity check and gzip-compressed in
+  `data/backups/`; the last 7 are kept (`BACKUP_KEEP`, `BACKUP_INTERVAL_HOURS`,
+  `BACKUP_DIR` in `.env`)
+- Command line: `python -m ticketbot backup`, `backups` and `restore <file>`; a restore
+  checks the backup first and keeps the current database as `ticketbot.db.before-restore`
 
 ### Changed
 - Tool settings (`ruff`, `pytest`) moved to `pyproject.toml`; `pytest.ini` removed

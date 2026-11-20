@@ -15,6 +15,10 @@ DATA_DIR = Path(os.getenv("DATA_DIR", "data"))
 DB_PATH = DATA_DIR / "ticketbot.db"
 LEGACY_CONFIG = Path(os.getenv("LEGACY_CONFIG", "config.json"))  # v1 config, migrated once
 
+BACKUP_DIR = Path(os.getenv("BACKUP_DIR", DATA_DIR / "backups"))
+BACKUP_KEEP = int(os.getenv("BACKUP_KEEP", "7"))          # 0 disables automatic backups
+BACKUP_INTERVAL_HOURS = float(os.getenv("BACKUP_INTERVAL_HOURS", "24"))
+
 COLOR = discord.Color.blurple()
 TOPIC_PREFIX = "ticket-owner:"
 DEFAULT_LANGUAGE = "en"

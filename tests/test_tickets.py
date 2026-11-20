@@ -610,3 +610,104 @@ def test_waiting_since_falls_back_for_old_tickets():
 def test_guild_reminder_setting_and_upgrade(db):
     assert db.save_guild(1)["staff_reminders"] == 1
     assert db.save_guild(1, staff_reminders=0)["staff_reminders"] == 0
+
+
+# ----------------------------------------------------------------- backups ---
+
+def _filled_db(path):
+    database = Database(path)
+    database.save_guild(1, language="it")
+    new_ticket(database, guild_id=1)
+    return database
+
+
+def test_backup_is_valid_and_compressed(tmp_path):
+    import gzip
+    import sqlite3
+
+    from ticketbot.backup import create_backup, list_backups
+
+    database = _filled_db(tmp_path / "data" / "ticketbot.db")
+    path = create_backup(database.conn, tmp_path / "backups",
+                         now=datetime(2026, 11, 20, 3, 0, tzinfo=timezone.utc))
+    assert path.name == "ticketbot-20261120-030000.db.gz"
+    assert list_backups(tmp_path / "backups") == [path]
+    restored = tmp_path / "check.db"
+    restored.write_bytes(gzip.decompress(path.read_bytes()))
+    conn = sqlite3.connect(restored)
+    assert conn.execute("SELECT language FROM guilds").fetchone()[0] == "it"
+    assert conn.execute("SELECT COUNT(*) FROM tickets").fetchone()[0] == 1
+    conn.close()
+    database.close()
+
+
+def test_prune_keeps_newest_and_backup_due(tmp_path):
+    import os
+
+    from ticketbot.backup import backup_due, list_backups, prune_backups
+
+    folder = tmp_path / "backups"
+    assert backup_due(folder, 24)  # no backups yet
+    folder.mkdir()
+    for day in range(1, 11):
+        (folder / f"ticketbot-202611{day:02d}-030000.db.gz").write_bytes(b"x")
+    (folder / "notes.txt").write_text("not a backup")
+    removed = prune_backups(folder, keep=7)
+    assert [p.name[10:18] for p in removed] == ["20261101", "20261102", "20261103"]
+    assert len(list_backups(folder)) == 7 and (folder / "notes.txt").exists()
+    newest = list_backups(folder)[-1]
+    os.utime(newest, (1_000_000, 1_000_000))
+    assert not backup_due(folder, 24, now=1_000_000 + 23 * HOUR)
+    assert backup_due(folder, 24, now=1_000_000 + 24 * HOUR)
+
+
+def test_restore_replaces_db_and_keeps_safety_copy(tmp_path):
+    from ticketbot.backup import create_backup, restore_backup
+
+    db_path = tmp_path / "data" / "ticketbot.db"
+    database = _filled_db(db_path)
+    backup = create_backup(database.conn, tmp_path / "backups")
+    database.save_guild(2)  # change after the backup
+    database.close()
+
+    safety = restore_backup(backup, db_path)
+    restored = Database(db_path)
+    assert restored.guild_ids() == [1]
+    restored.close()
+    before = Database(safety)
+    assert sorted(before.guild_ids()) == [1, 2]
+    before.close()
+
+
+def test_restore_refuses_damaged_backup(tmp_path):
+    import gzip
+
+    from ticketbot.backup import restore_backup
+
+    db_path = tmp_path / "ticketbot.db"
+    _filled_db(db_path).close()
+    damaged = tmp_path / "ticketbot-20260101-000000.db.gz"
+    damaged.write_bytes(gzip.compress(b"this is not a database" * 100))
+    with pytest.raises(Exception):  # noqa: B017
+        restore_backup(damaged, db_path)
+    check = Database(db_path)
+    assert check.guild_ids() == [1]  # untouched
+    check.close()
+
+
+def test_command_line(tmp_path, monkeypatch, capsys):
+    from ticketbot import __main__ as cli
+    from ticketbot import config as cfg
+
+    db_path = tmp_path / "ticketbot.db"
+    _filled_db(db_path).close()
+    monkeypatch.setattr(cfg, "DB_PATH", db_path)
+    monkeypatch.setattr(cfg, "BACKUP_DIR", tmp_path / "backups")
+    assert cli.main(["backup"]) == 0
+    assert "Backup saved" in capsys.readouterr().out
+    assert cli.main(["backups"]) == 0
+    listed = capsys.readouterr().out.split()[0]
+    assert cli.main(["restore", listed, "--yes"]) == 0
+    assert "Restored" in capsys.readouterr().out
+    assert cli.main(["restore", str(tmp_path / "missing.db.gz"), "--yes"]) == 1
+    assert "Restore failed" in capsys.readouterr().out
