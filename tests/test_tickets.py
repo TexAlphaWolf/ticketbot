@@ -836,3 +836,35 @@ def test_ticket_history_embed():
     assert embed.fields[1].name == "Closed (latest 10 of 14)"
     assert "⭐" in embed.fields[1].value and len(embed.fields[1].value) <= 1024
     assert ticket_history_embed([], "x", _).description == t("en", "mytickets.none")
+
+
+def test_blocks_expire_and_are_per_server(db):
+    db.save_guild(1)
+    db.save_guild(2)
+    db.block_user(1, 10, "spam", 99, 1_000.0, None)
+    db.block_user(1, 11, None, 99, 1_000.0, 2_000.0)
+    assert db.get_block(1, 10, 5_000.0)["reason"] == "spam"
+    assert db.get_block(2, 10, 5_000.0) is None
+    assert db.get_block(1, 11, 1_500.0) is not None
+    assert db.get_block(1, 11, 2_000.0) is None
+    assert [b["user_id"] for b in db.list_blocks(1, 1_500.0)] == [10, 11]
+    assert db.purge_expired_blocks(5_000.0) == 1
+    assert db.unblock_user(1, 10) and not db.unblock_user(1, 10)
+    db.block_user(2, 10, None, 99, 1_000.0, None)
+    db.delete_guild(2)
+    assert db.get_block(2, 10, 5_000.0) is None
+
+
+def test_cooldown_left():
+    last = {"opened_at": 1_000.0, "closed_at": 1_060.0}
+    assert logic.cooldown_left(None, 10, 1_000.0) == 0
+    assert logic.cooldown_left(last, 0, 1_000.0) == 0
+    assert logic.cooldown_left(last, 10, 1_300.0) == 300
+    assert logic.cooldown_left(last, 10, 1_600.0) == 0
+
+
+def test_last_ticket_of_owner(db):
+    new_ticket(db, owner_id=10, channel_id=1, now=1_000.0)
+    second = new_ticket(db, owner_id=10, channel_id=2, now=2_000.0)
+    assert db.last_ticket_of_owner(1, 10)["id"] == second
+    assert db.last_ticket_of_owner(1, 11) is None

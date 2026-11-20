@@ -395,6 +395,9 @@ class SettingsGroup(app_commands.Group):
         embed.add_field(name=_("settings.reminders"),
                         value=_("settings.on") if cfg.get("staff_reminders", 1)
                         else _("settings.off"))
+        cooldown = cfg.get("ticket_cooldown") or 0
+        embed.add_field(name=_("settings.cooldown"),
+                        value=format_duration(cooldown * 60) if cooldown else _("settings.off"))
         embed.add_field(name=_("settings.types"),
                         value=str(len(interaction.client.db.list_types(interaction.guild.id))))
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -448,6 +451,20 @@ class SettingsGroup(app_commands.Group):
             ephemeral=True)
         await refresh_guidelines(interaction.guild, cfg)
 
+    @app_commands.command(name="cooldown",
+                          description="Minimum time between two tickets of the same member")
+    @app_commands.describe(minutes="Minutes (0 = off, max 1440)")
+    async def cooldown(self, interaction: discord.Interaction,
+                       minutes: app_commands.Range[int, 0, config.MAX_TICKET_COOLDOWN_MINUTES]):
+        ctx = await require_setup(interaction)
+        if ctx is None:
+            return
+        _ = ctx[1]
+        interaction.client.db.save_guild(interaction.guild.id, ticket_cooldown=minutes)
+        await interaction.response.send_message(
+            _("settings.cooldown_set", time=format_duration(minutes * 60)) if minutes
+            else _("settings.cooldown_off"), ephemeral=True)
+
     @app_commands.command(name="archive", description="Set or remove the archive channel")
     @app_commands.describe(channel="Archive channel (leave empty to disable it)")
     async def archive(self, interaction: discord.Interaction,
@@ -462,6 +479,122 @@ class SettingsGroup(app_commands.Group):
             _("settings.archive_set", channel=channel.mention) if channel
             else _("settings.archive_off"), ephemeral=True
         )
+
+
+# ---------------------------------------------------------- blocked users ---
+
+BLOCK_CHOICES = [
+    app_commands.Choice(name="1 hour", value="1h"),
+    app_commands.Choice(name="1 day", value="1d"),
+    app_commands.Choice(name="7 days", value="7d"),
+    app_commands.Choice(name="30 days", value="30d"),
+    app_commands.Choice(name="Permanent", value="permanent"),
+]
+
+
+async def log_event(guild: discord.Guild, cfg: dict, text: str) -> None:
+    """Post a short moderation note in the log channel, if there is one."""
+    channel = guild.get_channel(cfg.get("log_channel") or 0)
+    if channel is None:
+        return
+    try:
+        await channel.send(embed=discord.Embed(description=text, color=config.COLOR),
+                           allowed_mentions=discord.AllowedMentions.none())
+    except discord.HTTPException:
+        pass
+
+
+class BlockGroup(app_commands.Group):
+    """/block ...: members who can't open tickets."""
+
+    def __init__(self):
+        super().__init__(name="block", description="Block members from opening tickets",
+                         guild_only=True)
+
+    async def _staff(self, interaction: discord.Interaction):
+        ctx = await require_setup(interaction)
+        if ctx is None:
+            return None
+        cfg, _ = ctx
+        if not is_staff(interaction.user, cfg):
+            await interaction.response.send_message(_("error.staff_only"), ephemeral=True)
+            return None
+        return ctx
+
+    @app_commands.command(name="add", description="Block a member from opening tickets")
+    @app_commands.describe(member="Member to block", duration="How long the block lasts",
+                           reason="Reason (shown to the member)")
+    @app_commands.choices(duration=BLOCK_CHOICES)
+    async def block_add(self, interaction: discord.Interaction, member: discord.Member,
+                        duration: app_commands.Choice[str] | None = None,
+                        reason: app_commands.Range[str, 1, config.BLOCK_REASON_LENGTH]
+                        | None = None):
+        ctx = await self._staff(interaction)
+        if ctx is None:
+            return
+        cfg, _ = ctx
+        if member.bot or member.id == interaction.user.id or is_staff(member, cfg):
+            await interaction.response.send_message(_("block.cannot"), ephemeral=True)
+            return
+        db = interaction.client.db
+        now = time.time()
+        seconds = config.BLOCK_DURATIONS[duration.value if duration else "permanent"]
+        until = now + seconds if seconds else None
+        db.block_user(interaction.guild.id, member.id, reason, interaction.user.id, now, until)
+
+        when = _("block.until", time=f"<t:{int(until)}:f>") if until else _("block.permanent")
+        text = _("block.added", user=member.mention, when=when)
+        existing = db.open_ticket_of_owner(interaction.guild.id, member.id)
+        if existing:
+            text += "\n" + _("block.has_open", channel=f"<#{existing['channel_id']}>")
+        await interaction.response.send_message(text, ephemeral=True)
+        log = _("block.log_added", staff=interaction.user.mention, user=member.mention,
+                when=when)
+        if reason:
+            log += "\n" + _("open.blocked_reason", reason=reason)
+        await log_event(interaction.guild, cfg, log)
+
+    @app_commands.command(name="remove", description="Allow a member to open tickets again")
+    @app_commands.describe(member="Member to unblock")
+    async def block_remove(self, interaction: discord.Interaction, member: discord.Member):
+        ctx = await self._staff(interaction)
+        if ctx is None:
+            return
+        cfg, _ = ctx
+        db = interaction.client.db
+        active = db.get_block(interaction.guild.id, member.id, time.time())
+        db.unblock_user(interaction.guild.id, member.id)
+        if not active:
+            await interaction.response.send_message(_("block.not_blocked", user=member.mention),
+                                                    ephemeral=True)
+            return
+        await interaction.response.send_message(_("block.removed", user=member.mention),
+                                                ephemeral=True)
+        await log_event(interaction.guild, cfg, _("block.log_removed",
+                                                  staff=interaction.user.mention,
+                                                  user=member.mention))
+
+    @app_commands.command(name="list", description="Show the blocked members")
+    async def block_list(self, interaction: discord.Interaction):
+        ctx = await self._staff(interaction)
+        if ctx is None:
+            return
+        _ = ctx[1]
+        blocks = interaction.client.db.list_blocks(interaction.guild.id, time.time())
+        embed = discord.Embed(title=_("block.list_title", count=len(blocks)), color=config.COLOR)
+        description = ""
+        for b in blocks:
+            when = (_("block.until", time=f"<t:{int(b['until'])}:R>") if b["until"]
+                    else _("block.permanent"))
+            line = f"<@{b['user_id']}> · {when} · <@{b['blocked_by']}>"
+            if b.get("reason"):
+                line += f"\n-# {b['reason'][:100]}"
+            if len(description) + len(line) + 1 > 4000:  # Discord: 4096 characters
+                description += "…"
+                break
+            description += line + "\n"
+        embed.description = description.strip() or _("block.none")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 # ------------------------------------------------------------ ticket types ---
@@ -998,4 +1131,4 @@ class ProfileGroup(app_commands.Group):
 def all_commands() -> list:
     return [setup, guidelines, queue, mytickets, add, remove, close, reopen, priority,
             transfer, stats, reply, NoteGroup(), SettingsGroup(), TypesGroup(), TelegramGroup(),
-            ProfileGroup(), RepliesGroup()]
+            ProfileGroup(), RepliesGroup(), BlockGroup()]

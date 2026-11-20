@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS guilds (
     counter            INTEGER NOT NULL DEFAULT 0,
     retention_days     INTEGER NOT NULL DEFAULT 30,
     telegram_chat_id   TEXT,
-    staff_reminders    INTEGER NOT NULL DEFAULT 1
+    staff_reminders    INTEGER NOT NULL DEFAULT 1,
+    ticket_cooldown    INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS ticket_types (
@@ -95,6 +96,16 @@ CREATE TABLE IF NOT EXISTS replies (
     PRIMARY KEY (guild_id, name)
 );
 
+CREATE TABLE IF NOT EXISTS blocked_users (
+    guild_id   INTEGER NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL,
+    reason     TEXT,
+    blocked_by INTEGER NOT NULL,
+    blocked_at REAL    NOT NULL,
+    until      REAL,
+    PRIMARY KEY (guild_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS transcript_refs (
     guild_id   INTEGER NOT NULL REFERENCES guilds(guild_id) ON DELETE CASCADE,
     channel_id INTEGER NOT NULL,
@@ -108,7 +119,7 @@ CREATE TABLE IF NOT EXISTS transcript_refs (
 GUILD_FIELDS = {
     "language", "staff_role", "category", "log_channel", "archive_channel",
     "panel_channel", "panel_message", "guidelines_channel", "guidelines_message",
-    "counter", "retention_days", "telegram_chat_id", "staff_reminders",
+    "counter", "retention_days", "telegram_chat_id", "staff_reminders", "ticket_cooldown",
 }
 TYPE_FIELDS = {"label", "emoji", "description", "position"}
 TICKET_FIELDS = {
@@ -145,7 +156,8 @@ class Database:
         added = {
             "tickets": (("user_number", "INTEGER"), ("name", "TEXT"),
                         ("awaiting_staff_since", "REAL"), ("staff_reminded_at", "REAL")),
-            "guilds": (("staff_reminders", "INTEGER NOT NULL DEFAULT 1"),),
+            "guilds": (("staff_reminders", "INTEGER NOT NULL DEFAULT 1"),
+                       ("ticket_cooldown", "INTEGER NOT NULL DEFAULT 0")),
         }
         for table, new_columns in added.items():
             columns = {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}
@@ -317,6 +329,10 @@ class Database:
                     "WHERE id = ?", (ticket_id,))
         self._write("DELETE FROM notes WHERE ticket_id = ?", (ticket_id,))
 
+    def last_ticket_of_owner(self, guild_id: int, owner_id: int) -> dict | None:
+        return self._one("SELECT * FROM tickets WHERE guild_id = ? AND owner_id = ? "
+                         "ORDER BY opened_at DESC, id DESC LIMIT 1", (guild_id, owner_id))
+
     def tickets_of_user(self, guild_id: int, owner_id: int) -> list[dict]:
         """All the tickets of a member in a server, newest first."""
         return self._all("SELECT * FROM tickets WHERE guild_id = ? AND owner_id = ? "
@@ -329,6 +345,33 @@ class Database:
     def purge_closed_before(self, before: float) -> int:
         return self._write("DELETE FROM tickets WHERE status = 'closed' AND channel_deleted = 1 "
                            "AND closed_at < ?", (before,)).rowcount
+
+    # ---------------------------------------------------- blocked users ---
+
+    def block_user(self, guild_id: int, user_id: int, reason: str | None, blocked_by: int,
+                   blocked_at: float, until: float | None) -> None:
+        self._write("INSERT OR REPLACE INTO blocked_users "
+                    "(guild_id, user_id, reason, blocked_by, blocked_at, until) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (guild_id, user_id, reason, blocked_by, blocked_at, until))
+
+    def unblock_user(self, guild_id: int, user_id: int) -> bool:
+        return self._write("DELETE FROM blocked_users WHERE guild_id = ? AND user_id = ?",
+                           (guild_id, user_id)).rowcount > 0
+
+    def get_block(self, guild_id: int, user_id: int, now: float) -> dict | None:
+        """The block of a member, if it is still active."""
+        return self._one("SELECT * FROM blocked_users WHERE guild_id = ? AND user_id = ? "
+                         "AND (until IS NULL OR until > ?)", (guild_id, user_id, now))
+
+    def list_blocks(self, guild_id: int, now: float) -> list[dict]:
+        return self._all("SELECT * FROM blocked_users WHERE guild_id = ? "
+                         "AND (until IS NULL OR until > ?) ORDER BY blocked_at DESC",
+                         (guild_id, now))
+
+    def purge_expired_blocks(self, now: float) -> int:
+        return self._write("DELETE FROM blocked_users WHERE until IS NOT NULL AND until <= ?",
+                           (now,)).rowcount
 
     # ------------------------------------------------------------ notes ---
 

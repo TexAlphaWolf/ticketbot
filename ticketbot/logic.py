@@ -82,6 +82,13 @@ def format_duration(seconds: float | None) -> str:
     return f"{max(minutes, 1)}m" if seconds >= 30 else "<1m"
 
 
+def cooldown_left(last_ticket: dict | None, minutes: int, now: float) -> float:
+    """Seconds a member still has to wait before opening a new ticket (0 = can open)."""
+    if not last_ticket or minutes <= 0:
+        return 0.0
+    return max(0.0, last_ticket["opened_at"] + minutes * 60 - now)
+
+
 def stars(n: int | None) -> str:
     return "⭐" * n if n else "-"
 

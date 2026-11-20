@@ -215,6 +215,7 @@ class TicketBot(discord.Client):
                         continue  # try again next hour
                 self.db.delete_transcript_ref(ref["channel_id"], ref["message_id"])
         # Old closed tickets used only for /stats
+        self.db.purge_expired_blocks(now)
         purged = self.db.purge_closed_before(now - config.STATS_KEEP_DAYS * 86400)
         if purged:
             print(f"Purged {purged} old closed ticket(s)")

@@ -36,6 +36,9 @@ with `/note add`.
 **Attachments**: files uploaded in the ticket form are posted in the ticket channel on
 Discord; the bot does not keep a copy.
 
+**Blocked members**: Discord user ID of the member blocked from opening tickets, the
+reason, the ID of the staff member who blocked them and when the block started and ends.
+
 **Ratings**: the score from 1 to 5 and the optional comment the user gives after a
 ticket is closed.
 
@@ -95,6 +98,7 @@ Discord and Telegram process this data under their own privacy policies.
   until they are deleted by the server's admins or by the user.
 - **Server configuration and all the data of a server** are kept while the bot is in
   the server and are **deleted automatically when the bot is removed** from it.
+- **Blocks** are deleted when they end or when the staff removes them with `/block remove`.
 - **Telegram verification codes** are kept in memory only, for up to 10 minutes.
 
 ## 6. Security

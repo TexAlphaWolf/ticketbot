@@ -16,6 +16,12 @@
 - **`/mytickets`**: shows your open tickets (status and channel link) and your latest
   10 closed tickets with type, dates and rating. Staff members can use the `member`
   option to see the history of another member
+- **Abuse protection**: `/block add`, `remove` and `list` let the staff block a member
+  from opening tickets for 1 hour, 1 day, 7 days, 30 days or permanently, with an
+  optional reason shown to the member; every block and unblock is noted in the log
+  channel. `/settings cooldown` sets a minimum time between two tickets of the same
+  member (off by default). Staff members are never blocked or slowed down, and the
+  checks run both on the panel button and when the form is sent
 
 ## [2.1.0] - 2026-11-20
 

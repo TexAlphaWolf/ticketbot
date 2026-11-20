@@ -42,6 +42,11 @@ BLOCKED_EXTENSIONS = {
     "js", "jse", "lnk", "msc", "msi", "msp", "pif", "ps1", "psm1", "reg", "scr", "sh",
     "sys", "vb", "vbe", "vbs", "vhd", "vhdx", "wsf", "wsh",
 }
+MAX_TICKET_COOLDOWN_MINUTES = 1440  # /settings cooldown: up to one day between two tickets
+BLOCK_REASON_LENGTH = 200
+# /block add durations (seconds, None = permanent)
+BLOCK_DURATIONS = {"1h": 3600, "1d": 86400, "7d": 7 * 86400, "30d": 30 * 86400,
+                   "permanent": None}
 MAX_REPLIES = 100              # quick replies per server
 MAX_REPLY_LENGTH = 1800        # leaves room for the signature (Discord: 2000)
 

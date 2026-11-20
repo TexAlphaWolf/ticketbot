@@ -22,6 +22,7 @@ from .common import (
 from .logic import (
     answers_text,
     attachment_problem,
+    cooldown_left,
     format_duration,
     is_kept,
     stars,
@@ -40,6 +41,30 @@ def panel_embed(types: list[dict], _: Translate) -> discord.Embed:
     return discord.Embed(title=_("panel.title"), description=description, color=config.COLOR)
 
 
+def open_problem(db, cfg: dict, member: discord.abc.User, _: Translate) -> str | None:
+    """Why a member can't open a ticket right now (None = they can)."""
+    guild_id = cfg["guild_id"]
+    existing = db.open_ticket_of_owner(guild_id, member.id)
+    if existing:
+        return _("open.already", channel=f"<#{existing['channel_id']}>")
+    if is_staff(member, cfg):
+        return None
+    now = time.time()
+    block = db.get_block(guild_id, member.id, now)
+    if block:
+        text = _("open.blocked")
+        if block.get("reason"):
+            text += "\n" + _("open.blocked_reason", reason=block["reason"])
+        if block.get("until"):
+            text += "\n" + _("open.blocked_until", time=f"<t:{int(block['until'])}:R>")
+        return text
+    wait = cooldown_left(db.last_ticket_of_owner(guild_id, member.id),
+                         cfg.get("ticket_cooldown") or 0, now)
+    if wait:
+        return _("open.cooldown", time=f"<t:{int(now + wait) + 1}:R>")
+    return None
+
+
 class TicketPanel(discord.ui.View):
     """Panel with the button to open tickets (persistent)."""
 
@@ -56,6 +81,10 @@ class TicketPanel(discord.ui.View):
         _ = translator(cfg)
         if cfg is None or not cfg.get("category"):
             await interaction.response.send_message(_("error.not_setup"), ephemeral=True)
+            return
+        problem = open_problem(db, cfg, interaction.user, _)
+        if problem:
+            await interaction.response.send_message(problem, ephemeral=True)
             return
         types = db.list_types(interaction.guild.id)
         if not types:
@@ -201,11 +230,9 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
         await interaction.response.send_message(_("error.bad_setup"), ephemeral=True)
         return
 
-    existing = db.open_ticket_of_owner(guild.id, user.id)
-    if existing:
-        await interaction.response.send_message(
-            _("open.already", channel=f"<#{existing['channel_id']}>"), ephemeral=True
-        )
+    problem = open_problem(db, cfg, user, _)  # checked again: the form may stay open a while
+    if problem:
+        await interaction.response.send_message(problem, ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True, thinking=True)

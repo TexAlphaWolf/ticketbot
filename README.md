@@ -38,6 +38,10 @@ Available in **English**, **Italian** and **German**.
   🟢 48h, ⚪ 12h without a priority), the bot pings the staff member who claimed it, or
   the staff role, and sends a Telegram notification; it can be turned off per server
 - **Transfer** a ticket to another staff member
+- **Abuse protection**: block members from opening tickets with `/block` (for 1 hour,
+  1 day, 7 days, 30 days or permanently, with a reason shown to them and a note in the log
+  channel), and set a minimum time between two tickets of the same member with
+  `/settings cooldown`; staff members are never blocked
 - **Private notes** visible only to the staff and included in the staff transcript
 - **Reopen**: closed tickets stay available for 12 hours before the channel is deleted
 - **Statistics** with `/stats`: tickets per type and priority, average first response and
@@ -192,11 +196,12 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 |---|---|---|
 | `/setup` | Admin | Sets up the ticket system and posts the panel |
 | `/guidelines` | Admin | Posts and pins the priority guidelines in the log channel |
-| `/settings show` / `language` / `retention` / `archive` / `reminders` | Admin | Shows or changes the settings |
+| `/settings show` / `language` / `retention` / `archive` / `reminders` / `cooldown` | Admin | Shows or changes the settings |
 | `/types list` / `add` / `edit` / `remove` | Admin | Manages the ticket types |
 | `/types questions list` / `add` / `remove` | Admin | Manages the custom questions of a ticket type |
 | `/telegram link` / `verify` / `status` / `test` / `unlink` | Admin | Manages Telegram notifications |
 | `/profile name` / `avatar` / `banner` / `bio` / `reset` | Admin | Changes the bot's profile in this server only |
+| `/block add` / `remove` / `list` | Staff | Blocks members from opening tickets |
 | `/stats period member` | Staff | Shows ticket statistics |
 | `/replies list` / `add` / `edit` / `remove` | Admin | Manages the quick replies |
 | `/reply name` | Staff | Sends a quick reply in the ticket |
