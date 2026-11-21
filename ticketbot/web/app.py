@@ -2,6 +2,7 @@
 
 import asyncio
 import socket
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -70,12 +71,33 @@ def _check_port(host: str, port: int) -> None:
                 f"another port in .env, e.g. WEB_PORT={port + 1}") from None
 
 
-def run(settings: Settings) -> None:
+def wait_for_database(settings: Settings, wait: float, *, sleep=time.sleep,
+                      clock=time.monotonic) -> None:
+    """Check the database; with `wait` > 0 try again for that many seconds while it isn't
+    ready (Docker: the bot updates it at start, PostgreSQL may still be starting)."""
+    until = clock() + wait
+    said = False
+    while True:
+        try:
+            asyncio.run(_check_database(settings))
+            return
+        except Exception as e:
+            if clock() >= until:
+                if isinstance(e, SettingsError):
+                    raise
+                raise SettingsError(f"The database can't be reached: {e}") from None
+            if not said:
+                print(f"[web] waiting for the database (up to {wait:.0f}s): {e}")
+                said = True
+            sleep(3)
+
+
+def run(settings: Settings, wait: float = 0) -> None:
     """Start the web server. Raises SettingsError before starting if the database isn't
     ready, so the message isn't buried in a traceback."""
     import uvicorn
 
-    asyncio.run(_check_database(settings))
+    wait_for_database(settings, wait)
     _check_port(settings.web_host, settings.web_port)
     print(f"[web] http://{settings.web_host}:{settings.web_port}"
           + (f" (public: {settings.web_public_url})" if settings.web_public_url else ""))

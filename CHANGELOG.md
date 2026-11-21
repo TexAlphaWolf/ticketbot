@@ -123,6 +123,16 @@
   dashboard show who wrote them (transcripts saved before show them without)
 - The transcript in the dashboard shows stickers, reactions and image previews too,
   like the HTML file (`stickers` and `reactions` in the transcript API)
+- **Docker with the dashboard**: the image is built in stages (Node.js builds the
+  dashboard, the final image has only Python, the packages and the built files, and runs
+  as a normal user) and `docker-compose.yml` starts the bot and the dashboard
+  (`ticketbot-web`, on `127.0.0.1:8080`, with a health check) from the same image, on the
+  same `data/` folder. Optional PostgreSQL container with
+  `docker compose --profile postgres up -d`. Python 3.14 in the image
+- `python -m ticketbot web --wait SECONDS`: if the database isn't ready yet (the bot is
+  creating or updating it, PostgreSQL is starting), the dashboard tries again for up to
+  that long instead of stopping
+- The tests on GitHub also build the Docker image and check that the dashboard starts
 
 ## [3.0.0-beta.2] - 2026-11-21
 

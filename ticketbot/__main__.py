@@ -28,7 +28,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m ticketbot", description="TicketBot")
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("bot", help="start the Discord bot (default)")
-    sub.add_parser("web", help="start the web dashboard and API")
+    web = sub.add_parser("web", help="start the web dashboard and API")
+    web.add_argument("--wait", type=float, default=0, metavar="SECONDS",
+                     help="if the database isn't ready yet (e.g. the bot is updating it), "
+                          "try again for up to this long (used by Docker)")
     sub.add_parser("backup", help="make a database backup now")
     sub.add_parser("backups", help="list the database backups")
     restore = sub.add_parser("restore", help="restore a backup (stop the bot first)")
@@ -76,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "web":
         from .web.app import run as run_web
         try:
-            run_web(settings)
+            run_web(settings, wait=args.wait)
         except SettingsError as e:
             print(e)
             return 2

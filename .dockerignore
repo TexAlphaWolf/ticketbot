@@ -3,8 +3,12 @@
 .venv
 .env
 .pytest_cache
+.ruff_cache
 __pycache__
 *.pyc
 data
 config.json*
 tests
+frontend/node_modules
+ticketbot/web/static
+*.zip

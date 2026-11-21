@@ -36,6 +36,38 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+  docker:
+    name: Docker image (build and start)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the image (dashboard with Node, then Python only)
+        run: docker build -t ticketbot:ci .
+      - name: The dashboard is inside, without Node
+        run: |
+          docker run --rm ticketbot:ci python -c "from ticketbot.web import spa; assert spa.built(spa.DEFAULT_DIR)"
+          ! docker run --rm ticketbot:ci sh -c "command -v node"
+      - name: The compose file is valid
+        run: |
+          touch .env
+          docker compose config --quiet
+          docker compose --profile postgres config --quiet
+      - name: The dashboard starts once the database is ready
+        run: |
+          key=$(docker run --rm ticketbot:ci python -m ticketbot keygen | head -n 1)
+          printf '%s\nWEB_HOST=0.0.0.0\n' "$key" > ci.env
+          mkdir -p data && sudo chown 1000:1000 data
+          docker run -d --name web --env-file ci.env -v "$PWD/data:/app/data" -p 127.0.0.1:8080:8080 \
+            ticketbot:ci python -m ticketbot web --wait 120
+          docker run --rm --env-file ci.env -v "$PWD/data:/app/data" ticketbot:ci python -c \
+            "import asyncio; from ticketbot.core.settings import get_settings; from ticketbot.db.engine import create_engine; from ticketbot.db import migrate; s = get_settings(); asyncio.run(migrate.prepare(create_engine(s.db_url)))"
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8080/api/v1/health && exit 0
+            sleep 2
+          done
+          docker logs web
+          exit 1
+
   test:
     name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest

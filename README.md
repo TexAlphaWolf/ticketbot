@@ -126,7 +126,33 @@ docker compose up -d --build
 docker compose logs -f
 ```
 
-The database is saved in the `data/` folder next to `docker-compose.yml`.
+This starts two containers from the same image: `ticketbot` (the bot) and
+`ticketbot-web` (the web dashboard, on `http://127.0.0.1:8080`, reachable only from
+this computer). The dashboard waits until the bot has created or updated the database,
+then starts. The database is saved in the `data/` folder next to `docker-compose.yml`.
+
+The image is built in stages: Node.js builds the dashboard, then only the built files,
+Python and the packages go into the final image (no Node.js, no build tools), which
+runs as a normal user, not root. Nothing needs to be installed besides Docker.
+
+With PostgreSQL in a container too, add to `.env`
+
+```bash
+POSTGRES_PASSWORD=a-long-random-password
+DATABASE_URL=postgresql://ticketbot:a-long-random-password@postgres:5432/ticketbot
+```
+
+and start everything with `docker compose --profile postgres up -d --build`: the bot and
+the dashboard wait for PostgreSQL to be ready. Its data stays in the `postgres` Docker
+volume; back it up with
+`docker compose exec postgres pg_dump -U ticketbot ticketbot > ticketbot.sql`.
+
+To update: `git pull`, then `docker compose up -d --build` again.
+
+> On **Docker Desktop for Windows or macOS** the `data/` folder is shared with the
+> containers through a virtual machine, where SQLite can't safely be used by the bot and
+> the dashboard at the same time. There, use the PostgreSQL profile above, or keep the
+> project inside WSL (e.g. `~/ticketbot` in Ubuntu). On a Linux server nothing changes.
 
 ### Upgrading from TicketBot 2
 
@@ -225,6 +251,9 @@ npm run build                  # type check, then build into ticketbot/web/stati
 cd ..
 python -m ticketbot web        # http://127.0.0.1:8080
 ```
+
+With Docker the dashboard is built inside the image and starts with the bot (see
+[With Docker](#with-docker)): no Node.js needed.
 
 While changing the dashboard, `npm run dev` (in `frontend/`) serves it at
 `http://127.0.0.1:5173` with instant reload, sending the API calls to the web server on

@@ -365,3 +365,38 @@ def test_built_dashboard_is_served(tmp_path):
         assert c.get("/assets/..%2F..%2Fsecret.txt").status_code == 404
         assert c.get("/api/v1/nope").json() == {"detail": "Not Found"}     # API stays JSON
         assert c.get("/api/v1/health").json()["status"] == "ok"
+
+
+def test_web_waits_for_the_bot_to_prepare_the_database(monkeypatch, capsys):
+    """Docker starts the bot and the dashboard together: `web --wait` tries again until
+    the bot has created or updated the database, then gives up with the reason."""
+    import ticketbot.web.app as web_app
+    from ticketbot.core.settings import SettingsError
+
+    tries = {"n": 0}
+
+    async def not_ready_twice(settings):
+        tries["n"] += 1
+        if tries["n"] <= 2:
+            raise SettingsError("no TicketBot database. Start the bot first")
+
+    now = {"t": 0.0}
+
+    def sleep(seconds):
+        now["t"] += seconds
+
+    monkeypatch.setattr(web_app, "_check_database", not_ready_twice)
+    web_app.wait_for_database(None, 60, sleep=sleep, clock=lambda: now["t"])
+    assert tries["n"] == 3 and now["t"] == 6
+    assert capsys.readouterr().out.count("waiting for the database") == 1   # said once
+
+    async def unreachable(settings):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(web_app, "_check_database", unreachable)
+    now["t"] = 0.0
+    with pytest.raises(SettingsError, match="can't be reached: connection refused"):
+        web_app.wait_for_database(None, 10, sleep=sleep, clock=lambda: now["t"])
+    assert now["t"] >= 10
+    with pytest.raises(SettingsError):                       # without --wait: at once
+        web_app.wait_for_database(None, 0, sleep=sleep, clock=lambda: now["t"])
