@@ -51,6 +51,10 @@ viewing another member's tickets...): the server ID, the Discord user ID of who 
 it was about (e.g. a ticket number) and when. Details such as a closing or escalation
 reason are encrypted. For actions from the web dashboard, the IP address is recorded, encrypted.
 
+**FAQ**: when a member reads the FAQ before opening a ticket and presses *It's solved*
+or *Open a ticket anyway*, only the server, the ticket type, which button and when are
+recorded, to count the tickets avoided. Who pressed it is not recorded.
+
 **Ratings**: the score from 1 to 5 and the optional comment the user gives after a
 ticket is closed.
 
@@ -114,6 +118,7 @@ Discord and Telegram process this data under their own privacy policies.
   the server and are **deleted automatically when the bot is removed** from it.
 - **Audit log** entries are kept for **365 days**, then deleted, and are deleted with the
   rest of the server's data when the bot is removed from it.
+- **FAQ results** (anonymous) are kept for **365 days** for `/stats`, then deleted.
 - **Blocks** are deleted when they end or when the staff removes them with `/block remove`.
 - **Telegram verification codes** are kept in memory only, for up to 10 minutes.
 

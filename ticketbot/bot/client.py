@@ -284,6 +284,7 @@ class TicketBot(discord.Client):
         # Old closed tickets used only for /stats
         await self.db.purge_expired_blocks(now)
         await self.db.purge_audit_before(now - config.AUDIT_KEEP_DAYS * 86400)
+        await self.db.purge_faq_results_before(now - config.STATS_KEEP_DAYS * 86400)
         await self.db.purge_finished_commands(now - config.COMMANDS_KEEP_DAYS * 86400)
         purged = await self.db.purge_closed_before(now - config.STATS_KEEP_DAYS * 86400)
         if purged:

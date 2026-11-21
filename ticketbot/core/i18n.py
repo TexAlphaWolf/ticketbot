@@ -72,6 +72,30 @@ STRINGS["en"] = {
         "New tickets of this type are shown only to their roles and to the admins.",
     "roles.exists": "{role} already handles the {type} tickets.",
     "roles.removed": "🗑️ {role} no longer handles the {type} tickets.",
+    "faq.title": "💡 Before you open a ticket · {type}",
+    "faq.intro": "These answers solve many requests. If none of them helps, open a ticket "
+        "and the staff will answer you.",
+    "btn.faq_solved": "It's solved",
+    "btn.faq_open": "Open a ticket anyway",
+    "faq.glad": "✅ Great, glad it's solved! You can open a ticket from the panel any time.",
+    "faq.none": "No FAQ yet. Add one with `/faq add`: members see it after choosing the "
+        "ticket type, before the form.",
+    "faq.list_title": "💡 FAQ ({count}/{max})",
+    "faq.all_types": "all types",
+    "faq.modal_add": "New FAQ entry",
+    "faq.modal_edit": "Edit FAQ #{id}",
+    "faq.q_label": "Question",
+    "faq.q_hint": "As a member would ask it",
+    "faq.a_label": "Answer",
+    "faq.a_hint": "Markdown and links work",
+    "faq.added": "✅ FAQ #{id} added. Members see it after choosing the ticket type, "
+        "before the form.",
+    "faq.saved": "✅ FAQ #{id} saved.",
+    "faq.too_many": "You can have up to {max} FAQ entries.",
+    "faq.unknown": "There is no FAQ #{id}.",
+    "faq.removed": "🗑️ FAQ #{id} removed.",
+    "stats.faq": "💡 FAQ",
+    "stats.faq_value": "Solved without a ticket: **{solved}** · opened anyway: **{opened}**",
     "escalation.automatic": "-# Escalated automatically: no staff reply in time.",
     "escalation.by": "-# Escalated by {user}.",
     "escalation.done": "⬆️ Ticket escalated to **level {level}**: {role} can now see and "
@@ -480,6 +504,31 @@ STRINGS["it"] = {
         "I nuovi ticket di questo tipo vengono mostrati solo ai suoi ruoli e agli admin.",
     "roles.exists": "{role} gestisce già i ticket {type}.",
     "roles.removed": "🗑️ {role} non gestisce più i ticket {type}.",
+    "faq.title": "💡 Prima di aprire un ticket · {type}",
+    "faq.intro": "Queste risposte risolvono molte richieste. Se nessuna ti aiuta, apri un "
+        "ticket e lo staff ti risponderà.",
+    "btn.faq_solved": "Ho risolto",
+    "btn.faq_open": "Apri comunque un ticket",
+    "faq.glad": "✅ Ottimo, felice che tu abbia risolto! Puoi aprire un ticket dal pannello "
+        "quando vuoi.",
+    "faq.none": "Nessuna FAQ. Aggiungine una con `/faq add`: i membri la vedono dopo aver "
+        "scelto il tipo di ticket, prima del modulo.",
+    "faq.list_title": "💡 FAQ ({count}/{max})",
+    "faq.all_types": "tutti i tipi",
+    "faq.modal_add": "Nuova FAQ",
+    "faq.modal_edit": "Modifica FAQ #{id}",
+    "faq.q_label": "Domanda",
+    "faq.q_hint": "Come la farebbe un membro",
+    "faq.a_label": "Risposta",
+    "faq.a_hint": "Puoi usare Markdown e link",
+    "faq.added": "✅ FAQ #{id} aggiunta. I membri la vedono dopo aver scelto il tipo di "
+        "ticket, prima del modulo.",
+    "faq.saved": "✅ FAQ #{id} salvata.",
+    "faq.too_many": "Puoi avere al massimo {max} FAQ.",
+    "faq.unknown": "La FAQ #{id} non esiste.",
+    "faq.removed": "🗑️ FAQ #{id} rimossa.",
+    "stats.faq": "💡 FAQ",
+    "stats.faq_value": "Risolti senza ticket: **{solved}** · aperti comunque: **{opened}**",
     "escalation.automatic": "-# Escalation automatica: nessuna risposta dello staff in "
         "tempo.",
     "escalation.by": "-# Escalation fatta da {user}.",
@@ -886,6 +935,31 @@ STRINGS["de"] = {
         "Neue Tickets dieser Art sehen nur ihre Rollen und die Admins.",
     "roles.exists": "{role} bearbeitet die {type}-Tickets bereits.",
     "roles.removed": "🗑️ {role} bearbeitet die {type}-Tickets nicht mehr.",
+    "faq.title": "💡 Bevor du ein Ticket öffnest · {type}",
+    "faq.intro": "Diese Antworten lösen viele Anfragen. Wenn keine hilft, öffne ein Ticket "
+        "und das Team antwortet dir.",
+    "btn.faq_solved": "Hat sich erledigt",
+    "btn.faq_open": "Trotzdem Ticket öffnen",
+    "faq.glad": "✅ Super, schön, dass es gelöst ist! Du kannst jederzeit über das Panel ein "
+        "Ticket öffnen.",
+    "faq.none": "Noch keine FAQ. Lege eine mit `/faq add` an: Mitglieder sehen sie nach der "
+        "Wahl der Ticket-Art, vor dem Formular.",
+    "faq.list_title": "💡 FAQ ({count}/{max})",
+    "faq.all_types": "alle Arten",
+    "faq.modal_add": "Neuer FAQ-Eintrag",
+    "faq.modal_edit": "FAQ #{id} bearbeiten",
+    "faq.q_label": "Frage",
+    "faq.q_hint": "So, wie ein Mitglied sie stellen würde",
+    "faq.a_label": "Antwort",
+    "faq.a_hint": "Markdown und Links funktionieren",
+    "faq.added": "✅ FAQ #{id} angelegt. Mitglieder sehen sie nach der Wahl der Ticket-Art, "
+        "vor dem Formular.",
+    "faq.saved": "✅ FAQ #{id} gespeichert.",
+    "faq.too_many": "Du kannst höchstens {max} FAQ-Einträge haben.",
+    "faq.unknown": "FAQ #{id} gibt es nicht.",
+    "faq.removed": "🗑️ FAQ #{id} entfernt.",
+    "stats.faq": "💡 FAQ",
+    "stats.faq_value": "Ohne Ticket gelöst: **{solved}** · trotzdem geöffnet: **{opened}**",
     "escalation.automatic": "-# Automatisch eskaliert: keine rechtzeitige Antwort des "
         "Teams.",
     "escalation.by": "-# Eskaliert von {user}.",
@@ -1334,6 +1408,15 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Where new tickets are opened": "Dove vengono aperti i nuovi ticket",
         "Channels (one per ticket)": "Canali (uno per ticket)",
         "Private threads in the panel channel": "Thread privati nel canale del pannello",
+        "Questions and answers shown before the ticket form":
+            "Domande e risposte mostrate prima del modulo dei ticket",
+        "Show the FAQ": "Mostra le FAQ",
+        "Add a question and its answer": "Aggiungi una domanda e la sua risposta",
+        "(Optional) Ticket type (default: all types)":
+            "(Facoltativo) Tipo di ticket (di base: tutti i tipi)",
+        "Edit a FAQ entry": "Modifica una FAQ",
+        "FAQ entry": "FAQ",
+        "Remove a FAQ entry": "Rimuovi una FAQ",
         "Bring this ticket to the next escalation level":
             "Porta questo ticket al livello di escalation successivo",
         "(Optional) Level to reach (default: the next one)":
@@ -1509,6 +1592,15 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Where new tickets are opened": "Wo neue Tickets geöffnet werden",
         "Channels (one per ticket)": "Kanäle (einer pro Ticket)",
         "Private threads in the panel channel": "Private Threads im Panel-Kanal",
+        "Questions and answers shown before the ticket form":
+            "Fragen und Antworten, die vor dem Ticket-Formular erscheinen",
+        "Show the FAQ": "FAQ anzeigen",
+        "Add a question and its answer": "Eine Frage mit Antwort anlegen",
+        "(Optional) Ticket type (default: all types)":
+            "(Optional) Ticket-Art (Standard: alle Arten)",
+        "Edit a FAQ entry": "Einen FAQ-Eintrag bearbeiten",
+        "FAQ entry": "FAQ-Eintrag",
+        "Remove a FAQ entry": "Einen FAQ-Eintrag entfernen",
         "Bring this ticket to the next escalation level":
             "Dieses Ticket auf die nächste Eskalationsstufe bringen",
         "(Optional) Level to reach (default: the next one)":

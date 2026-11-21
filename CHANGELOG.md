@@ -25,6 +25,13 @@
   Escalations are sent to Telegram and recorded in the audit log, automatic ones as
   done by the system. Levels never go down; removing a level moves the ones above it
   down by one
+- **FAQ before the ticket form**: `/faq add`, `edit`, `remove` and `list` manage up to
+  50 questions with their answers, written in a form (Markdown and new lines work), for
+  one ticket type or for all of them. After choosing the type, a member first sees up to
+  5 answers (the type's own, then the general ones) with *It's solved* and *Open a
+  ticket anyway*; without FAQ the form opens straight away as before. `/stats` shows
+  how many requests were solved without a ticket. The results are anonymous and kept
+  for 365 days
 
 ## [3.0.0-beta.1] - 2026-11-20
 

@@ -162,7 +162,59 @@ class TypeSelect(discord.ui.Select):
         if ticket_type is None:
             await interaction.response.send_message(_("error.type_gone"), ephemeral=True)
             return
+        faq = await db.faq_for_type(interaction.guild.id, ticket_type["key"], config.FAQ_SHOWN)
+        if faq:
+            await interaction.response.edit_message(
+                content=None, embed=faq_embed(ticket_type, faq, _),
+                view=FaqView(ticket_type["key"], _))
+            return
         questions = await db.list_questions(interaction.guild.id, ticket_type["key"])
+        await interaction.response.send_modal(TicketModal(ticket_type, _, questions))
+
+
+def faq_embed(ticket_type: dict, entries: list[dict], _: Translate) -> discord.Embed:
+    embed = discord.Embed(title=_("faq.title", type=f"{ticket_type['emoji']} "
+                                                   f"{ticket_type['label']}")[:256],
+                          description=_("faq.intro"), color=COLOR)
+    for entry in entries:
+        embed.add_field(name=entry["question"][:256], value=entry["answer"][:1024],
+                        inline=False)
+    return embed
+
+
+class FaqView(discord.ui.View):
+    """Shown before the form when the type has FAQ: solved alone, or open the ticket."""
+
+    def __init__(self, type_key: str, _: Translate):
+        super().__init__(timeout=600)
+        self.type_key = type_key
+        self.solved_btn.label = _("btn.faq_solved")
+        self.open_btn.label = _("btn.faq_open")
+
+    @discord.ui.button(label="It's solved", emoji="✅", style=discord.ButtonStyle.success)
+    async def solved_btn(self, interaction: discord.Interaction, _button: discord.ui.Button):
+        db = interaction.client.db
+        _ = translator(await db.get_guild(interaction.guild.id))
+        await db.record_faq_result(interaction.guild.id, self.type_key, solved=True)
+        self.stop()
+        await interaction.response.edit_message(content=_("faq.glad"), embed=None, view=None)
+
+    @discord.ui.button(label="Open a ticket anyway", emoji="📩",
+                       style=discord.ButtonStyle.secondary)
+    async def open_btn(self, interaction: discord.Interaction, _button: discord.ui.Button):
+        db = interaction.client.db
+        cfg = await db.get_guild(interaction.guild.id)
+        _ = translator(cfg)
+        ticket_type = await db.get_type(interaction.guild.id, self.type_key)
+        if cfg is None or ticket_type is None:
+            await interaction.response.send_message(_("error.type_gone"), ephemeral=True)
+            return
+        problem = await open_problem(db, cfg, interaction.user, _)
+        if problem:
+            await interaction.response.send_message(problem, ephemeral=True)
+            return
+        await db.record_faq_result(interaction.guild.id, self.type_key, solved=False)
+        questions = await db.list_questions(interaction.guild.id, self.type_key)
         await interaction.response.send_modal(TicketModal(ticket_type, _, questions))
 
 

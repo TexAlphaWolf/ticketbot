@@ -563,6 +563,10 @@ async def stats(interaction: discord.Interaction,
                            handled=row["handled"], rating=rating,
                            response=format_duration(row["avg_first_response"])))
         embed.add_field(name=_("stats.staff"), value="\n".join(lines)[:1024], inline=False)
+    faq = None if member else await interaction.client.db.faq_results_since(
+        interaction.guild.id, since)
+    if faq and (faq["solved"] or faq["opened"]):
+        embed.add_field(name=_("stats.faq"), value=_("stats.faq_value", **faq), inline=False)
     if not s["opened"]:
         embed.description = _("stats.empty")
     await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -1455,6 +1459,142 @@ class RepliesGroup(app_commands.Group):
                                                     ephemeral=True)
 
 
+# -------------------------------------------------------------------- FAQ ---
+
+async def faq_autocomplete(interaction: discord.Interaction, current: str):
+    current = current.lower()
+    return [
+        app_commands.Choice(name=f"#{e['id']} {e['question']}"[:100], value=e["id"])
+        for e in await interaction.client.db.list_faq(interaction.guild.id)
+        if current in e["question"].lower() or current.lstrip("#") == str(e["id"])
+    ][:25]
+
+
+class FaqModal(discord.ui.Modal):
+    """Question and answer of a FAQ entry (new when entry is None)."""
+
+    def __init__(self, _, type_key: str | None = None, entry: dict | None = None):
+        title = _("faq.modal_edit", id=entry["id"]) if entry else _("faq.modal_add")
+        super().__init__(title=title[:45])
+        self._, self.type_key, self.entry = _, type_key, entry
+        self.question = discord.ui.TextInput(
+            max_length=config.FAQ_QUESTION_LENGTH,
+            default=entry["question"] if entry else None)
+        self.answer = discord.ui.TextInput(
+            style=discord.TextStyle.paragraph, max_length=config.FAQ_ANSWER_LENGTH,
+            default=entry["answer"] if entry else None)
+        self.add_item(discord.ui.Label(text=_("faq.q_label"), description=_("faq.q_hint"),
+                                       component=self.question))
+        self.add_item(discord.ui.Label(text=_("faq.a_label"), description=_("faq.a_hint"),
+                                       component=self.answer))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        _ = self._
+        db = interaction.client.db
+        guild_id = interaction.guild.id
+        question, answer = self.question.value.strip(), self.answer.value.strip()
+        if self.entry:
+            if not await db.update_faq(guild_id, self.entry["id"], question, answer):
+                await interaction.response.send_message(
+                    _("faq.unknown", id=self.entry["id"]), ephemeral=True)
+                return
+            entry_id = self.entry["id"]
+            await audit(interaction, "faq.edit", f"faq:{entry_id}")
+            text = _("faq.saved", id=entry_id)
+        else:
+            if len(await db.list_faq(guild_id)) >= config.MAX_FAQ_ENTRIES:
+                await interaction.response.send_message(
+                    _("faq.too_many", max=config.MAX_FAQ_ENTRIES), ephemeral=True)
+                return
+            if self.type_key and await db.get_type(guild_id, self.type_key) is None:
+                await interaction.response.send_message(_("error.type_gone"), ephemeral=True)
+                return
+            entry_id = await db.add_faq(guild_id, self.type_key, question, answer)
+            await audit(interaction, "faq.add", f"faq:{entry_id}", type=self.type_key)
+            text = _("faq.added", id=entry_id)
+        preview = discord.Embed(color=COLOR)
+        preview.add_field(name=question, value=answer, inline=False)
+        await interaction.response.send_message(text, embed=preview, ephemeral=True)
+
+
+class FaqGroup(app_commands.Group):
+    """/faq ...: answers shown before the ticket form, to solve requests without a ticket."""
+
+    def __init__(self):
+        super().__init__(name="faq", description="Questions and answers shown before the "
+                                                 "ticket form",
+                         guild_only=True,
+                         default_permissions=discord.Permissions(administrator=True))
+
+    @app_commands.command(name="list", description="Show the FAQ")
+    async def list_faq(self, interaction: discord.Interaction):
+        ctx = await require_setup(interaction)
+        if ctx is None:
+            return
+        _ = ctx[1]
+        db = interaction.client.db
+        entries = await db.list_faq(interaction.guild.id)
+        if not entries:
+            await interaction.response.send_message(_("faq.none"), ephemeral=True)
+            return
+        types = {t["key"]: f"{t['emoji']} {t['label']}"
+                 for t in await db.list_types(interaction.guild.id)}
+        lines = [f"`#{e['id']}` **{e['question']}** · "
+                 + (types.get(e["type_key"], e["type_key"]) if e["type_key"]
+                    else _("faq.all_types"))
+                 for e in entries]
+        embed = discord.Embed(title=_("faq.list_title", count=len(entries),
+                                      max=config.MAX_FAQ_ENTRIES),
+                              description="\n".join(lines)[:4096], color=COLOR)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="add", description="Add a question and its answer")
+    @app_commands.describe(type="(Optional) Ticket type (default: all types)")
+    @app_commands.autocomplete(type=type_autocomplete)
+    async def add_faq(self, interaction: discord.Interaction, type: str | None = None):
+        ctx = await require_setup(interaction)
+        if ctx is None:
+            return
+        _ = ctx[1]
+        db = interaction.client.db
+        if type is not None and await db.get_type(interaction.guild.id, type) is None:
+            await interaction.response.send_message(_("error.type_gone"), ephemeral=True)
+            return
+        if len(await db.list_faq(interaction.guild.id)) >= config.MAX_FAQ_ENTRIES:
+            await interaction.response.send_message(
+                _("faq.too_many", max=config.MAX_FAQ_ENTRIES), ephemeral=True)
+            return
+        await interaction.response.send_modal(FaqModal(_, type_key=type))
+
+    @app_commands.command(name="edit", description="Edit a FAQ entry")
+    @app_commands.describe(entry="FAQ entry")
+    @app_commands.autocomplete(entry=faq_autocomplete)
+    async def edit_faq(self, interaction: discord.Interaction, entry: int):
+        ctx = await require_setup(interaction)
+        if ctx is None:
+            return
+        _ = ctx[1]
+        saved = await interaction.client.db.get_faq(interaction.guild.id, entry)
+        if saved is None:
+            await interaction.response.send_message(_("faq.unknown", id=entry), ephemeral=True)
+            return
+        await interaction.response.send_modal(FaqModal(_, entry=saved))
+
+    @app_commands.command(name="remove", description="Remove a FAQ entry")
+    @app_commands.describe(entry="FAQ entry")
+    @app_commands.autocomplete(entry=faq_autocomplete)
+    async def remove_faq(self, interaction: discord.Interaction, entry: int):
+        ctx = await require_setup(interaction)
+        if ctx is None:
+            return
+        _ = ctx[1]
+        if not await interaction.client.db.remove_faq(interaction.guild.id, entry):
+            await interaction.response.send_message(_("faq.unknown", id=entry), ephemeral=True)
+            return
+        await audit(interaction, "faq.remove", f"faq:{entry}")
+        await interaction.response.send_message(_("faq.removed", id=entry), ephemeral=True)
+
+
 # ---------------------------------------------------------------- profile ---
 
 class ProfileGroup(app_commands.Group):
@@ -1533,4 +1673,4 @@ def all_commands() -> list:
     return [setup, guidelines, audit_log, queue, mytickets, available, add, remove, close, reopen,
             priority, transfer, escalate_command, stats, export_stats, reply, NoteGroup(),
             SettingsGroup(), TypesGroup(), TelegramGroup(), ProfileGroup(), RepliesGroup(),
-            BlockGroup(), EscalationGroup()]
+            BlockGroup(), EscalationGroup(), FaqGroup()]

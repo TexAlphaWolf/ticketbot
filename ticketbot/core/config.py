@@ -33,6 +33,10 @@ BLOCK_DURATIONS = {"1h": 3600, "1d": 86400, "7d": 7 * 86400, "30d": 30 * 86400,
                    "permanent": None}
 MAX_ESCALATION_LEVELS = 5      # /escalation add: levels above the normal staff
 MAX_ESCALATION_HOURS = 720.0    # auto escalation after at most 30 days
+MAX_FAQ_ENTRIES = 50           # /faq add: entries per server
+FAQ_SHOWN = 5                  # entries shown before the form (type first, then general)
+FAQ_QUESTION_LENGTH = 100
+FAQ_ANSWER_LENGTH = 1000       # embed field value: max 1024
 MAX_REPLIES = 100              # quick replies per server
 MAX_REPLY_LENGTH = 1800        # leaves room for the signature (Discord: 2000)
 

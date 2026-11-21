@@ -22,6 +22,7 @@ STAFF, BLOCKS, REFS = T["staff_availability"], T["blocked_users"], T["transcript
 AUDIT, COMMANDS = T["audit_log"], T["bot_commands"]
 TYPE_ROLES = T["type_staff_roles"]
 LEVELS = T["escalation_levels"]
+FAQ, FAQ_RESULTS = T["faq_entries"], T["faq_results"]
 
 GUILD_FIELDS = {c.name for c in GUILDS.columns} - {"guild_id"}
 TYPE_FIELDS = {"label", "emoji", "description", "position"}
@@ -410,6 +411,59 @@ class Store:
     async def remove_reply(self, guild_id: int, name: str) -> bool:
         return await self._write(delete(REPLIES).where(REPLIES.c.guild_id == guild_id,
                                                        REPLIES.c.name == name.lower())) > 0
+
+    # -------------------------------------------------------------- FAQ ---
+
+    async def list_faq(self, guild_id: int) -> list[dict]:
+        return await self._all(select(FAQ).where(FAQ.c.guild_id == guild_id)
+                               .order_by(FAQ.c.id))
+
+    async def faq_for_type(self, guild_id: int, type_key: str, limit: int) -> list[dict]:
+        """The entries of this type first, then the ones for every type."""
+        return await self._all(
+            select(FAQ).where(FAQ.c.guild_id == guild_id,
+                              or_(FAQ.c.type_key == type_key, FAQ.c.type_key.is_(None)))
+            .order_by(FAQ.c.type_key.is_(None), FAQ.c.id).limit(limit))
+
+    async def get_faq(self, guild_id: int, entry_id: int) -> dict | None:
+        return await self._one(select(FAQ).where(FAQ.c.guild_id == guild_id,
+                                                 FAQ.c.id == entry_id))
+
+    async def add_faq(self, guild_id: int, type_key: str | None, question: str, answer: str,
+                      now: float | None = None) -> int:
+        async with self.engine.begin() as conn:
+            result = await conn.execute(insert(FAQ).values(
+                guild_id=guild_id, type_key=type_key, question=question, answer=answer,
+                created_at=now or time.time()).returning(FAQ.c.id))
+            return result.scalar_one()
+
+    async def update_faq(self, guild_id: int, entry_id: int, question: str,
+                         answer: str) -> bool:
+        return await self._write(update(FAQ).where(FAQ.c.guild_id == guild_id,
+                                                   FAQ.c.id == entry_id)
+                                 .values(question=question, answer=answer)) > 0
+
+    async def remove_faq(self, guild_id: int, entry_id: int) -> bool:
+        return await self._write(delete(FAQ).where(FAQ.c.guild_id == guild_id,
+                                                   FAQ.c.id == entry_id)) > 0
+
+    async def record_faq_result(self, guild_id: int, type_key: str, solved: bool,
+                                now: float | None = None) -> None:
+        await self._write(insert(FAQ_RESULTS).values(guild_id=guild_id, type_key=type_key,
+                                                     solved=solved,
+                                                     created_at=now or time.time()))
+
+    async def faq_results_since(self, guild_id: int, since: float) -> dict[str, int]:
+        """{"solved": tickets avoided, "opened": tickets opened anyway} since a time."""
+        rows = await self._all(
+            select(FAQ_RESULTS.c.solved, func.count().label("n"))
+            .where(FAQ_RESULTS.c.guild_id == guild_id, FAQ_RESULTS.c.created_at >= since)
+            .group_by(FAQ_RESULTS.c.solved))
+        counts = {bool(r["solved"]): r["n"] for r in rows}
+        return {"solved": counts.get(True, 0), "opened": counts.get(False, 0)}
+
+    async def purge_faq_results_before(self, before: float) -> int:
+        return await self._write(delete(FAQ_RESULTS).where(FAQ_RESULTS.c.created_at < before))
 
     # ------------------------------------------------- transcript refs ---
 

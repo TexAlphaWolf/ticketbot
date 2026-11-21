@@ -19,6 +19,9 @@ Available in **English**, **Italian** and **German**.
   by @Developers, *Payments* by @Admins) with `/types roles add`: only those roles and
   the admins see its tickets, are pinged and can claim them, and auto-assign picks among
   them; types without roles go to the staff role
+- **FAQ before the form**: with `/faq add` admins write questions and answers, for one
+  ticket type or for all. After choosing the type, members see them first and can press
+  *It's solved* or *Open a ticket anyway*; `/stats` counts the tickets avoided
 - **Escalation levels**: up to 5 levels above the staff (e.g. 1 → @Senior, 2 →
   @Managers) with `/escalation add`. `/escalate` brings a ticket to the next level: its
   role gets access to the ticket and is pinged. A level can also be reached by itself
@@ -274,6 +277,7 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 | `/types list` / `add` / `edit` / `remove` | Admin | Manages the ticket types |
 | `/types roles add` / `remove` | Admin | Chooses the roles that handle the tickets of a type |
 | `/escalation list` / `add` / `remove` | Admin | Manages the escalation levels |
+| `/faq list` / `add` / `edit` / `remove` | Admin | Manages the FAQ shown before the ticket form |
 | `/types questions list` / `add` / `remove` | Admin | Manages the custom questions of a ticket type |
 | `/telegram link` / `verify` / `status` / `test` / `unlink` | Admin | Manages Telegram notifications |
 | `/profile name` / `avatar` / `banner` / `bio` / `reset` | Admin | Changes the bot's profile in this server only |

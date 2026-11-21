@@ -124,6 +124,44 @@ class EscalationLevel(Base):
     after_hours: Mapped[float | None] = mapped_column(Double)
 
 
+class FaqEntry(Base):
+    """A question and its answer, shown before the ticket form so a member may solve the
+    problem alone. type_key None = shown for every ticket type."""
+
+    __tablename__ = "faq_entries"
+    __table_args__ = (
+        ForeignKeyConstraint(["guild_id", "type_key"],
+                             ["ticket_types.guild_id", "ticket_types.key"],
+                             ondelete="CASCADE"),
+        Index("ix_faq_entries_guild", "guild_id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    guild_id: Mapped[int] = mapped_column(BigInteger, guild_fk())
+    type_key: Mapped[str | None] = mapped_column(Text)
+    question: Mapped[str] = mapped_column(Text)
+    answer: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[float] = mapped_column(Double)
+
+
+class FaqResult(Base):
+    """What a member did after reading the FAQ: solved alone or opened a ticket anyway.
+    Who it was is not recorded: only the server, the type and when."""
+
+    __tablename__ = "faq_results"
+    __table_args__ = (
+        Index("ix_faq_results_guild_created", "guild_id", "created_at"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    guild_id: Mapped[int] = mapped_column(BigInteger, guild_fk())
+    type_key: Mapped[str] = mapped_column(Text)
+    solved: Mapped[bool] = mapped_column(Boolean)
+    created_at: Mapped[float] = mapped_column(Double)
+
+
 class Ticket(Base):
     __tablename__ = "tickets"
     __table_args__ = (
