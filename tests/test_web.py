@@ -135,10 +135,17 @@ def test_port_in_use_is_reported_before_starting():
 # ------------------------------------------------------- login with Discord ---
 
 class FakeDiscord:
-    """Stands in for discord_api.DiscordOAuth: no network in the tests."""
+    """Stands in for discord_api.DiscordBot: no network in the tests. `guilds` is what
+    /users/@me/guilds returns, `members` maps (guild, user) to the member's roles."""
 
-    def __init__(self, scope="identify guilds"):
+    def __init__(self, scope="identify guilds", user_id="123456789012345678"):
         self.scope, self.codes, self.revoked = scope, [], []
+        self.user_id = user_id
+        self.guilds: list[dict] = []
+        self.members: dict[tuple[int, int], list[int]] = {}
+        self.refreshed: list[str] = []
+        self.refresh_fails = False
+        self.calls = 0
 
     def authorize_url(self, state, challenge):
         return f"https://discord.test/authorize?state={state}&code_challenge={challenge}"
@@ -149,8 +156,27 @@ class FakeDiscord:
                 "expires_in": 604800, "scope": self.scope}
 
     async def fetch_user(self, token):
-        return {"id": "123456789012345678", "username": "tex", "global_name": "Tex",
+        return {"id": self.user_id, "username": "tex", "global_name": "Tex",
                 "avatar": None}
+
+    async def refresh(self, refresh_token):
+        from ticketbot.web.discord_api import DiscordError
+        if self.refresh_fails:
+            raise DiscordError("invalid_grant", 400)
+        self.refreshed.append(refresh_token)
+        return {"access_token": "renewed", "refresh_token": "r2", "expires_in": 604800}
+
+    async def user_guilds(self, token):
+        self.calls += 1
+        return self.guilds
+
+    async def member(self, guild_id, user_id):
+        roles = self.members.get((guild_id, user_id))
+        if roles is None:
+            return None
+        return {"roles": [str(r) for r in roles], "nick": None,
+                "user": {"id": str(user_id), "username": f"user{user_id}",
+                         "global_name": f"User {user_id}", "avatar": None}}
 
     async def revoke(self, token):
         self.revoked.append(token)

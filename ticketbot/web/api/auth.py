@@ -81,7 +81,7 @@ async def login(request: Request, next: str | None = None) -> RedirectResponse:
 
 @router.get("/callback", status_code=status.HTTP_302_FOUND, include_in_schema=False)
 async def callback(request: Request, code: str | None = None, state: str | None = None,
-                   error: str | None = None) -> RedirectResponse:
+                   error: str | None = None, iss: str | None = None) -> RedirectResponse:
     """Discord sends the browser back here after the login."""
     settings, store = request.app.state.settings, request.app.state.store
 
@@ -101,7 +101,9 @@ async def callback(request: Request, code: str | None = None, state: str | None 
     if error:                  # e.g. access_denied: the user pressed Cancel
         return finish("/?login_error=" + ("cancelled" if error == "access_denied"
                                            else "discord"))
-    if not code or not state or not hmac.compare_digest(state, saved["state"]):
+    # iss (RFC 9207): the answer must come from Discord, not from another login service
+    if not code or not state or not hmac.compare_digest(state, saved["state"]) or \
+            (iss is not None and iss != "https://discord.com"):
         return finish("/?login_error=invalid")
 
     discord = request.app.state.discord
@@ -153,6 +155,7 @@ async def logout(request: Request, session: Annotated[dict, Depends(current_sess
 async def end_session(request: Request, session: dict, response: Response) -> None:
     store = request.app.state.store
     await store.delete_web_session(session["id"])
+    request.app.state.guilds_cache.drop(session["id"])
     try:                       # Discord forgets the token too; not essential
         await request.app.state.discord.revoke(session["access_token"])
     except DiscordError:

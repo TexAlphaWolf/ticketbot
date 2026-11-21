@@ -89,3 +89,29 @@ def check_origin(request: Request) -> None:
 
 def client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
+
+
+async def discord_token(request: Request, session: dict) -> str:
+    """The session's Discord access token, renewed when it is about to expire. If Discord
+    refuses to renew it, the login ends (401)."""
+    if session["token_expires_at"] - time.time() > 300:
+        return session["access_token"]
+    from .discord_api import DiscordError
+
+    store = request.app.state.store
+    try:
+        if not session["refresh_token"]:
+            raise DiscordError("no refresh token", 400)
+        tokens = await request.app.state.discord.refresh(session["refresh_token"])
+        values = {"access_token": tokens["access_token"],
+                  "refresh_token": tokens.get("refresh_token") or session["refresh_token"],
+                  "token_expires_at": time.time() + float(tokens.get("expires_in", 604800))}
+    except (DiscordError, KeyError) as e:
+        if getattr(e, "status", 400) in (400, 401):
+            await store.delete_web_session(session["id"])
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED,
+                                "The Discord login expired: log in again") from None
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Discord can't be reached") from None
+    await store.update_web_session(session["id"], **values)
+    session.update(values)
+    return session["access_token"]

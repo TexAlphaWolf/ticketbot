@@ -5,10 +5,11 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from ... import __version__
-from . import auth
+from . import auth, guilds
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(auth.router)
+router.include_router(guilds.router)
 
 
 class Health(BaseModel):

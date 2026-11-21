@@ -11,8 +11,9 @@ from starlette.exceptions import HTTPException
 from .. import __version__
 from ..core.settings import Settings, SettingsError
 from .api import v1
+from .cache import TTLCache
 from .database import open_web_store
-from .discord_api import DiscordOAuth
+from .discord_api import DiscordBot
 from .home import router as home_router
 from .security import DOCS_PATH, SecurityHeaders
 
@@ -22,7 +23,9 @@ def create_app(settings: Settings) -> FastAPI:
     async def lifespan(app: FastAPI):
         app.state.settings = settings
         app.state.store = await open_web_store(settings)
-        app.state.discord = DiscordOAuth(settings)
+        app.state.discord = DiscordBot(settings)
+        app.state.guilds_cache = TTLCache(60)        # session → its Discord servers
+        app.state.members_cache = TTLCache(60)       # (server, user) → member
         try:
             yield
         finally:

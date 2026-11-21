@@ -20,6 +20,17 @@
   expired logins are deleted every hour. New settings `DISCORD_CLIENT_ID` and
   `DISCORD_CLIENT_SECRET`; `python -m ticketbot settings` shows the redirect to add in
   the Developer Portal. A temporary home page shows who is logged in
+- **Read-only web API**: `GET /api/v1/guilds` lists the servers where you are admin or
+  staff and TicketBot is set up; `/guilds/{id}` gives the ticket types and the queue,
+  `/guilds/{id}/tickets` the tickets (open, closed or all, by type, 50 per page),
+  `/guilds/{id}/tickets/{n}` one ticket with its form answers, notes, closing and
+  rating, `/guilds/{id}/stats` the numbers of `/stats` with the FAQ results. Everyone
+  sees exactly the tickets they could handle on Discord (admins all; staff role, type
+  roles and escalation roles as on Discord). Servers you can't use answer 404, like
+  servers that don't exist. Names and avatars come from Discord; its answers are
+  cached for a minute and the Discord login is renewed by itself. Opening someone
+  else's ticket is recorded in the audit log. The login also checks that the answer
+  comes from Discord (`iss`)
 - `requirements-dev.txt` with the tools for the tests (pytest, httpx2, ruff)
 
 ## [3.0.0-beta.2] - 2026-11-21

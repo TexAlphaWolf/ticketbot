@@ -229,6 +229,13 @@ python -m ticketbot web        # http://127.0.0.1:8080
   The login asks Discord only who you are and which servers you are in; it lasts 7 days
   (`WEB_SESSION_DAYS`) and is kept in an HttpOnly cookie, with CSRF protection on every
   request that changes something
+- **Read-only API** for the servers where you are admin or staff: `GET /api/v1/guilds`,
+  `/guilds/{id}`, `/guilds/{id}/tickets` (filters and pages), `/guilds/{id}/tickets/{n}`
+  (form answers, notes, closing, rating) and `/guilds/{id}/stats`. Everyone sees what
+  they could handle on Discord: admins everything, the staff role the types without
+  roles of their own, a type's roles that type, an escalation role the tickets
+  escalated to its level. The web reads the roles with the bot's token
+  (`DISCORD_TOKEN`), so it must be in the same `.env`
 - `/api/docs` is the interactive documentation of the API (`WEB_API_DOCS=false` turns
   it off)
 - The web dashboard never changes the database schema: start the bot first after an
@@ -357,6 +364,9 @@ ticketbot/
 │   ├── app.py           # FastAPI application and server
 │   ├── api/v1.py        # REST API, version 1
 │   ├── api/auth.py      # login with Discord and logout
+│   ├── api/guilds.py    # servers, tickets and statistics
+│   ├── permissions.py   # who may see what (the same rules as the bot)
+│   ├── cache.py         # short in-memory cache of Discord's answers
 │   ├── sessions.py      # login cookies, current user, CSRF protection
 │   ├── discord_api.py   # Discord OAuth2 calls
 │   ├── home.py          # temporary home page

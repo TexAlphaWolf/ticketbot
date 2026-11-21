@@ -51,7 +51,9 @@ gives for the login (scopes `identify` and `guilds`: who they are and which serv
 are in, nothing else), the IP address and browser name, and when the login started, was
 last used and ends. Tokens, IP and browser name are encrypted; the browser keeps only a
 random cookie, and the database only its hash. Logins and logouts are recorded in the
-audit log.
+audit log. To decide who may see which tickets, the dashboard asks Discord which servers
+the person is in and their roles there; names, avatars and roles shown in the dashboard
+are kept only in memory, for one minute, and are never written to the database.
 
 **Audit log**: for the actions that change something or read other people's data
 (settings, ticket types, blocks, claims, transfers, escalations, closings, exports,

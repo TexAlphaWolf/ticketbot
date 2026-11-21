@@ -7,6 +7,7 @@ so the bot logic did not have to change. The same code runs on SQLite and Postgr
 
 import json
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from sqlalchemy import Table, and_, delete, func, insert, or_, select, update
@@ -34,6 +35,33 @@ def _check(fields: dict, allowed: set) -> None:
     unknown = set(fields) - allowed
     if unknown:
         raise ValueError(f"Unknown fields: {', '.join(sorted(unknown))}")
+
+
+@dataclass(frozen=True)
+class TicketScope:
+    """Which tickets of a server a staff member may see (admins: no scope at all).
+    A ticket is visible when its type is in `types`; or, with `other_types`, when its
+    type has no roles of its own (`types_with_roles` lists those that have); or when it
+    was escalated to `min_level` or higher."""
+
+    types: frozenset[str] = frozenset()
+    other_types: bool = False
+    types_with_roles: frozenset[str] = frozenset()
+    min_level: int | None = None
+
+    def clause(self):
+        parts = []
+        if self.other_types:
+            parts.append(TICKETS.c.type_key.not_in(self.types_with_roles)
+                         if self.types_with_roles else TICKETS.c.type_key.is_not(None))
+        if self.types:
+            parts.append(TICKETS.c.type_key.in_(self.types))
+        if self.min_level is not None:
+            parts.append(TICKETS.c.escalation_level >= self.min_level)
+        return or_(*parts) if parts else TICKETS.c.id.is_(None)     # nothing
+
+
+TICKET_STATUSES = {"open", "closed", "all"}
 
 
 def _open(table=TICKETS):
@@ -311,6 +339,24 @@ class Store:
             select(TICKETS).where(TICKETS.c.guild_id == guild_id,
                                   TICKETS.c.owner_id == owner_id)
             .order_by(TICKETS.c.opened_at.desc(), TICKETS.c.id.desc()))
+
+    async def list_tickets(self, guild_id: int, *, status: str = "open",
+                           type_key: str | None = None, scope: TicketScope | None = None,
+                           before_id: int | None = None, limit: int = 50) -> list[dict]:
+        """Newest first. status: open, closed or all. Pass the last id seen as before_id
+        for the next page."""
+        stmt = select(TICKETS).where(TICKETS.c.guild_id == guild_id)
+        if status == "open":
+            stmt = stmt.where(_open())
+        elif status == "closed":
+            stmt = stmt.where(TICKETS.c.status == "closed")
+        if type_key is not None:
+            stmt = stmt.where(TICKETS.c.type_key == type_key)
+        if scope is not None:
+            stmt = stmt.where(scope.clause())
+        if before_id is not None:
+            stmt = stmt.where(TICKETS.c.id < before_id)
+        return await self._all(stmt.order_by(TICKETS.c.id.desc()).limit(limit))
 
     async def tickets_since(self, guild_id: int, since: float) -> list[dict]:
         return await self._all(select(TICKETS).where(TICKETS.c.guild_id == guild_id,
