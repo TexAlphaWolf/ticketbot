@@ -401,7 +401,7 @@ ticketbot/
 frontend/                # web dashboard: React 19 + TypeScript, built with Vite
 ├── src/api.ts           # typed client of the REST API
 ├── src/i18n.ts          # texts in English, Italian and German
-├── src/pages/           # servers, overview, tickets, ticket
+├── src/pages/           # servers, overview, tickets, ticket, statistics, admin pages
 └── src/components/      # layout and small building blocks
 ```
 

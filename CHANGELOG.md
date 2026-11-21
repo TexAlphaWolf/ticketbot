@@ -47,6 +47,15 @@
   saved at once and recorded in the audit log; the bot refreshes the panel and the
   guidelines, checks its permissions for thread mode and gives the new roles access to
   the threads
+- **Web dashboard (second part)**: in a ticket, reply (posted by the bot with your name),
+  add a private note, claim with a priority, change the priority, transfer to another
+  staff member, escalate and close; the dashboard waits for the bot and says whether it
+  worked. A statistics page (periods, response and resolution times, ratings, types,
+  priorities, FAQ, staff) and, for admins, pages for the settings and the ticket mode,
+  the ticket types with their questions and roles, the FAQ and the escalation levels.
+  New `GET /api/v1/guilds/{id}/staff` (staff to transfer to: the auto-assign rotation
+  and whoever handled a ticket in the last 90 days) and the number of escalation
+  levels in `/guilds/{id}`
 - **Web dashboard (first part)**: a React 19 + TypeScript app in `frontend/`, built
   with Vite and served by `python -m ticketbot web`. Login with Discord, your servers,
   the overview of a server (queue and ticket types), the tickets with filters by status

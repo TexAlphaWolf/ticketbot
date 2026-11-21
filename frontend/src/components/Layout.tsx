@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router";
-import { api, type GuildSummary, type Me } from "../api";
+import { api, type GuildDetail, type GuildSummary, type Me } from "../api";
 import { LANGS, type Lang, useI18n } from "../i18n";
 import { Avatar } from "./ui";
 
@@ -11,6 +11,11 @@ export function Layout({ me }: { me: Me }) {
   const queryClient = useQueryClient();
   const guilds = useQuery({ queryKey: ["guilds"], queryFn: () => api<GuildSummary[]>("/guilds") });
   const current = guilds.data?.find((g) => g.id === guildId);
+  const detail = useQuery({
+    queryKey: ["guild", guildId],
+    queryFn: () => api<GuildDetail>(`/guilds/${guildId}`),
+    enabled: !!current,
+  });
   const name = me.user.global_name ?? me.user.username;
 
   async function logout() {
@@ -42,6 +47,16 @@ export function Layout({ me }: { me: Me }) {
               {t("nav.overview")}
             </NavLink>
             <NavLink to={`/servers/${current.id}/tickets`}>{t("nav.tickets")}</NavLink>
+            {detail.data?.can_see_stats && <NavLink to={`/servers/${current.id}/stats`}>{t("nav.stats")}</NavLink>}
+          </nav>
+        )}
+        {current?.role === "admin" && (
+          <nav className="sidebar-section" aria-label={t("nav.manage")}>
+            <p className="sidebar-label">{t("nav.manage")}</p>
+            <NavLink to={`/servers/${current.id}/settings`}>{t("nav.settings")}</NavLink>
+            <NavLink to={`/servers/${current.id}/types`}>{t("nav.types")}</NavLink>
+            <NavLink to={`/servers/${current.id}/faq`}>{t("nav.faq")}</NavLink>
+            <NavLink to={`/servers/${current.id}/escalation`}>{t("nav.escalation")}</NavLink>
           </nav>
         )}
         <div className="sidebar-footer">

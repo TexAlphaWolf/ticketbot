@@ -3,6 +3,7 @@ import { StrictMode, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ApiError } from "./api";
 import { App } from "./App";
+import { Toasts } from "./components/toast";
 import { detectLang, I18n, type Lang, translator } from "./i18n";
 import "./styles.css";
 
@@ -47,7 +48,9 @@ function Root() {
   return (
     <I18n.Provider value={value}>
       <QueryClientProvider client={queryClient}>
-        <App />
+        <Toasts>
+          <App />
+        </Toasts>
       </QueryClientProvider>
     </I18n.Provider>
   );

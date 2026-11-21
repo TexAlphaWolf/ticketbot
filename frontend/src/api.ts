@@ -37,6 +37,7 @@ export interface GuildDetail extends GuildSummary {
   waiting: number;
   in_progress: number;
   can_see_stats: boolean;
+  escalation_levels: number;
 }
 
 export interface Person {
@@ -132,3 +133,103 @@ export function loginUrl(next = window.location.pathname + window.location.searc
 export function channelUrl(guildId: string, channelId: string) {
   return `https://discord.com/channels/${guildId}/${channelId}`;
 }
+
+// ------------------------------------------------------------- actions ---
+
+export interface Queued {
+  command_id: number;
+  status: string;
+}
+
+export interface CommandStatus {
+  id: number;
+  kind: string;
+  status: "pending" | "running" | "done" | "failed";
+  result: string | null;
+}
+
+export interface StaffMember extends Person {
+  id: string;
+}
+
+/** Wait for the bot to carry out a queued action (it checks every few seconds). */
+export async function waitForCommand(guildId: string, queued: Queued, timeoutMs = 45_000) {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 1500));
+    const c = await api<CommandStatus>(`/guilds/${guildId}/commands/${queued.command_id}`);
+    if (c.status === "done") return c;
+    if (c.status === "failed") throw new ApiError(409, c.result ?? "failed");
+  }
+  throw new ApiError(504, "timeout");
+}
+
+// ---------------------------------------------------------- statistics ---
+
+export interface Stats {
+  period: "7" | "30" | "90" | "all";
+  opened: number;
+  closed: number;
+  open: number;
+  unclaimed: number;
+  avg_first_response: number | null;
+  avg_resolution: number | null;
+  avg_rating: number | null;
+  ratings: number;
+  by_type: Record<string, number>;
+  by_priority: Record<string, number>;
+  faq_solved: number;
+  faq_opened: number;
+  leaderboard: { staff_id: string; handled: number; avg_rating: number | null; ratings: number; avg_first_response: number | null }[];
+  people: Record<string, Person>;
+}
+
+// ------------------------------------------------------------ admin -----
+
+export interface DiscordRole {
+  id: string;
+  name: string;
+  color: number;
+  position: number;
+  assignable: boolean;
+}
+
+export interface Settings {
+  language: "en" | "it" | "de";
+  retention_days: number;
+  staff_reminders: boolean;
+  auto_assign: boolean;
+  ticket_cooldown: number;
+  ticket_mode: "channel" | "thread";
+  staff_role: string | null;
+}
+
+export interface Question {
+  position: number;
+  label: string;
+  placeholder: string;
+  long: boolean;
+  required: boolean;
+}
+
+export interface AdminType extends TicketType {
+  position: number;
+  roles: string[];
+  questions: Question[];
+}
+
+export interface FaqEntry {
+  id: number;
+  type_key: string | null;
+  question: string;
+  answer: string;
+  created_at: number;
+}
+
+export interface Level {
+  level: number;
+  role_id: string;
+  after_hours: number | null;
+}
+
+export const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) });

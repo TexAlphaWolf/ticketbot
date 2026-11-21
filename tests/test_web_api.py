@@ -327,3 +327,10 @@ def test_names_of_former_members(api):
     assert people[str(MEMBER)] == {
         "name": f"gone{MEMBER}",
         "avatar_url": f"https://cdn.discordapp.com/avatars/{MEMBER}/a1.png?size=128"}
+
+
+def test_staff_candidates(api):
+    as_user(api, STAFF)
+    staff = api.get(f"/api/v1/guilds/{GUILD}/staff").json()
+    assert [s["id"] for s in staff] == [str(STAFF)]          # handled ticket 4
+    assert api.get(f"/api/v1/guilds/{GUILD}").json()["escalation_levels"] == 1

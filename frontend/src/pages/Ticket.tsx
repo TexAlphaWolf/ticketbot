@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { api, channelUrl, type TicketDetail } from "../api";
+import { TicketActions } from "../components/TicketActions";
 import { Card, DiscordText, ErrorBox, Loading, PersonChip, PriorityLabel, StatusBadge } from "../components/ui";
 import { dateTime, duration } from "../format";
 import { useI18n } from "../i18n";
+import { useGuild } from "./Overview";
 import { ticketTitle } from "./Tickets";
 
 export function Ticket() {
@@ -13,10 +15,13 @@ export function Ticket() {
     queryKey: ["ticket", guildId, ticketId],
     queryFn: () => api<TicketDetail>(`/guilds/${guildId}/tickets/${ticketId}`),
   });
+  const guild = useGuild(guildId);
   if (ticket.isPending) return <Loading />;
   if (ticket.isError) return <ErrorBox error={ticket.error} retry={() => ticket.refetch()} />;
   const d = ticket.data;
   const people = d.people;
+  const open = d.status !== "closed" && d.channel_id !== null;
+  const levels = guild.data?.escalation_levels ?? 0;
 
   return (
     <>
@@ -58,6 +63,7 @@ export function Ticket() {
               <p className="muted">{t("ticket.no_content")}</p>
             )}
           </Card>
+          {open && <TicketActions guildId={guildId} ticket={d} levels={levels} part="main" />}
           <Card title={t("ticket.notes")}>
             {d.notes.length === 0 ? (
               <p className="muted">{t("ticket.no_notes")}</p>
@@ -122,6 +128,7 @@ export function Ticket() {
               )}
             </dl>
           </Card>
+          {open && <TicketActions guildId={guildId} ticket={d} levels={levels} part="side" />}
         </aside>
       </div>
     </>

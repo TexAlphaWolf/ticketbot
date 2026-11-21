@@ -43,11 +43,17 @@ class GuildDetail(GuildSummary):
     waiting: int
     in_progress: int
     can_see_stats: bool
+    escalation_levels: int
+
 
 
 class Person(BaseModel):
     name: str
     avatar_url: str
+
+
+class StaffMember(Person):
+    id: str
 
 
 class TicketSummary(BaseModel):
@@ -273,7 +279,22 @@ async def get_guild(request: Request, access: GuildAccess) -> GuildDetail:
         types=[TicketType(key=t["key"], label=t["label"], emoji=t["emoji"],
                           description=t["description"] or "")
                for t in await store.list_types(access.guild_id)],
-        waiting=waiting, in_progress=in_progress, can_see_stats=access.can_see_stats)
+        waiting=waiting, in_progress=in_progress, can_see_stats=access.can_see_stats,
+        escalation_levels=len(access.levels))
+
+
+@router.get("/{guild_id}/staff", response_model=list[StaffMember])
+async def list_staff(request: Request, access: GuildAccess) -> list[StaffMember]:
+    """Staff members to transfer a ticket to: the auto-assign rotation and whoever
+    handled a ticket in the last 90 days (Discord can't list a server's members without
+    a privileged intent). The bot checks again that the chosen one is staff."""
+    store = request.app.state.store
+    ids = {s["user_id"] for s in await store.available_staff(access.guild_id)}
+    recent = await store.tickets_since(access.guild_id, time.time() - 90 * 86400)
+    ids |= {t["claimed_by"] for t in recent if t["claimed_by"]}
+    found = await people(request, access.guild_id, ids)
+    return sorted((StaffMember(id=i, **p.model_dump()) for i, p in found.items()),
+                  key=lambda s: s.name.lower())
 
 
 @router.get("/{guild_id}/tickets", response_model=TicketPage)

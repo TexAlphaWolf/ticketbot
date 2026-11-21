@@ -5,8 +5,10 @@ import { api, ApiError, type Me, setCsrfToken } from "./api";
 import { Layout } from "./components/Layout";
 import { ErrorBox, Loading } from "./components/ui";
 import { Login } from "./pages/Login";
+import { EscalationPage, FaqPage, SettingsPage, TypesPage } from "./pages/admin";
 import { Overview } from "./pages/Overview";
 import { Servers } from "./pages/Servers";
+import { Stats } from "./pages/Stats";
 import { Ticket } from "./pages/Ticket";
 import { Tickets } from "./pages/Tickets";
 
@@ -31,6 +33,11 @@ export function App() {
           <Route path="servers/:guildId" element={<Overview />} />
           <Route path="servers/:guildId/tickets" element={<Tickets />} />
           <Route path="servers/:guildId/tickets/:ticketId" element={<Ticket />} />
+          <Route path="servers/:guildId/stats" element={<Stats />} />
+          <Route path="servers/:guildId/settings" element={<SettingsPage />} />
+          <Route path="servers/:guildId/types" element={<TypesPage />} />
+          <Route path="servers/:guildId/faq" element={<FaqPage />} />
+          <Route path="servers/:guildId/escalation" element={<EscalationPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
