@@ -12,6 +12,8 @@ from .. import __version__
 from ..core.settings import Settings, SettingsError
 from .api import v1
 from .database import open_web_store
+from .discord_api import DiscordOAuth
+from .home import router as home_router
 from .security import DOCS_PATH, SecurityHeaders
 
 
@@ -20,9 +22,11 @@ def create_app(settings: Settings) -> FastAPI:
     async def lifespan(app: FastAPI):
         app.state.settings = settings
         app.state.store = await open_web_store(settings)
+        app.state.discord = DiscordOAuth(settings)
         try:
             yield
         finally:
+            await app.state.discord.close()
             await app.state.store.close()
 
     app = FastAPI(title="TicketBot", version=__version__, lifespan=lifespan,
@@ -31,6 +35,7 @@ def create_app(settings: Settings) -> FastAPI:
                   openapi_url="/api/openapi.json" if settings.web_api_docs else None)
     app.add_middleware(SecurityHeaders, hsts=settings.web_https)
     app.include_router(v1.router)
+    app.include_router(home_router)
 
     @app.exception_handler(HTTPException)
     async def http_error(_request: Request, exc: HTTPException) -> JSONResponse:

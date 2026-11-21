@@ -54,6 +54,21 @@ class Settings(BaseSettings):
     web_public_url: str | None = None              # e.g. https://tickets.example.com
     web_api_docs: bool = True                      # interactive API docs at /api/docs
     web_trusted_proxies: str = "127.0.0.1"         # who may set X-Forwarded-For/-Proto
+    web_session_days: int = Field(default=7, ge=1, le=30)
+
+    # Login with Discord: OAuth2 page of the bot's application in the Developer Portal
+    discord_client_id: str | None = None
+    discord_client_secret: SecretStr | None = None
+
+    @field_validator("discord_client_id")
+    @classmethod
+    def _client_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value.isdigit():
+            raise ValueError("the client ID is a number (OAuth2 page in the Developer Portal)")
+        return value
 
     @field_validator("web_public_url")
     @classmethod
@@ -124,6 +139,23 @@ class Settings(BaseSettings):
         return Path(url.database)
 
     @property
+    def web_base_url(self) -> str:
+        """Where the browser reaches the dashboard."""
+        if self.web_public_url:
+            return self.web_public_url
+        host = "127.0.0.1" if self.web_host in ("0.0.0.0", "::") else self.web_host
+        return f"http://{host}:{self.web_port}"
+
+    @property
+    def oauth_redirect_uri(self) -> str:
+        """To add in the Developer Portal → OAuth2 → Redirects."""
+        return f"{self.web_base_url}/api/v1/auth/callback"
+
+    @property
+    def discord_login(self) -> bool:
+        return bool(self.discord_client_id and self.discord_client_secret)
+
+    @property
     def web_https(self) -> bool:
         return bool(self.web_public_url and self.web_public_url.startswith("https://"))
 
@@ -172,6 +204,10 @@ class Settings(BaseSettings):
             ("WEB_PUBLIC_URL", self.web_public_url or "not set"),
             ("WEB_API_DOCS", "on" if self.web_api_docs else "off"),
             ("WEB_TRUSTED_PROXIES", self.web_trusted_proxies),
+            ("WEB_SESSION_DAYS", str(self.web_session_days)),
+            ("DISCORD_CLIENT_ID", self.discord_client_id or "not set"),
+            ("DISCORD_CLIENT_SECRET", secret(self.discord_client_secret)),
+            ("OAuth2 redirect", self.oauth_redirect_uri),
         ]
 
 

@@ -10,6 +10,16 @@
   HSTS when `WEB_PUBLIC_URL` is HTTPS) and never migrates the database: it asks to start
   the bot first when the schema is older, and says so when the port is already in
   use. New `WEB_*` settings in `.env.example`
+- **Login with Discord**: OAuth2 authorization code flow with PKCE, scopes `identify` and
+  `guilds` only (`/api/v1/auth/login`, `/callback`, `/me`, `/logout`). Logins last 7
+  days (`WEB_SESSION_DAYS`) and live in an HttpOnly, SameSite=Lax cookie (`__Host-`
+  and Secure over HTTPS); the database keeps only the SHA-256 of the cookie and the
+  Discord tokens encrypted. Requests that change something need the CSRF token and
+  can't come from another site; after the login only pages of the dashboard are
+  opened. Logout revokes the Discord token. Logins and logouts go in the audit log,
+  expired logins are deleted every hour. New settings `DISCORD_CLIENT_ID` and
+  `DISCORD_CLIENT_SECRET`; `python -m ticketbot settings` shows the redirect to add in
+  the Developer Portal. A temporary home page shows who is logged in
 - `requirements-dev.txt` with the tools for the tests (pytest, httpx2, ruff)
 
 ## [3.0.0-beta.2] - 2026-11-21

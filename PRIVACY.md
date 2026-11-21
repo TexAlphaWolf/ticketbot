@@ -45,6 +45,14 @@ leave the rotation, the staff role or the server.
 **Blocked members**: Discord user ID of the member blocked from opening tickets, the
 reason, the ID of the staff member who blocked them and when the block started and ends.
 
+**Web dashboard logins**: when someone logs in to the web dashboard with Discord, their
+Discord user ID, username, display name and avatar, the access and refresh tokens Discord
+gives for the login (scopes `identify` and `guilds`: who they are and which servers they
+are in, nothing else), the IP address and browser name, and when the login started, was
+last used and ends. Tokens, IP and browser name are encrypted; the browser keeps only a
+random cookie, and the database only its hash. Logins and logouts are recorded in the
+audit log.
+
 **Audit log**: for the actions that change something or read other people's data
 (settings, ticket types, blocks, claims, transfers, escalations, closings, exports,
 viewing another member's tickets...): the server ID, the Discord user ID of who did it, the action, what
@@ -120,6 +128,8 @@ Discord and Telegram process this data under their own privacy policies.
   rest of the server's data when the bot is removed from it.
 - **FAQ results** (anonymous) are kept for **365 days** for `/stats`, then deleted.
 - **Blocks** are deleted when they end or when the staff removes them with `/block remove`.
+- **Web dashboard logins** last 7 days by default (`WEB_SESSION_DAYS`) and are deleted
+  when they end or at logout; at logout the Discord token is also revoked.
 - **Telegram verification codes** are kept in memory only, for up to 10 minutes.
 
 ## 6. Security

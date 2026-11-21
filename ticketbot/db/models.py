@@ -273,6 +273,32 @@ class AuditEntry(Base):
     created_at: Mapped[float] = mapped_column(Double)
 
 
+class WebSession(Base):
+    """A login to the web dashboard. The id is the SHA-256 of the cookie's value, so the
+    database alone can't be used to log in. Discord tokens and the CSRF token are
+    encrypted."""
+
+    __tablename__ = "web_sessions"
+    __table_args__ = (Index("ix_web_sessions_user", "user_id"),
+                      Index("ix_web_sessions_expires", "expires_at"))
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger)
+    username: Mapped[str] = mapped_column(Text)
+    global_name: Mapped[str | None] = mapped_column(Text)
+    avatar: Mapped[str | None] = mapped_column(Text)
+    access_token: Mapped[str] = mapped_column(EncryptedText("web_sessions.access_token"))
+    refresh_token: Mapped[str | None] = mapped_column(
+        EncryptedText("web_sessions.refresh_token"))
+    token_expires_at: Mapped[float] = mapped_column(Double)
+    csrf_token: Mapped[str] = mapped_column(EncryptedText("web_sessions.csrf_token"))
+    ip: Mapped[str | None] = mapped_column(EncryptedText("web_sessions.ip"))
+    user_agent: Mapped[str | None] = mapped_column(EncryptedText("web_sessions.user_agent"))
+    created_at: Mapped[float] = mapped_column(Double)
+    last_seen_at: Mapped[float] = mapped_column(Double)
+    expires_at: Mapped[float] = mapped_column(Double)
+
+
 class BotCommand(Base):
     """An action asked by the web dashboard and carried out by the bot on Discord."""
 

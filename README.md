@@ -222,6 +222,13 @@ python -m ticketbot web        # http://127.0.0.1:8080
 ```
 
 - `GET /api/v1/health` tells whether the API and its database work
+- **Login with Discord** (OAuth2 with PKCE): in the [Developer Portal](https://discord.com/developers/applications)
+  open the bot's application → **OAuth2**, copy the Client ID and the Client Secret into
+  `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET`, and add the redirect shown by
+  `python -m ticketbot settings` (by default `http://127.0.0.1:8080/api/v1/auth/callback`).
+  The login asks Discord only who you are and which servers you are in; it lasts 7 days
+  (`WEB_SESSION_DAYS`) and is kept in an HttpOnly cookie, with CSRF protection on every
+  request that changes something
 - `/api/docs` is the interactive documentation of the API (`WEB_API_DOCS=false` turns
   it off)
 - The web dashboard never changes the database schema: start the bot first after an
@@ -349,6 +356,10 @@ ticketbot/
 ├── web/
 │   ├── app.py           # FastAPI application and server
 │   ├── api/v1.py        # REST API, version 1
+│   ├── api/auth.py      # login with Discord and logout
+│   ├── sessions.py      # login cookies, current user, CSRF protection
+│   ├── discord_api.py   # Discord OAuth2 calls
+│   ├── home.py          # temporary home page
 │   ├── database.py      # opens the database (without migrating it)
 │   └── security.py      # HTTP security headers
 ├── integrations/

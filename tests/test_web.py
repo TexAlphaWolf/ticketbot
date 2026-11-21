@@ -130,3 +130,173 @@ def test_port_in_use_is_reported_before_starting():
         with pytest.raises(SettingsError, match=f"WEB_PORT={port + 1}"):
             _check_port("127.0.0.1", port)
     _check_port("127.0.0.1", port)          # free again
+
+
+# ------------------------------------------------------- login with Discord ---
+
+class FakeDiscord:
+    """Stands in for discord_api.DiscordOAuth: no network in the tests."""
+
+    def __init__(self, scope="identify guilds"):
+        self.scope, self.codes, self.revoked = scope, [], []
+
+    def authorize_url(self, state, challenge):
+        return f"https://discord.test/authorize?state={state}&code_challenge={challenge}"
+
+    async def exchange_code(self, code, verifier):
+        self.codes.append((code, verifier))
+        return {"access_token": "discord-access-" + code, "refresh_token": "r",
+                "expires_in": 604800, "scope": self.scope}
+
+    async def fetch_user(self, token):
+        return {"id": "123456789012345678", "username": "tex", "global_name": "Tex",
+                "avatar": None}
+
+    async def revoke(self, token):
+        self.revoked.append(token)
+
+    async def close(self):
+        pass
+
+
+@pytest.fixture
+def web(tmp_path):
+    asyncio.run(_prepare(tmp_path))
+    settings = make_settings(tmp_path, discord_client_id="42",
+                             discord_client_secret="s3cret")
+    with TestClient(create_app(settings), follow_redirects=False) as c:
+        c.app.state.discord = FakeDiscord()
+        c.db_path = tmp_path / "ticketbot.db"
+        yield c
+
+
+def log_in(c, next_page=None):
+    r = c.get("/api/v1/auth/login", params={"next": next_page} if next_page else None)
+    assert r.status_code == 302
+    state = r.headers["location"].split("state=")[1].split("&")[0]
+    return c.get("/api/v1/auth/callback", params={"code": "abc", "state": state})
+
+
+def test_login_flow(web):
+    from urllib.parse import parse_qs, urlparse
+
+    from ticketbot.web.api.auth import code_challenge
+
+    assert web.get("/api/v1/auth/me").status_code == 401
+    r = web.get("/api/v1/auth/login", params={"next": "/tickets"})
+    query = parse_qs(urlparse(r.headers["location"]).query)
+    cookie = r.headers["set-cookie"]
+    assert "tb_oauth=" in cookie and "HttpOnly" in cookie and "Path=/api/v1/auth" in cookie
+    assert "samesite=lax" in cookie.lower()
+
+    r = web.get("/api/v1/auth/callback", params={"code": "abc", "state": query["state"][0]})
+    assert r.status_code == 302 and r.headers["location"] == "/tickets"
+    session_cookie = next(h for h in r.headers.get_list("set-cookie")
+                          if h.startswith("tb_session="))
+    assert "HttpOnly" in session_cookie and "Path=/" in session_cookie
+    code, verifier = web.app.state.discord.codes[0]
+    assert code == "abc" and code_challenge(verifier) == query["code_challenge"][0]
+
+    me = web.get("/api/v1/auth/me").json()
+    assert me["user"] == {"id": "123456789012345678", "username": "tex",
+                          "global_name": "Tex", "avatar_url": me["user"]["avatar_url"]}
+    assert me["user"]["avatar_url"].startswith("https://cdn.discordapp.com/embed/avatars/")
+    assert len(me["csrf_token"]) > 30
+    assert "Logged in as <strong>Tex</strong>" in web.get("/").text
+
+    # The database keeps only the hash of the cookie, and the Discord token encrypted
+    token = web.cookies["tb_session"]
+    rows = raw(web.db_path, "SELECT id, access_token, csrf_token FROM web_sessions")
+    assert rows[0][0] != token and len(rows[0][0]) == 64
+    assert rows[0][1].startswith("enc:v1:") and rows[0][2].startswith("enc:v1:")
+    actions = raw(web.db_path, "SELECT action, source, actor_id FROM audit_log")
+    assert actions == [("auth.login", "web", 123456789012345678)]
+
+    # Logging out needs the CSRF token and the same site
+    assert web.post("/api/v1/auth/logout").status_code == 403
+    assert web.post("/api/v1/auth/logout", headers={"X-CSRF-Token": "wrong"}).status_code \
+        == 403
+    assert web.post("/api/v1/auth/logout", headers={
+        "X-CSRF-Token": me["csrf_token"], "Origin": "https://evil.example"}).status_code == 403
+    r = web.post("/api/v1/auth/logout", headers={"X-CSRF-Token": me["csrf_token"],
+                                                 "Origin": "http://testserver"})
+    assert r.status_code == 204
+    assert web.app.state.discord.revoked == ["discord-access-abc"]
+    assert web.get("/api/v1/auth/me").status_code == 401
+    assert raw(web.db_path, "SELECT COUNT(*) FROM web_sessions") == [(0,)]
+
+
+def raw(path, sql):
+    import sqlite3
+    conn = sqlite3.connect(path)
+    try:
+        return conn.execute(sql).fetchall()
+    finally:
+        conn.close()
+
+
+def test_login_errors(web):
+    def callback(**params):
+        return web.get("/api/v1/auth/callback", params=params).headers["location"]
+
+    assert callback(code="x", state="y") == "/?login_error=expired"     # no login started
+    web.get("/api/v1/auth/login")
+    assert callback(code="x", state="forged") == "/?login_error=invalid"
+    web.get("/api/v1/auth/login")
+    assert callback(error="access_denied") == "/?login_error=cancelled"
+    web.app.state.discord = FakeDiscord(scope="identify")
+    assert log_in(web).headers["location"] == "/?login_error=scope"
+    assert web.get("/api/v1/auth/me").status_code == 401
+    assert "didn&#x27;t grant" in web.get("/?login_error=scope").text
+
+
+def test_only_local_pages_after_login(web):
+    from ticketbot.web.api.auth import safe_next
+
+    for bad in ("https://evil.example", "//evil.example", "/\\evil.example", "", None):
+        assert safe_next(bad) == "/"
+    assert log_in(web, "//evil.example/x").headers["location"] == "/"
+
+
+def test_expired_session_and_form_logout(web):
+    log_in(web)
+    raw_update(web.db_path, "UPDATE web_sessions SET expires_at = 1")
+    assert web.get("/api/v1/auth/me").status_code == 401
+    assert raw(web.db_path, "SELECT COUNT(*) FROM web_sessions") == [(0,)]
+
+    log_in(web)
+    csrf = web.get("/api/v1/auth/me").json()["csrf_token"]
+    assert web.post("/logout", data={"csrf_token": "wrong"}).status_code == 403
+    r = web.post("/logout", data={"csrf_token": csrf})
+    assert r.status_code == 303 and r.headers["location"] == "/"
+    assert web.get("/api/v1/auth/me").status_code == 401
+
+
+def raw_update(path, sql):
+    import sqlite3
+    conn = sqlite3.connect(path)
+    with conn:
+        conn.execute(sql)
+    conn.close()
+
+
+def test_login_not_configured(client):
+    r = client.get("/api/v1/auth/login", follow_redirects=False)
+    assert r.status_code == 503 and "DISCORD_CLIENT_ID" in r.json()["detail"]
+    assert "isn't configured" in client.get("/").text
+
+
+def test_https_cookies(tmp_path):
+    asyncio.run(_prepare(tmp_path))
+    settings = make_settings(tmp_path, discord_client_id="42", discord_client_secret="s",
+                             web_public_url="https://tickets.example.com")
+    assert settings.oauth_redirect_uri == \
+        "https://tickets.example.com/api/v1/auth/callback"
+    with TestClient(create_app(settings), base_url="https://tickets.example.com",
+                    follow_redirects=False) as c:
+        c.app.state.discord = FakeDiscord()
+        r = log_in(c)
+        cookies = r.headers.get_list("set-cookie")
+        session = next(h for h in cookies if h.startswith("__Host-tb_session="))
+        assert "Secure" in session and "Path=/" in session and "Domain" not in session
+        assert c.get("/api/v1/auth/me").status_code == 200

@@ -23,6 +23,7 @@ AUDIT, COMMANDS = T["audit_log"], T["bot_commands"]
 TYPE_ROLES = T["type_staff_roles"]
 LEVELS = T["escalation_levels"]
 FAQ, FAQ_RESULTS = T["faq_entries"], T["faq_results"]
+SESSIONS = T["web_sessions"]
 
 GUILD_FIELDS = {c.name for c in GUILDS.columns} - {"guild_id"}
 TYPE_FIELDS = {"label", "emoji", "description", "position"}
@@ -506,6 +507,23 @@ class Store:
 
     async def purge_audit_before(self, before: float) -> int:
         return await self._write(delete(AUDIT).where(AUDIT.c.created_at < before))
+
+    # ------------------------------------------------------ web sessions ---
+
+    async def create_web_session(self, **values) -> None:
+        await self._write(insert(SESSIONS).values(**values))
+
+    async def get_web_session(self, session_id: str) -> dict | None:
+        return await self._one(select(SESSIONS).where(SESSIONS.c.id == session_id))
+
+    async def update_web_session(self, session_id: str, **values) -> None:
+        await self._write(update(SESSIONS).where(SESSIONS.c.id == session_id).values(**values))
+
+    async def delete_web_session(self, session_id: str) -> bool:
+        return await self._write(delete(SESSIONS).where(SESSIONS.c.id == session_id)) > 0
+
+    async def purge_web_sessions(self, now: float) -> int:
+        return await self._write(delete(SESSIONS).where(SESSIONS.c.expires_at < now))
 
     # ----------------------------------------------- commands from the web ---
 
