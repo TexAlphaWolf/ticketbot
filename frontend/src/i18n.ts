@@ -44,6 +44,7 @@ const en = {
   "status.open": "Open",
   "status.closed": "Closed",
   "status.all": "All",
+  "status.closed_one": "Closed",
   "status.waiting": "Waiting",
   "status.in_progress": "In progress",
   "priority.low": "Low",
@@ -162,6 +163,15 @@ const en = {
   "esc.none": "No levels: /escalate isn't available.",
   "admin.only": "Only the server's admins can change this.",
   "admin.choose_role": "Choose a role",
+  "transcript.title": "Transcript",
+  "transcript.download": "Download HTML",
+  "transcript.empty": "No messages.",
+  "transcript.notes": "Staff notes at closing",
+  "transcript.bot": "BOT",
+  "transcript.none": "This ticket was closed before transcripts were kept in the database: its transcript is only in the log channel on Discord.",
+  "transcript.link_expiry": "Discord attachment links may stop working after a while.",
+  "ticket.delete": "Delete ticket",
+  "ticket.delete_confirm": "Delete this ticket everywhere? The dashboard, the statistics and the transcript messages in the log and archive channels lose it. This can't be undone.",
 };
 
 type Key = keyof typeof en;
@@ -207,6 +217,7 @@ const it: Dict = {
   "status.open": "Aperti",
   "status.closed": "Chiusi",
   "status.all": "Tutti",
+  "status.closed_one": "Chiuso",
   "status.waiting": "In attesa",
   "status.in_progress": "In corso",
   "priority.low": "Bassa",
@@ -325,6 +336,15 @@ const it: Dict = {
   "esc.none": "Nessun livello: /escalate non è disponibile.",
   "admin.only": "Solo gli admin del server possono modificarlo.",
   "admin.choose_role": "Scegli un ruolo",
+  "transcript.title": "Transcript",
+  "transcript.download": "Scarica HTML",
+  "transcript.empty": "Nessun messaggio.",
+  "transcript.notes": "Note dello staff alla chiusura",
+  "transcript.bot": "BOT",
+  "transcript.none": "Questo ticket è stato chiuso prima che i transcript venissero salvati nel database: il suo transcript è solo nel canale di log su Discord.",
+  "transcript.link_expiry": "I link degli allegati di Discord possono smettere di funzionare dopo un po'.",
+  "ticket.delete": "Elimina ticket",
+  "ticket.delete_confirm": "Eliminare questo ticket ovunque? Spariscono dalla dashboard, dalle statistiche e dai canali di log e archivio i suoi messaggi del transcript. Non si può annullare.",
 };
 
 const de: Dict = {
@@ -367,6 +387,7 @@ const de: Dict = {
   "status.open": "Offen",
   "status.closed": "Geschlossen",
   "status.all": "Alle",
+  "status.closed_one": "Geschlossen",
   "status.waiting": "Wartend",
   "status.in_progress": "In Bearbeitung",
   "priority.low": "Niedrig",
@@ -485,6 +506,15 @@ const de: Dict = {
   "esc.none": "Keine Stufen: /escalate ist nicht verfügbar.",
   "admin.only": "Nur die Admins des Servers können das ändern.",
   "admin.choose_role": "Rolle wählen",
+  "transcript.title": "Transkript",
+  "transcript.download": "HTML herunterladen",
+  "transcript.empty": "Keine Nachrichten.",
+  "transcript.notes": "Team-Notizen beim Schließen",
+  "transcript.bot": "BOT",
+  "transcript.none": "Dieses Ticket wurde geschlossen, bevor Transkripte in der Datenbank gespeichert wurden: sein Transkript ist nur im Log-Kanal auf Discord.",
+  "transcript.link_expiry": "Links zu Discord-Anhängen können nach einiger Zeit ungültig werden.",
+  "ticket.delete": "Ticket löschen",
+  "ticket.delete_confirm": "Dieses Ticket überall löschen? Dashboard, Statistik und die Transkript-Nachrichten in Log- und Archivkanal verlieren es. Das kann nicht rückgängig gemacht werden.",
 };
 
 const DICTS: Record<Lang, Dict> = { en, it, de };

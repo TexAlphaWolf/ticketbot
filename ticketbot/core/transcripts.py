@@ -1,6 +1,7 @@
 """Ticket transcripts rendered as plain text and HTML (no Discord dependency)."""
 
 import html
+import json
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -246,3 +247,39 @@ def render_html(meta: dict, messages: list[TMessage], notes: list[dict],
     parts.append(f"<div class='foot'>{esc(_('transcript.footer', count=len(messages)))}"
                  "</div></div></body></html>")
     return "".join(parts).encode("utf-8")
+
+
+# ------------------------------------------------- stored in the database ---
+
+def dump_transcript(meta: dict, messages: list[TMessage], notes: list[dict]) -> str:
+    """The transcript as JSON, to keep (encrypted) in the database."""
+    return json.dumps({
+        "v": 1,
+        "meta": {"guild": meta["guild"], "channel": meta["channel"],
+                 "fields": [[str(k), str(v)] for k, v in meta["fields"]]},
+        "messages": [{
+            "author": m.author, "author_id": str(m.author_id), "avatar": m.avatar,
+            "color": m.color, "bot": m.bot, "created_at": m.created_at.timestamp(),
+            "content": m.content, "attachments": m.attachments,
+            "embeds": [{**e, "fields": [list(f) for f in e["fields"]]} for e in m.embeds],
+            "stickers": [{**st, "id": str(st["id"])} for st in m.stickers],
+            "reactions": [{**r, "id": str(r["id"]) if r.get("id") else None}
+                          for r in m.reactions],
+        } for m in messages],
+        "notes": [{"author": n["author"], "author_id": str(n["author_id"]),
+                   "text": n["text"], "created_at": n["created_at"]} for n in notes],
+    }, ensure_ascii=False)
+
+
+def load_transcript(text: str) -> tuple[dict, list[TMessage], list[dict]]:
+    data = json.loads(text)
+    messages = [TMessage(
+        author=m["author"], author_id=int(m["author_id"]), avatar=m["avatar"],
+        color=m.get("color"), bot=m["bot"],
+        created_at=datetime.fromtimestamp(m["created_at"], UTC), content=m["content"],
+        embeds=[{**e, "fields": [tuple(f) for f in e["fields"]]} for e in m["embeds"]],
+        attachments=m["attachments"],
+        stickers=[{**st, "id": int(st["id"])} for st in m.get("stickers", [])],
+        reactions=m.get("reactions", [])) for m in data["messages"]]
+    meta = {**data["meta"], "fields": [tuple(f) for f in data["meta"]["fields"]]}
+    return meta, messages, data["notes"]

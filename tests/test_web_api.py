@@ -334,3 +334,56 @@ def test_staff_candidates(api):
     staff = api.get(f"/api/v1/guilds/{GUILD}/staff").json()
     assert [s["id"] for s in staff] == [str(STAFF)]          # handled ticket 4
     assert api.get(f"/api/v1/guilds/{GUILD}").json()["escalation_levels"] == 1
+
+
+def add_transcript(path, ticket_id):
+    from test_transcripts_db import MESSAGES, META, NOTES
+
+    from ticketbot.core.transcripts import dump_transcript
+
+    async def go():
+        store = await new_store(path)
+        await store.save_transcript(guild_id=GUILD, ticket_id=ticket_id, channel_name="t-4",
+                                    content=dump_transcript(META, MESSAGES, NOTES),
+                                    created_at=1.0, archive_channel_id=70,
+                                    archive_message_id=500)
+        await store.close()
+
+    asyncio.run(go())
+
+
+def test_transcript_in_the_dashboard(api):
+    add_transcript(api.db_path, 4)
+    as_user(api, STAFF)
+    assert api.get(f"/api/v1/guilds/{GUILD}/tickets/4").json()["has_transcript"]
+    assert not api.get(f"/api/v1/guilds/{GUILD}/tickets/2").json()["has_transcript"]
+    tr = api.get(f"/api/v1/guilds/{GUILD}/tickets/4/transcript").json()
+    assert tr["channel_name"] == "t-4" and tr["messages"][0]["content"] == "It **crashes**"
+    assert tr["messages"][0]["attachments"][0]["filename"] == "log.txt"
+    assert tr["notes"][0]["text"] == "Known bug"
+    r = api.get(f"/api/v1/guilds/{GUILD}/tickets/4/transcript.html")
+    assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
+    assert r.headers["content-security-policy"].startswith("sandbox")
+    assert "crashes" in r.text
+    assert api.get(f"/api/v1/guilds/{GUILD}/tickets/2/transcript").status_code == 404
+    as_user(api, DEV)                       # can't see ticket 4 (support)
+    assert api.get(f"/api/v1/guilds/{GUILD}/tickets/4/transcript").status_code == 404
+    conn = sqlite3.connect(api.db_path)
+    views = conn.execute("SELECT COUNT(*) FROM audit_log "
+                         "WHERE action = 'ticket.transcript_view'").fetchone()[0]
+    conn.close()
+    assert views == 2
+
+
+def test_admin_deletes_a_ticket(api):
+    add_transcript(api.db_path, 4)
+    as_user(api, STAFF)
+    assert api.delete(f"/api/v1/guilds/{GUILD}/tickets/4", headers=csrf(api)).status_code \
+        == 403
+    as_user(api, ADMIN, owner=True)
+    h = csrf(api)
+    assert api.delete(f"/api/v1/guilds/{GUILD}/tickets/2", headers=h).status_code == 409
+    assert api.delete(f"/api/v1/guilds/{GUILD}/tickets/4", headers=h).status_code == 204
+    assert api.get(f"/api/v1/guilds/{GUILD}/tickets/4").status_code == 404
+    assert api.delete(f"/api/v1/guilds/{GUILD}/tickets/4", headers=h).status_code == 404
+    assert [c[0] for c in commands(api)] == ["transcript.delete_messages"]

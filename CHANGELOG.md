@@ -47,6 +47,21 @@
   saved at once and recorded in the audit log; the bot refreshes the panel and the
   guidelines, checks its permissions for thread mode and gives the new roles access to
   the threads
+- **Transcripts in the database and in the dashboard**: when a ticket closes, its
+  transcript (messages, embeds, attachment links, staff notes) is saved encrypted in a
+  new `transcripts` table (migration 0008) and shown on the ticket's page, with *Download
+  HTML* (the same file as in the log channel; served as a download with a sandbox CSP).
+  Reading a transcript is recorded in the audit log
+- **Delete a ticket everywhere**: deleting its transcript message from the archive
+  channel, or *Delete ticket* in the dashboard (admins, closed tickets), removes the
+  ticket, its notes and transcript from the dashboard and the statistics and deletes the
+  transcript messages in the log and archive channels. New `LEGAL_HOLD_DAYS` (default 0):
+  keep a hidden, encrypted copy of a deleted ticket's transcript for that many days, also
+  when tickets are purged after 365 days or the bot leaves a server;
+  `python -m ticketbot held [id]` lists the copies or saves one as HTML (recorded in the
+  audit log)
+- The *Claimed by* button shows the staff member's name also when the ticket is
+  claimed or transferred from the dashboard (it showed the ID)
 - **Web dashboard (second part)**: in a ticket, reply (posted by the bot with your name),
   add a private note, claim with a priority, change the priority, transfer to another
   staff member, escalate and close; the dashboard waits for the bot and says whether it

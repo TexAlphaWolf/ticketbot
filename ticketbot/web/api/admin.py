@@ -359,6 +359,28 @@ async def remove_type_role(request: Request, session: Session, access: Admin,
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+# ------------------------------------------------------------ tickets -----
+
+@router.delete("/tickets/{ticket_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_ticket(request: Request, session: Session, access: Admin,
+                        ticket_id: Annotated[int, Path(ge=1)]) -> Response:
+    """Delete a closed ticket everywhere: dashboard, statistics, notes, transcript and
+    its messages in the log and archive channels (like deleting the archive message).
+    With LEGAL_HOLD_DAYS a hidden copy of the transcript stays for that long."""
+    store = request.app.state.store
+    t = await store.get_ticket(ticket_id)
+    if t is None or t["guild_id"] != access.guild_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Ticket not found")
+    if t["status"] != config.STATUS_CLOSED:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Close the ticket first")
+    removed = await store.delete_ticket(ticket_id, request.app.state.settings.legal_hold_days)
+    await record(request, session, access, "ticket.delete", f"ticket:{ticket_id}")
+    if removed:
+        await queue(request, session, access, "transcript.delete_messages", transcripts=[
+            {k: str(v) if v else None for k, v in r.items() if k != "id"} for r in removed])
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 # ------------------------------------------------------------ FAQ ---------
 
 class FaqOut(BaseModel):

@@ -205,6 +205,32 @@ class Ticket(Base):
     rated_at: Mapped[float | None] = mapped_column(Double)
 
 
+class Transcript(Base):
+    """The conversation of a closed ticket, encrypted (JSON: messages and notes), for the
+    dashboard. When the ticket is deleted it is deleted too or, with LEGAL_HOLD_DAYS,
+    kept hidden until held_until (no ticket any more, not shown anywhere)."""
+
+    __tablename__ = "transcripts"
+    __table_args__ = (
+        Index("ix_transcripts_ticket", "ticket_id"),
+        Index("ix_transcripts_archive_message", "archive_message_id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    guild_id: Mapped[int] = mapped_column(BigInteger)       # no FK: a held copy outlives it
+    ticket_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("tickets.id", ondelete="SET NULL"))
+    channel_name: Mapped[str] = mapped_column(Text)
+    content: Mapped[str] = mapped_column(EncryptedText("transcripts.content"))
+    archive_channel_id: Mapped[int | None] = mapped_column(BigInteger)
+    archive_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    log_channel_id: Mapped[int | None] = mapped_column(BigInteger)
+    log_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[float] = mapped_column(Double)
+    held_until: Mapped[float | None] = mapped_column(Double)
+
+
 class Note(Base):
     __tablename__ = "notes"
     __table_args__ = {"sqlite_autoincrement": True}

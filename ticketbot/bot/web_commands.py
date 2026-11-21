@@ -29,7 +29,7 @@ from .tickets import (
     ticket_roles,
 )
 
-ADMIN_KINDS = {"settings.mode", "thread.access"}
+ADMIN_KINDS = {"settings.mode", "thread.access", "transcript.delete_messages"}
 TICKET_KINDS = {"ticket.close", "ticket.claim", "ticket.priority", "ticket.transfer",
                 "ticket.escalate", "ticket.message"}
 
@@ -72,6 +72,9 @@ async def run_web_command(client, command: dict) -> str:
             raise CommandError("only admins can change this")
         if kind == "settings.mode":
             return await set_ticket_mode(client, guild, cfg, payload["mode"], member)
+        if kind == "transcript.delete_messages":
+            await delete_transcript_messages(client, guild.id, payload["transcripts"])
+            return "ok"
         failed = await thread_access(client, guild, cfg,
                                      [int(r) for r in payload["role_ids"]])
         return f"could not change: {', '.join(failed)}" if failed else "ok"
@@ -127,6 +130,26 @@ async def run_web_command(client, command: dict) -> str:
     elif kind == "ticket.message":
         await post_staff_message(client, channel, ticket, member, payload["text"], _)
     return "ok"
+
+
+async def delete_transcript_messages(client, guild_id: int, transcripts: list[dict],
+                                     keep: int | None = None) -> None:
+    """Delete the archive and log messages of deleted tickets' transcripts (`keep`: the
+    one that was just deleted by hand)."""
+    guild = client.get_guild(guild_id)
+    if guild is None:
+        return
+    for t in transcripts:
+        for channel_key, message_key in (("archive_channel_id", "archive_message_id"),
+                                         ("log_channel_id", "log_message_id")):
+            channel = guild.get_channel(int(t.get(channel_key) or 0))
+            message_id = t.get(message_key)
+            if channel is None or not message_id or int(message_id) == keep:
+                continue
+            try:
+                await channel.get_partial_message(int(message_id)).delete()
+            except discord.HTTPException:
+                pass          # already gone, or no permission: nothing else to do
 
 
 async def set_ticket_mode(client, guild: discord.Guild, cfg: dict, mode: str,

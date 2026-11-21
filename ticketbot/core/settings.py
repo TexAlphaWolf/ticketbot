@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     web_trusted_proxies: str = "127.0.0.1"         # who may set X-Forwarded-For/-Proto
     web_session_days: int = Field(default=7, ge=1, le=30)
 
+    # A deleted ticket's transcript stays hidden in the database for these days (0 = it
+    # is deleted at once). Set it only if you must keep transcripts for a reason (e.g.
+    # the law for a business) and write it in your privacy policy.
+    legal_hold_days: float = Field(default=0, ge=0, le=3660)
+
     # Login with Discord: OAuth2 page of the bot's application in the Developer Portal
     discord_client_id: str | None = None
     discord_client_secret: SecretStr | None = None
@@ -205,6 +210,7 @@ class Settings(BaseSettings):
             ("WEB_API_DOCS", "on" if self.web_api_docs else "off"),
             ("WEB_TRUSTED_PROXIES", self.web_trusted_proxies),
             ("WEB_SESSION_DAYS", str(self.web_session_days)),
+            ("LEGAL_HOLD_DAYS", f"{self.legal_hold_days:g}"),
             ("DISCORD_CLIENT_ID", self.discord_client_id or "not set"),
             ("DISCORD_CLIENT_SECRET", secret(self.discord_client_secret)),
             ("OAuth2 redirect", self.oauth_redirect_uri),

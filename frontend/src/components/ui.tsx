@@ -32,7 +32,7 @@ export function PersonChip({ id, people }: { id: string | null; people: Record<s
 
 export function StatusBadge({ status }: { status: Status }) {
   const { t } = useI18n();
-  const label = status === "closed" ? t("status.closed") : t(`status.${status}`);
+  const label = status === "closed" ? t("status.closed_one") : t(`status.${status}`);
   return <span className={`badge badge-${status}`}>{label}</span>;
 }
 

@@ -4,11 +4,13 @@ import asyncio
 import time
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from pydantic import BaseModel
 
 from ...core import config
+from ...core.i18n import t as translate
 from ...core.logic import compute_stats
+from ...core.transcripts import load_transcript, render_html
 from ..discord_api import DiscordError, avatar_url, guild_icon_url
 from ..permissions import Access, is_admin
 from ..sessions import client_ip, current_session, discord_token
@@ -99,6 +101,44 @@ class TicketDetail(TicketSummary):
     escalated_at: float | None
     notes: list[Note]
     people: dict[str, Person]
+    has_transcript: bool
+
+
+class TranscriptAttachment(BaseModel):
+    filename: str
+    url: str
+    image: bool
+
+
+class TranscriptEmbed(BaseModel):
+    title: str
+    description: str
+    fields: list[tuple[str, str]]
+
+
+class TranscriptMessage(BaseModel):
+    author: str
+    author_id: str
+    avatar: str
+    bot: bool
+    created_at: float
+    content: str
+    attachments: list[TranscriptAttachment]
+    embeds: list[TranscriptEmbed]
+
+
+class TranscriptNote(BaseModel):
+    author: str
+    author_id: str
+    text: str
+    created_at: float
+
+
+class TranscriptOut(BaseModel):
+    channel_name: str
+    created_at: float
+    messages: list[TranscriptMessage]
+    notes: list[TranscriptNote]
 
 
 class LeaderboardRow(BaseModel):
@@ -335,7 +375,58 @@ async def get_ticket(request: Request, session: Session, access: GuildAccess,
         rating_comment=t["rating_comment"], escalated_at=t["escalated_at"],
         notes=[Note(author_id=str(n["author_id"]), text=n["text"],
                     created_at=n["created_at"]) for n in notes],
-        people=await people(request, access.guild_id, ids))
+        people=await people(request, access.guild_id, ids),
+        has_transcript=await store.ticket_transcript(ticket_id) is not None)
+
+
+async def visible_transcript(request: Request, session: dict, access: Access,
+                             ticket_id: int) -> tuple[dict, dict]:
+    store = request.app.state.store
+    t = await store.get_ticket(ticket_id)
+    if t is None or t["guild_id"] != access.guild_id or not access.can_see(t):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Ticket not found")
+    transcript = await store.ticket_transcript(ticket_id)
+    if transcript is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No transcript for this ticket")
+    await store.audit(access.guild_id, session["user_id"], "ticket.transcript_view",
+                      source="web", target=f"ticket:{ticket_id}", ip=client_ip(request))
+    return t, transcript
+
+
+@router.get("/{guild_id}/tickets/{ticket_id}/transcript", response_model=TranscriptOut)
+async def get_transcript(request: Request, session: Session, access: GuildAccess,
+                         ticket_id: Annotated[int, Path(ge=1)]) -> TranscriptOut:
+    """The conversation of a closed ticket, with the staff notes as they were."""
+    _t, transcript = await visible_transcript(request, session, access, ticket_id)
+    _meta, messages, notes = load_transcript(transcript["content"])
+    return TranscriptOut(
+        channel_name=transcript["channel_name"], created_at=transcript["created_at"],
+        messages=[TranscriptMessage(
+            author=m.author, author_id=str(m.author_id), avatar=m.avatar, bot=m.bot,
+            created_at=m.created_at.timestamp(), content=m.content,
+            attachments=[TranscriptAttachment(**a) for a in m.attachments],
+            embeds=[TranscriptEmbed(title=e["title"], description=e["description"],
+                                    fields=[(str(n), str(v)) for n, v in e["fields"]])
+                    for e in m.embeds]) for m in messages],
+        notes=[TranscriptNote(**n) for n in notes])
+
+
+@router.get("/{guild_id}/tickets/{ticket_id}/transcript.html",
+            response_class=Response, responses={200: {"content": {"text/html": {}}}})
+async def download_transcript(request: Request, session: Session, access: GuildAccess,
+                              ticket_id: Annotated[int, Path(ge=1)]) -> Response:
+    """The same HTML file the bot posts in the log channel, as a download."""
+    _t, transcript = await visible_transcript(request, session, access, ticket_id)
+    meta, messages, notes = load_transcript(transcript["content"])
+    lang = access.cfg.get("language") or "en"
+    page = render_html(meta, messages, notes, lambda key, /, **kw: translate(lang, key, **kw))
+    name = "".join(c for c in transcript["channel_name"] if c.isalnum() or c in "-_") \
+        or "transcript"
+    return Response(page, media_type="text/html; charset=utf-8", headers={
+        "Content-Disposition": f'attachment; filename="{name}.html"',
+        # Never shown inside the dashboard: a sandbox even if a browser opens it here
+        "Content-Security-Policy": "sandbox; default-src 'none'; img-src https: data:; "
+                                   "style-src 'unsafe-inline'"})
 
 
 @router.get("/{guild_id}/stats", response_model=Stats)

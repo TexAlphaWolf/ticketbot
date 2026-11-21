@@ -25,6 +25,7 @@ TYPE_ROLES = T["type_staff_roles"]
 LEVELS = T["escalation_levels"]
 FAQ, FAQ_RESULTS = T["faq_entries"], T["faq_results"]
 SESSIONS = T["web_sessions"]
+TRANSCRIPTS = T["transcripts"]
 
 GUILD_FIELDS = {c.name for c in GUILDS.columns} - {"guild_id"}
 TYPE_FIELDS = {"label", "emoji", "description", "position"}
@@ -66,6 +67,15 @@ TICKET_STATUSES = {"open", "closed", "all"}
 
 def _open(table=TICKETS):
     return and_(table.c.status != "closed", table.c.channel_deleted.is_(False))
+
+
+async def _retire_transcripts(conn, where, hold_days: float, now: float) -> None:
+    """Transcripts whose ticket goes away: deleted, or hidden until now + hold_days."""
+    if hold_days > 0:
+        await conn.execute(update(TRANSCRIPTS).where(where, TRANSCRIPTS.c.held_until.is_(None))
+                           .values(held_until=now + hold_days * 86400, ticket_id=None))
+    else:
+        await conn.execute(delete(TRANSCRIPTS).where(where, TRANSCRIPTS.c.held_until.is_(None)))
 
 
 class Store:
@@ -127,9 +137,13 @@ class Store:
                                    .values(**fields))
         return await self.get_guild(guild_id)
 
-    async def delete_guild(self, guild_id: int) -> bool:
-        """All the data of a server: its tables cascade, the audit log is removed too."""
+    async def delete_guild(self, guild_id: int, hold_days: float = 0,
+                           now: float | None = None) -> bool:
+        """All the data of a server: its tables cascade, the audit log is removed too.
+        Transcripts are deleted, or kept hidden for hold_days (LEGAL_HOLD_DAYS)."""
         async with self.engine.begin() as conn:
+            await _retire_transcripts(conn, TRANSCRIPTS.c.guild_id == guild_id, hold_days,
+                                      now or time.time())
             await conn.execute(delete(AUDIT).where(AUDIT.c.guild_id == guild_id))
             result = await conn.execute(delete(GUILDS).where(GUILDS.c.guild_id == guild_id))
             return result.rowcount > 0
@@ -362,10 +376,62 @@ class Store:
         return await self._all(select(TICKETS).where(TICKETS.c.guild_id == guild_id,
                                                      TICKETS.c.opened_at >= since))
 
-    async def purge_closed_before(self, before: float) -> int:
-        return await self._write(delete(TICKETS).where(
-            TICKETS.c.status == "closed", TICKETS.c.channel_deleted.is_(True),
-            TICKETS.c.closed_at < before))
+    async def purge_closed_before(self, before: float, hold_days: float = 0,
+                                  now: float | None = None) -> int:
+        old = and_(TICKETS.c.status == "closed", TICKETS.c.channel_deleted.is_(True),
+                   TICKETS.c.closed_at < before)
+        async with self.engine.begin() as conn:
+            await _retire_transcripts(conn, TRANSCRIPTS.c.ticket_id.in_(
+                select(TICKETS.c.id).where(old)), hold_days, now or time.time())
+            return (await conn.execute(delete(TICKETS).where(old))).rowcount
+
+    async def delete_ticket(self, ticket_id: int, hold_days: float = 0,
+                            now: float | None = None) -> list[dict]:
+        """Delete a ticket everywhere (notes, transcript; the statistics lose it). Its
+        transcript is kept hidden for hold_days if set. Returns the transcripts it had
+        (to delete their messages on Discord)."""
+        async with self.engine.begin() as conn:
+            found = [dict(r._mapping) for r in (await conn.execute(
+                select(TRANSCRIPTS.c.id, TRANSCRIPTS.c.archive_channel_id,
+                       TRANSCRIPTS.c.archive_message_id, TRANSCRIPTS.c.log_channel_id,
+                       TRANSCRIPTS.c.log_message_id)
+                .where(TRANSCRIPTS.c.ticket_id == ticket_id))).all()]
+            await _retire_transcripts(conn, TRANSCRIPTS.c.ticket_id == ticket_id, hold_days,
+                                      now or time.time())
+            await conn.execute(delete(TICKETS).where(TICKETS.c.id == ticket_id))
+        return found
+
+    # ------------------------------------------------------- transcripts ---
+
+    async def save_transcript(self, **values) -> int:
+        async with self.engine.begin() as conn:
+            result = await conn.execute(insert(TRANSCRIPTS).values(**values)
+                                        .returning(TRANSCRIPTS.c.id))
+            return result.scalar_one()
+
+    async def ticket_transcript(self, ticket_id: int) -> dict | None:
+        """The latest visible transcript of a ticket (a reopened ticket has more)."""
+        return await self._one(select(TRANSCRIPTS).where(
+            TRANSCRIPTS.c.ticket_id == ticket_id, TRANSCRIPTS.c.held_until.is_(None))
+            .order_by(TRANSCRIPTS.c.id.desc()).limit(1))
+
+    async def transcript_by_archive_message(self, message_id: int) -> dict | None:
+        return await self._one(select(TRANSCRIPTS).where(
+            TRANSCRIPTS.c.archive_message_id == message_id,
+            TRANSCRIPTS.c.held_until.is_(None)))
+
+    async def held_transcripts(self) -> list[dict]:
+        return await self._all(
+            select(TRANSCRIPTS.c.id, TRANSCRIPTS.c.guild_id, TRANSCRIPTS.c.channel_name,
+                   TRANSCRIPTS.c.created_at, TRANSCRIPTS.c.held_until)
+            .where(TRANSCRIPTS.c.held_until.is_not(None)).order_by(TRANSCRIPTS.c.id))
+
+    async def get_transcript(self, transcript_id: int) -> dict | None:
+        return await self._one(select(TRANSCRIPTS).where(TRANSCRIPTS.c.id == transcript_id))
+
+    async def purge_held_transcripts(self, now: float) -> int:
+        return await self._write(delete(TRANSCRIPTS).where(
+            TRANSCRIPTS.c.held_until.is_not(None), TRANSCRIPTS.c.held_until < now))
 
     # ------------------------------------------------- staff rotation ---
 

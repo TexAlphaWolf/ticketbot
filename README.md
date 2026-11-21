@@ -250,6 +250,13 @@ port 8080.
   queued and carried out by the bot within a few seconds; `GET .../commands/{id}` tells
   how they went. `.../notes` saves a private note at once. The bot checks your roles
   again before acting, so the bot must be running
+- **Transcripts in the dashboard**: when a ticket closes, its transcript is also saved in
+  the database (encrypted) and shown on the ticket's page, with a *Download HTML* button.
+  Deleting the transcript message from the archive channel, or the ticket from the
+  dashboard (admins), deletes the ticket everywhere: dashboard, statistics and the
+  transcript messages in the log and archive channels. To keep a hidden copy for legal
+  reasons set `LEGAL_HOLD_DAYS` (e.g. `3650`); `python -m ticketbot held` lists the
+  copies and saves one as HTML
 - **Server management** (admins only): `GET/PATCH .../settings` (language, retention,
   reminders, auto-assign, cooldown), `PUT .../settings/mode`, `.../types` with their
   questions and roles, `.../faq`, `.../escalation` and `GET .../roles` (the server's

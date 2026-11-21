@@ -17,7 +17,7 @@ from ..core.logic import (
     stars,
     ticket_channel_name,
 )
-from ..core.transcripts import render_html, render_txt
+from ..core.transcripts import dump_transcript, render_html, render_txt
 from .collect import collect_messages
 from .common import (
     COLOR,
@@ -534,12 +534,15 @@ async def get_context(interaction: discord.Interaction, *, staff: bool = False,
     return cfg, _, ticket
 
 
-async def refresh_controls(channel: discord.TextChannel, ticket: dict, _: Translate) -> None:
+async def refresh_controls(channel: discord.TextChannel, ticket: dict, _: Translate,
+                           name: str | None = None) -> None:
+    """Update the button that says who claimed the ticket. `name`: the claimer's name
+    when the caller has it (members aren't always in the bot's cache)."""
     if not ticket.get("control_message"):
         return
-    claimer = channel.guild.get_member(ticket["claimed_by"]) if ticket.get("claimed_by") else None
-    name = claimer.display_name if claimer else (str(ticket["claimed_by"])
-                                                 if ticket.get("claimed_by") else None)
+    if name is None and ticket.get("claimed_by"):
+        claimer = channel.guild.get_member(ticket["claimed_by"])
+        name = claimer.display_name if claimer else str(ticket["claimed_by"])
     try:
         await channel.get_partial_message(ticket["control_message"]).edit(
             view=TicketControls(_, claimed_by=name)
@@ -626,7 +629,7 @@ async def claim_ticket(client, channel, ticket: dict, cfg: dict, member: discord
                           target=f"ticket:{ticket['id']}", details={"priority": level})
     if respond is not None:
         await respond()
-    await refresh_controls(channel, ticket, _)
+    await refresh_controls(channel, ticket, _, member.display_name)
     await channel.send(_("claim.public", user=member.mention,
                          priority=priority_label(_, level)))
     await notify_high_priority(client, cfg, channel, ticket, member, level, previous)
@@ -694,7 +697,7 @@ async def move_ticket(client, channel, ticket: dict, cfg: dict, member: discord.
                           target=f"ticket:{ticket['id']}", details={"to": member.id})
     text = _("transfer.done", user=member.mention, by=by.mention)
     await (respond(text) if respond is not None else channel.send(text))
-    await refresh_controls(channel, ticket, _)
+    await refresh_controls(channel, ticket, _, member.display_name)
 
 
 # --------------------------------------------------------------- closing ---
@@ -808,6 +811,7 @@ async def close_ticket(client, channel: discord.TextChannel, ticket: dict,
         targets[archive_id] = False
     if log_id and log_id not in targets:
         targets[log_id] = not is_kept(priority)
+    posted: dict[int, int] = {}
     for cid, auto_delete in targets.items():
         target = guild.get_channel(cid)
         if target is None:
@@ -827,8 +831,18 @@ async def close_ticket(client, channel: discord.TextChannel, ticket: dict,
         except discord.HTTPException as e:
             print(f"Could not send the transcript to #{target}: {e}")
             continue
+        posted[cid] = sent.id
         if auto_delete:
             await db.add_transcript_ref(guild.id, target.id, sent.id, priority, now)
+
+    # The dashboard shows it; deleting the archive message deletes the ticket everywhere
+    await db.save_transcript(
+        guild_id=guild.id, ticket_id=ticket["id"], channel_name=channel.name,
+        content=dump_transcript(meta, messages, notes), created_at=now,
+        archive_channel_id=archive_id if archive_id in posted else None,
+        archive_message_id=posted.get(archive_id) if archive_id else None,
+        log_channel_id=log_id if log_id in posted and log_id != archive_id else None,
+        log_message_id=posted.get(log_id) if log_id and log_id != archive_id else None)
 
     await telegram_notify(
         client, cfg,

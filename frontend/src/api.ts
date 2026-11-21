@@ -91,6 +91,7 @@ export interface TicketDetail extends TicketSummary {
   escalated_at: number | null;
   notes: Note[];
   people: Record<string, Person>;
+  has_transcript: boolean;
 }
 
 export class ApiError extends Error {
@@ -233,3 +234,23 @@ export interface Level {
 }
 
 export const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) });
+
+// ---------------------------------------------------------- transcripts ---
+
+export interface TranscriptMessage {
+  author: string;
+  author_id: string;
+  avatar: string;
+  bot: boolean;
+  created_at: number;
+  content: string;
+  attachments: { filename: string; url: string; image: boolean }[];
+  embeds: { title: string; description: string; fields: [string, string][] }[];
+}
+
+export interface Transcript {
+  channel_name: string;
+  created_at: number;
+  messages: TranscriptMessage[];
+  notes: { author: string; author_id: string; text: string; created_at: number }[];
+}

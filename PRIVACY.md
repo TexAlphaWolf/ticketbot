@@ -73,6 +73,11 @@ recorded, to count the tickets avoided. Who pressed it is not recorded.
 **Ratings**: the score from 1 to 5 and the optional comment the user gives after a
 ticket is closed.
 
+**Transcripts in the database**: when a ticket is closed, its conversation (messages,
+names and avatars of the authors, attachment links, embeds and the staff notes) is also
+saved in the database, encrypted, so the staff can read it in the web dashboard. It is
+deleted with the ticket's data (see section 5).
+
 **Transcript references**: channel ID, message ID, priority and closing date of the
 transcripts posted in the log channel, used to delete them automatically.
 
@@ -137,6 +142,13 @@ Discord and Telegram process this data under their own privacy policies.
 - **Blocks** are deleted when they end or when the staff removes them with `/block remove`.
 - **Web dashboard logins** last 7 days by default (`WEB_SESSION_DAYS`) and are deleted
   when they end or at logout; at logout the Discord token is also revoked.
+- **Transcripts in the database** are deleted together with the ticket: after 365 days,
+  when the bot is removed from the server, or at once when an admin deletes the ticket
+  from the dashboard or deletes its transcript from the archive channel. If the person
+  running the bot sets `LEGAL_HOLD_DAYS` (default 0, off), a hidden, encrypted copy of
+  the transcript is kept for that many days after the deletion, for legal reasons only:
+  it isn't shown in the dashboard, can only be read from the server's command line, and
+  every read is recorded in the audit log.
 - **Telegram verification codes** are kept in memory only, for up to 10 minutes.
 
 ## 6. Security

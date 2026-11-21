@@ -49,7 +49,7 @@ from .tickets import (
     escalate,
 )
 from .translator import CommandTranslator
-from .web_commands import CommandError, run_web_command
+from .web_commands import CommandError, delete_transcript_messages, run_web_command
 
 
 class TicketBot(discord.Client):
@@ -111,7 +111,7 @@ class TicketBot(discord.Client):
         current = {g.id for g in self.guilds}
         for guild_id in await self.db.guild_ids():
             if guild_id not in current:
-                await self.db.delete_guild(guild_id)
+                await self.db.delete_guild(guild_id, self.settings.legal_hold_days)
                 await self.db.audit(None, None, "guild.removed", source="system",
                                     target=f"guild:{guild_id}")
                 self.pending_links.pop(guild_id, None)
@@ -145,9 +145,38 @@ class TicketBot(discord.Client):
     async def on_raw_thread_delete(self, payload: discord.RawThreadDeleteEvent):
         await self.on_guild_channel_delete(discord.Object(payload.thread_id))
 
+    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
+        await self.archive_messages_deleted(payload.guild_id, payload.channel_id,
+                                            [payload.message_id])
+
+    async def on_raw_bulk_message_delete(self, payload: discord.RawBulkMessageDeleteEvent):
+        await self.archive_messages_deleted(payload.guild_id, payload.channel_id,
+                                            list(payload.message_ids))
+
+    async def archive_messages_deleted(self, guild_id: int | None, channel_id: int,
+                                       message_ids: list[int]) -> int:
+        """A transcript deleted from the archive channel deletes its ticket everywhere:
+        dashboard, statistics, the log copy (a hidden copy stays for LEGAL_HOLD_DAYS)."""
+        cfg = await self.db.get_guild(guild_id) if guild_id else None
+        if not cfg or cfg.get("archive_channel") != channel_id:
+            return 0
+        deleted = 0
+        for message_id in message_ids:
+            transcript = await self.db.transcript_by_archive_message(message_id)
+            if transcript is None or transcript["ticket_id"] is None:
+                continue
+            removed = await self.db.delete_ticket(transcript["ticket_id"],
+                                                  self.settings.legal_hold_days)
+            await self.db.audit(guild_id, None, "ticket.delete", source="discord",
+                                target=f"ticket:{transcript['ticket_id']}",
+                                details={"why": "transcript deleted from the archive"})
+            await delete_transcript_messages(self, guild_id, removed, keep=message_id)
+            deleted += 1
+        return deleted
+
     async def on_guild_remove(self, guild: discord.Guild):
         # The bot was removed from a server: delete all the data stored for it
-        if await self.db.delete_guild(guild.id):
+        if await self.db.delete_guild(guild.id, self.settings.legal_hold_days):
             await self.db.audit(None, None, "guild.removed", source="system",
                                 target=f"guild:{guild.id}")
             print(f"Removed from {guild.name}: server data deleted")
@@ -284,7 +313,9 @@ class TicketBot(discord.Client):
         await self.db.purge_faq_results_before(now - config.STATS_KEEP_DAYS * 86400)
         await self.db.purge_web_sessions(now)
         await self.db.purge_finished_commands(now - config.COMMANDS_KEEP_DAYS * 86400)
-        purged = await self.db.purge_closed_before(now - config.STATS_KEEP_DAYS * 86400)
+        await self.db.purge_held_transcripts(now)
+        purged = await self.db.purge_closed_before(now - config.STATS_KEEP_DAYS * 86400,
+                                                   self.settings.legal_hold_days)
         if purged:
             print(f"Purged {purged} old closed ticket(s)")
 

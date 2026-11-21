@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { api, channelUrl, type TicketDetail } from "../api";
 import { TicketActions } from "../components/TicketActions";
+import { DeleteTicket, TranscriptView } from "../components/TranscriptView";
 import { Card, DiscordText, ErrorBox, Loading, PersonChip, PriorityLabel, StatusBadge } from "../components/ui";
 import { dateTime, duration } from "../format";
 import { useI18n } from "../i18n";
@@ -64,6 +65,7 @@ export function Ticket() {
             )}
           </Card>
           {open && <TicketActions guildId={guildId} ticket={d} levels={levels} part="main" />}
+          {d.status === "closed" && <TranscriptView guildId={guildId} ticketId={d.id} available={d.has_transcript} />}
           <Card title={t("ticket.notes")}>
             {d.notes.length === 0 ? (
               <p className="muted">{t("ticket.no_notes")}</p>
@@ -129,6 +131,7 @@ export function Ticket() {
             </dl>
           </Card>
           {open && <TicketActions guildId={guildId} ticket={d} levels={levels} part="side" />}
+          {d.status === "closed" && guild.data?.role === "admin" && <DeleteTicket guildId={guildId} ticketId={d.id} />}
         </aside>
       </div>
     </>

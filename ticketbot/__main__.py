@@ -12,6 +12,7 @@ Start the bot or the web dashboard, or manage the database:
     python -m ticketbot db copy <url>      copy all the data to another (empty) database
     python -m ticketbot db encrypt         encrypt with the current key (after a key change)
     python -m ticketbot keygen             make a new ENCRYPTION_KEY
+    python -m ticketbot held [id]          hidden transcripts of deleted tickets
 """
 
 import argparse
@@ -44,6 +45,10 @@ def main(argv: list[str] | None = None) -> int:
     db_sub.add_parser("encrypt", help="encrypt everything with the current ENCRYPTION_KEY "
                                       "(after changing it; the bot also does it at start)")
     sub.add_parser("keygen", help="make a new random ENCRYPTION_KEY for the .env file")
+    held = sub.add_parser("held", help="transcripts of deleted tickets kept for "
+                                       "LEGAL_HOLD_DAYS: list them, or save one as HTML")
+    held.add_argument("id", nargs="?", type=int, help="number of the transcript to save")
+    held.add_argument("--out", help="file to write (default: held-<id>.html)")
     args = parser.parse_args(argv)
 
     if args.command == "keygen":
@@ -78,6 +83,13 @@ def main(argv: list[str] | None = None) -> int:
         except KeyboardInterrupt:
             pass
         return 0
+
+    if args.command == "held":
+        try:
+            return asyncio.run(held_command(args, settings))
+        except SettingsError as e:
+            print(e)
+            return 2
 
     if args.command == "settings":
         width = max(len(name) for name, _ in settings.summary())
@@ -164,6 +176,45 @@ def confirm_copy(args, settings) -> bool:
         return True
     print("Copy cancelled.")
     return False
+
+
+async def held_command(args, settings) -> int:
+    """Hidden copies of deleted tickets' transcripts: only here, never in the dashboard.
+    Every copy saved to a file is recorded in the audit log."""
+    from datetime import UTC, datetime
+    from pathlib import Path
+
+    from .core.i18n import t
+    from .core.transcripts import load_transcript, render_html
+    from .web.database import open_web_store
+
+    store = await open_web_store(settings)
+    try:
+        if args.id is None:
+            rows = await store.held_transcripts()
+            if not rows:
+                print("No hidden transcripts.")
+            for r in rows:
+                until = datetime.fromtimestamp(r["held_until"], UTC).strftime("%Y-%m-%d")
+                made = datetime.fromtimestamp(r["created_at"], UTC).strftime("%Y-%m-%d")
+                print(f"{r['id']:>6}  server {r['guild_id']}  #{r['channel_name']}  "
+                      f"closed {made}  kept until {until}")
+            return 0
+        found = await store.get_transcript(args.id)
+        if found is None or found["held_until"] is None:
+            print(f"No hidden transcript number {args.id}.")
+            return 1
+        meta, messages, notes = load_transcript(found["content"])
+        page = render_html(meta, messages, notes, lambda key, /, **kw: t("en", key, **kw))
+        out = Path(args.out or f"held-{args.id}.html")
+        out.write_bytes(page)
+        await store.audit(found["guild_id"], None, "transcript.held_export", source="cli",
+                          target=f"transcript:{args.id}")
+        print(f"Saved to {out} (recorded in the audit log). It holds personal data: "
+              "delete the file when you don't need it anymore.")
+        return 0
+    finally:
+        await store.close()
 
 
 async def database_command(args, settings) -> int:
