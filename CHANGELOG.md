@@ -1,6 +1,37 @@
 # Changelog
 
-## [Unreleased] - V3 Beta3
+## [3.0.0-beta.3] - 2026-11-22
+
+Third beta of TicketBot V3: the web dashboard. Staff and admins handle tickets, read
+the statistics and manage the server from the browser, with live updates; every member
+can open a ticket from the browser and read the conversation of their closed tickets.
+Transcripts are now kept in the database, and deleting one deletes the ticket
+everywhere. Docker starts the bot and the dashboard together. The bot works exactly as
+before without the dashboard. Test it on a test server before using it in production.
+
+### Upgrading from 3.0.0-beta.2
+1. Stop the bot and make a backup: `python -m ticketbot backup` (SQLite)
+2. Update the files and the packages: `python -m pip install -r requirements.txt`
+   (new: FastAPI and uvicorn for the web server)
+3. Start the bot: it makes another backup and applies the migrations 0007 to 0009
+   (`[database] migrated from 0006 to 0009`)
+4. Optional, for the dashboard:
+   - in the [Developer Portal](https://discord.com/developers/applications), open the
+     bot's application → **OAuth2**, copy the Client ID and the Client Secret into
+     `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` in `.env` and add the redirect
+     `http://127.0.0.1:8080/api/v1/auth/callback` (`python -m ticketbot settings` shows
+     the one to use)
+   - build it once with Node.js 22.22 or newer: `cd frontend`, `npm ci`, `npm run build`
+   - start it next to the bot: `python -m ticketbot web` (http://127.0.0.1:8080)
+5. Optional: `LEGAL_HOLD_DAYS` in `.env` keeps a hidden copy of the transcripts of
+   deleted tickets for that many days (default 0: deleted at once)
+
+With Docker: `git pull` and `docker compose up -d --build`. The dashboard is built inside
+the image and starts with the bot (container `ticketbot-web`); only the Developer Portal
+step above is needed.
+
+Upgrading from 3.0.0-beta.1 or 2.3: follow the steps of the older versions below first,
+the bot applies all the migrations at once.
 
 ### Added
 - **Web API (base)**: `python -m ticketbot web` starts a FastAPI server next to the bot

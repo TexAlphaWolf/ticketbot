@@ -238,7 +238,7 @@ Every notification shows the server name, and each server only sends its own tic
 > Whoever hosts the bot technically has access to the data of every server it is in.
 > If you want full control over your tickets, host your own instance.
 
-## Web dashboard (in development)
+## Web dashboard (beta)
 
 TicketBot 3 has a web dashboard: a React app (in `frontend/`) on a REST API (FastAPI).
 Start it next to the bot, on the same database. The dashboard is built once with
