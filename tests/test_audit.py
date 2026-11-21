@@ -73,7 +73,7 @@ class FakeGuild:
 def test_web_commands_run_on_discord(tmp_path, monkeypatch):
     import discord
 
-    from ticketbot.bot import client as client_module
+    from ticketbot.bot import web_commands
     from ticketbot.bot.client import TicketBot
 
     class Member(SimpleNamespace):
@@ -93,8 +93,8 @@ def test_web_commands_run_on_discord(tmp_path, monkeypatch):
     async def fake_refresh(bot, g, cfg):
         refreshed.append(g.id)
 
-    monkeypatch.setattr(client_module, "close_ticket", fake_close)
-    monkeypatch.setattr(client_module, "refresh_panel", fake_refresh)
+    monkeypatch.setattr(web_commands, "close_ticket", fake_close)
+    monkeypatch.setattr(web_commands, "refresh_panel", fake_refresh)
 
     async def scenario():
         store = await new_store(tmp_path / "ticketbot.db")
@@ -114,7 +114,7 @@ def test_web_commands_run_on_discord(tmp_path, monkeypatch):
         await bot.web_commands.coro(bot)
         results = [await store.get_command(i) for i in ids]
         assert [r["status"] for r in results] == ["done", "failed", "done", "failed"]
-        assert "only staff" in results[1]["result"]
+        assert results[1]["result"] == "you are not staff for this ticket anymore"
         assert "unknown command" in results[3]["result"]
         assert closed == [(tid, 10, "Solved", "web")]
         assert refreshed == [1]

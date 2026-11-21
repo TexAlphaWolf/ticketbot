@@ -582,45 +582,71 @@ async def apply_priority(interaction: discord.Interaction, level: str, claim: bo
     if ctx is None:
         return
     cfg, _, ticket = ctx
-    client = interaction.client
-    db = client.db
     if claim and ticket.get("claimed_by"):
         await interaction.response.edit_message(
             content=_("claim.already", user=f"<@{ticket['claimed_by']}>"), view=None
         )
         return
-
-    previous = ticket.get("priority")
-    changes = {"priority": level}
     if claim:
-        changes.update(claimed_by=interaction.user.id, status=config.STATUS_IN_PROGRESS)
-        if not ticket.get("first_response_at"):
-            changes["first_response_at"] = time.time()
-    await db.update_ticket(ticket["id"], **changes)
-    ticket.update(changes)
-    await audit(interaction, "ticket.claim" if claim else "ticket.priority",
-                f"ticket:{ticket['id']}", priority=level, previous=None if claim else previous)
-
-    label = priority_label(_, level)
-    if claim:
-        await interaction.response.edit_message(content=_("claim.done", priority=label),
-                                                view=None)
-        await refresh_controls(interaction.channel, ticket, _)
-        await interaction.channel.send(
-            _("claim.public", user=interaction.user.mention, priority=label)
-        )
+        async def answer():
+            await interaction.response.edit_message(
+                content=_("claim.done", priority=priority_label(_, level)), view=None)
+        await claim_ticket(interaction.client, interaction.channel, ticket, cfg,
+                           interaction.user, level, respond=answer)
     else:
-        await interaction.response.send_message(_(
-            "priority.changed", old=priority_label(_, previous), new=label,
-            user=interaction.user.mention,
-        ))
+        await change_priority(interaction.client, interaction.channel, ticket, cfg,
+                              interaction.user, level,
+                              respond=lambda text: interaction.response.send_message(text))
 
+
+async def claim_ticket(client, channel, ticket: dict, cfg: dict, member: discord.Member,
+                       level: str, *, source: str = "discord", respond=None) -> None:
+    """`member` takes the ticket with a priority. `respond` (Discord) answers the
+    interaction right after the database is updated, before the slower calls."""
+    _ = translator(cfg)
+    changes = {"priority": level, "claimed_by": member.id,
+               "status": config.STATUS_IN_PROGRESS}
+    if not ticket.get("first_response_at"):
+        changes["first_response_at"] = time.time()
+    previous = ticket.get("priority")
+    await client.db.update_ticket(ticket["id"], **changes)
+    ticket.update(changes)
+    await client.db.audit(channel.guild.id, member.id, "ticket.claim", source=source,
+                          target=f"ticket:{ticket['id']}", details={"priority": level})
+    if respond is not None:
+        await respond()
+    await refresh_controls(channel, ticket, _)
+    await channel.send(_("claim.public", user=member.mention,
+                         priority=priority_label(_, level)))
+    await notify_high_priority(client, cfg, channel, ticket, member, level, previous)
+
+
+async def change_priority(client, channel, ticket: dict, cfg: dict, member: discord.Member,
+                          level: str, *, source: str = "discord", respond=None) -> None:
+    """`respond(text)` sends the announcement as the interaction's answer; without it,
+    the bot posts it in the ticket."""
+    _ = translator(cfg)
+    previous = ticket.get("priority")
+    await client.db.update_ticket(ticket["id"], priority=level)
+    ticket["priority"] = level
+    await client.db.audit(channel.guild.id, member.id, "ticket.priority", source=source,
+                          target=f"ticket:{ticket['id']}",
+                          details={"priority": level, **({"previous": previous}
+                                                         if previous else {})})
+    text = _("priority.changed", old=priority_label(_, previous),
+             new=priority_label(_, level), user=member.mention)
+    await (respond(text) if respond is not None else channel.send(text))
+    await notify_high_priority(client, cfg, channel, ticket, member, level, previous)
+
+
+async def notify_high_priority(client, cfg: dict, channel, ticket: dict, member, level: str,
+                               previous: str | None) -> None:
     if is_kept(level) and not is_kept(previous):
+        _ = translator(cfg)
         await telegram_notify(client, cfg, _(
-            "tg.high", guild=esc(interaction.guild.name), channel=esc(interaction.channel.name),
+            "tg.high", guild=esc(channel.guild.name), channel=esc(channel.name),
             type=esc(type_label(ticket)), subject=esc(ticket.get("subject") or "-"),
-            user=esc(interaction.user),
-            url=channel_url(interaction.guild.id, interaction.channel.id),
+            user=esc(member), url=channel_url(channel.guild.id, channel.id),
         ))
 
 
@@ -638,16 +664,26 @@ async def transfer_ticket(interaction: discord.Interaction, member: discord.Memb
         await interaction.response.send_message(_("transfer.same", user=member.mention),
                                                 ephemeral=True)
         return
+    await move_ticket(interaction.client, interaction.channel, ticket, cfg, member,
+                      interaction.user,
+                      respond=lambda text: interaction.response.send_message(text))
+
+
+async def move_ticket(client, channel, ticket: dict, cfg: dict, member: discord.Member,
+                      by: discord.abc.User, *, source: str = "discord",
+                      respond=None) -> None:
+    """Give the ticket to another staff member (checked by the caller)."""
+    _ = translator(cfg)
     changes = {"claimed_by": member.id}
     if ticket["status"] == config.STATUS_WAITING:
         changes["status"] = config.STATUS_IN_PROGRESS
-    await interaction.client.db.update_ticket(ticket["id"], **changes)
+    await client.db.update_ticket(ticket["id"], **changes)
     ticket.update(changes)
-    await audit(interaction, "ticket.transfer", f"ticket:{ticket['id']}", to=member.id)
-    await interaction.response.send_message(
-        _("transfer.done", user=member.mention, by=interaction.user.mention)
-    )
-    await refresh_controls(interaction.channel, ticket, _)
+    await client.db.audit(channel.guild.id, by.id, "ticket.transfer", source=source,
+                          target=f"ticket:{ticket['id']}", details={"to": member.id})
+    text = _("transfer.done", user=member.mention, by=by.mention)
+    await (respond(text) if respond is not None else channel.send(text))
+    await refresh_controls(channel, ticket, _)
 
 
 # --------------------------------------------------------------- closing ---

@@ -34,7 +34,6 @@ from .common import (
     channel_url,
     esc,
     is_staff,
-    is_ticket_staff,
     priority_label,
     staff_mentions,
     telegram_notify,
@@ -48,11 +47,9 @@ from .tickets import (
     TicketPanel,
     close_ticket,
     escalate,
-    refresh_guidelines,
-    refresh_panel,
-    ticket_roles,
 )
 from .translator import CommandTranslator
+from .web_commands import CommandError, run_web_command
 
 
 class TicketBot(discord.Client):
@@ -298,41 +295,18 @@ class TicketBot(discord.Client):
         for command in await self.db.take_commands():
             try:
                 result = await self.run_web_command(command)
+            except CommandError as e:
+                await self.db.finish_command(command["id"], False, str(e))
             except Exception as e:  # noqa: BLE001 - one failed command must not stop the loop
+                logging.getLogger(__name__).exception("Web command %s failed",
+                                                      command["kind"])
                 await self.db.finish_command(command["id"], False, f"{type(e).__name__}: {e}")
             else:
                 await self.db.finish_command(command["id"], True, result)
 
     async def run_web_command(self, command: dict) -> str:
         """Carry out an action asked from the web dashboard. Returns a short result."""
-        guild = self.get_guild(command["guild_id"])
-        cfg = await self.db.get_guild(command["guild_id"])
-        if guild is None or cfg is None:
-            raise RuntimeError("the bot is not in this server anymore")
-        payload, kind = command["payload"], command["kind"]
-        if kind == "panel.refresh":
-            await refresh_panel(self, guild, cfg)
-        elif kind == "guidelines.refresh":
-            await refresh_guidelines(guild, cfg)
-        elif kind == "ticket.close":
-            ticket = await self.db.get_ticket(int(payload["ticket_id"]))
-            if ticket is None or ticket["guild_id"] != guild.id:
-                raise RuntimeError("ticket not found")
-            if ticket["status"] == config.STATUS_CLOSED or ticket["channel_deleted"]:
-                return "already closed"
-            channel = await ticket_channel(guild, ticket)
-            if channel is None:
-                raise RuntimeError("the ticket channel doesn't exist anymore")
-            member = guild.get_member(command["requested_by"])
-            if member is None:
-                member = await guild.fetch_member(command["requested_by"])
-            if not is_ticket_staff(member, cfg, *await ticket_roles(self.db, ticket)):
-                raise RuntimeError("only staff members can close tickets")
-            reason = (payload.get("reason") or "").strip() or translator(cfg)("close.reason_staff")
-            await close_ticket(self, channel, ticket, member, reason[:500], source="web")
-        else:
-            raise RuntimeError(f"unknown command {kind!r}")
-        return "ok"
+        return await run_web_command(self, command)
 
     @maintenance.before_loop
     @hourly_cleanup.before_loop

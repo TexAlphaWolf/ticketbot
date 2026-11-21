@@ -236,6 +236,11 @@ python -m ticketbot web        # http://127.0.0.1:8080
   roles of their own, a type's roles that type, an escalation role the tickets
   escalated to its level. The web reads the roles with the bot's token
   (`DISCORD_TOKEN`), so it must be in the same `.env`
+- **Ticket actions**: `POST .../tickets/{n}/claim`, `priority`, `transfer`,
+  `escalate`, `messages` (an answer posted by the bot with your name) and `close` are
+  queued and carried out by the bot within a few seconds; `GET .../commands/{id}` tells
+  how they went. `.../notes` saves a private note at once. The bot checks your roles
+  again before acting, so the bot must be running
 - `/api/docs` is the interactive documentation of the API (`WEB_API_DOCS=false` turns
   it off)
 - The web dashboard never changes the database schema: start the bot first after an
@@ -357,6 +362,7 @@ ticketbot/
 │   ├── client.py        # Discord client, events and background tasks
 │   ├── commands.py      # slash commands
 │   ├── tickets.py       # panel, opening, claiming, closing, reopening, ratings
+│   ├── web_commands.py  # actions asked from the web dashboard
 │   ├── collect.py       # reads a ticket's messages for the transcripts
 │   ├── translator.py    # slash command translations
 │   └── common.py        # helpers shared by the bot modules
@@ -365,6 +371,7 @@ ticketbot/
 │   ├── api/v1.py        # REST API, version 1
 │   ├── api/auth.py      # login with Discord and logout
 │   ├── api/guilds.py    # servers, tickets and statistics
+│   ├── api/actions.py   # actions on tickets (queued for the bot)
 │   ├── permissions.py   # who may see what (the same rules as the bot)
 │   ├── cache.py         # short in-memory cache of Discord's answers
 │   ├── sessions.py      # login cookies, current user, CSRF protection

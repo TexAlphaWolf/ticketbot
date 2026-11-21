@@ -157,6 +157,22 @@ async def member(request: Request, guild_id: int, user_id: int) -> dict | None:
     return found or None
 
 
+async def user_profile(request: Request, user_id: int) -> dict | None:
+    """{"user": ...} like a member, for someone who isn't in the server."""
+    cache = request.app.state.members_cache
+    key = ("user", user_id)
+    found = cache.get(key)
+    if found is None:
+        try:
+            user = await request.app.state.discord.user(user_id)
+        except DiscordError:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY,
+                                "Discord can't be reached") from None
+        found = {"user": user} if user else {}
+        cache.set(key, found)
+    return found or None
+
+
 async def load_access(request: Request, session: dict, guild_id: int,
                       oauth_guild: dict) -> Access:
     store = request.app.state.store
@@ -195,7 +211,9 @@ async def people(request: Request, guild_id: int, ids: set[int]) -> dict[str, Pe
     async def one(user_id: int):
         async with sem:
             try:
-                return user_id, await member(request, guild_id, user_id)
+                found = await member(request, guild_id, user_id)
+                # Not in the server anymore (e.g. left after the ticket): their profile
+                return user_id, found or await user_profile(request, user_id)
             except HTTPException:
                 return user_id, None
 

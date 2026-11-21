@@ -61,6 +61,11 @@ viewing another member's tickets...): the server ID, the Discord user ID of who 
 it was about (e.g. a ticket number) and when. Details such as a closing or escalation
 reason are encrypted. For actions from the web dashboard, the IP address is recorded, encrypted.
 
+**Actions from the web dashboard**: what a staff member asks from the dashboard (e.g.
+close a ticket with a reason, answer in a ticket) waits in a queue until the bot carries
+it out: who asked it, the server, the action and its content (encrypted), and how it
+went. Finished actions are deleted after 30 days.
+
 **FAQ**: when a member reads the FAQ before opening a ticket and presses *It's solved*
 or *Open a ticket anyway*, only the server, the ticket type, which button and when are
 recorded, to count the tickets avoided. Who pressed it is not recorded.

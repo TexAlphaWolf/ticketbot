@@ -31,6 +31,19 @@
   cached for a minute and the Discord login is renewed by itself. Opening someone
   else's ticket is recorded in the audit log. The login also checks that the answer
   comes from Discord (`iss`)
+- **Ticket actions from the web**: claim with a priority, change the priority,
+  transfer, escalate, answer in the ticket and close (`POST /api/v1/guilds/{id}/tickets/
+  {n}/...`). They go in the queue and the bot carries them out within a few seconds,
+  after checking the member's roles again; `GET /api/v1/guilds/{id}/commands/{n}` gives
+  the result (done, or failed with the reason). Answers from the dashboard are posted
+  by the bot with the staff member's name and avatar and count as a staff reply
+  (first response, reminders, auto-close). Private notes are saved at once. Every
+  action is recorded in the audit log with source `web`
+- The names in the web API also cover members who left the server (from their Discord
+  profile)
+- Claiming, priority changes and transfers are shared by Discord and the web
+  (`claim_ticket`, `change_priority`, `move_ticket`); the web actions moved to
+  `bot/web_commands.py`
 - `requirements-dev.txt` with the tools for the tests (pytest, httpx2, ruff)
 
 ## [3.0.0-beta.2] - 2026-11-21

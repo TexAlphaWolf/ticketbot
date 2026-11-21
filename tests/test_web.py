@@ -170,6 +170,12 @@ class FakeDiscord:
         self.calls += 1
         return self.guilds
 
+    async def user(self, user_id):
+        if user_id in getattr(self, "former_members", ()):
+            return {"id": str(user_id), "username": f"gone{user_id}", "global_name": None,
+                    "avatar": "a1"}
+        return None
+
     async def member(self, guild_id, user_id):
         roles = self.members.get((guild_id, user_id))
         if roles is None:

@@ -72,6 +72,7 @@ STRINGS["en"] = {
         "New tickets of this type are shown only to their roles and to the admins.",
     "roles.exists": "{role} already handles the {type} tickets.",
     "roles.removed": "🗑️ {role} no longer handles the {type} tickets.",
+    "web.message_footer": "Sent from the web dashboard",
     "faq.title": "💡 Before you open a ticket · {type}",
     "faq.intro": "These answers solve many requests. If none of them helps, open a ticket "
         "and the staff will answer you.",
@@ -504,6 +505,7 @@ STRINGS["it"] = {
         "I nuovi ticket di questo tipo vengono mostrati solo ai suoi ruoli e agli admin.",
     "roles.exists": "{role} gestisce già i ticket {type}.",
     "roles.removed": "🗑️ {role} non gestisce più i ticket {type}.",
+    "web.message_footer": "Inviato dalla dashboard web",
     "faq.title": "💡 Prima di aprire un ticket · {type}",
     "faq.intro": "Queste risposte risolvono molte richieste. Se nessuna ti aiuta, apri un "
         "ticket e lo staff ti risponderà.",
@@ -935,6 +937,7 @@ STRINGS["de"] = {
         "Neue Tickets dieser Art sehen nur ihre Rollen und die Admins.",
     "roles.exists": "{role} bearbeitet die {type}-Tickets bereits.",
     "roles.removed": "🗑️ {role} bearbeitet die {type}-Tickets nicht mehr.",
+    "web.message_footer": "Über das Web-Dashboard gesendet",
     "faq.title": "💡 Bevor du ein Ticket öffnest · {type}",
     "faq.intro": "Diese Antworten lösen viele Anfragen. Wenn keine hilft, öffne ein Ticket "
         "und das Team antwortet dir.",

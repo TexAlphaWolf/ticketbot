@@ -240,3 +240,90 @@ def test_roles_and_admin():
     assert is_admin({"owner": True, "permissions": "0"})
     assert is_admin({"owner": False, "permissions": str(1 << 3 | 1 << 5)})
     assert not is_admin({"owner": False, "permissions": str(1 << 5)})   # Manage Server
+
+
+# ------------------------------------------------------------ actions ----
+
+def csrf(c):
+    return {"X-CSRF-Token": c.get("/api/v1/auth/me").json()["csrf_token"]}
+
+
+def commands(c):
+    conn = sqlite3.connect(c.db_path)
+    try:
+        return conn.execute("SELECT kind, requested_by, status FROM bot_commands "
+                            "ORDER BY id").fetchall()
+    finally:
+        conn.close()
+
+
+def test_actions_are_queued_for_the_bot(api):
+    as_user(api, STAFF)
+    h = csrf(api)
+    base = f"/api/v1/guilds/{GUILD}/tickets/2"
+    assert api.post(base + "/close", json={"reason": "Solved"}).status_code == 403  # no CSRF
+    r = api.post(base + "/close", json={"reason": "Solved"}, headers=h)
+    assert r.status_code == 202 and r.json()["status"] == "pending"
+    command_id = r.json()["command_id"]
+    for path, body in (("/claim", {"priority": "high"}), ("/priority", {"priority": "low"}),
+                       ("/transfer", {"member_id": "123456789012345678"}),
+                       ("/escalate", {"reason": "Refund"}), ("/messages", {"text": " Hi "})):
+        assert api.post(base + path, json=body, headers=h).status_code == 202, path
+    assert commands(api) == [(k, STAFF, "pending") for k in (
+        "ticket.close", "ticket.claim", "ticket.priority", "ticket.transfer",
+        "ticket.escalate", "ticket.message")]
+    conn = sqlite3.connect(api.db_path)
+    payloads = conn.execute("SELECT payload FROM bot_commands").fetchall()
+    conn.close()
+    assert all(p[0].startswith("enc:v1:") for p in payloads)       # encrypted
+
+    s = api.get(f"/api/v1/guilds/{GUILD}/commands/{command_id}").json()
+    assert s["kind"] == "ticket.close" and s["status"] == "pending" and s["result"] is None
+    as_user(api, DEV)                       # someone else's command: not shown
+    assert api.get(f"/api/v1/guilds/{GUILD}/commands/{command_id}").status_code == 404
+    as_user(api, ADMIN, owner=True)         # admins see every command of the server
+    assert api.get(f"/api/v1/guilds/{GUILD}/commands/{command_id}").status_code == 200
+
+
+def test_actions_are_checked_before_queueing(api):
+    as_user(api, STAFF)
+    h = csrf(api)
+    t = f"/api/v1/guilds/{GUILD}/tickets"
+    assert api.post(f"{t}/1/close", json={}, headers=h).status_code == 404   # bug: not theirs
+    assert api.post(f"{t}/4/close", json={}, headers=h).status_code == 409   # closed
+    assert api.post(f"{t}/2/priority", json={"priority": "urgent"},
+                    headers=h).status_code == 422
+    assert api.post(f"{t}/2/messages", json={"text": "   "}, headers=h).status_code == 422
+    assert api.post(f"{t}/2/transfer", json={"member_id": "abc"}, headers=h).status_code \
+        == 422
+    assert api.post(f"{t}/2/escalate", json={"level": 2}, headers=h).status_code == 409
+    assert api.post(f"{t}/3/escalate", json={}, headers=h).status_code == 409  # at the top
+    as_user(api, ADMIN, owner=True)
+    h = csrf(api)
+    assert api.post(f"{t}/2/claim", json={"priority": "low"}, headers=h).status_code == 202
+    conn = sqlite3.connect(api.db_path)
+    with conn:
+        conn.execute("UPDATE tickets SET claimed_by = 9 WHERE id = 2")
+    conn.close()
+    assert api.post(f"{t}/2/claim", json={"priority": "low"}, headers=h).status_code == 409
+    assert [c[0] for c in commands(api)] == ["ticket.claim"]
+
+
+def test_notes_are_saved_at_once(api):
+    as_user(api, STAFF)
+    r = api.post(f"/api/v1/guilds/{GUILD}/tickets/3/notes",
+                 json={"text": "Waiting for the bank"}, headers=csrf(api))
+    assert r.status_code == 201 and r.json()["author_id"] == str(STAFF)
+    notes = api.get(f"/api/v1/guilds/{GUILD}/tickets/3").json()["notes"]
+    assert [n["text"] for n in notes] == ["Waiting for the bank"]
+    assert commands(api) == []
+
+
+def test_names_of_former_members(api):
+    api.discord.former_members = {MEMBER}
+    del api.discord.members[(GUILD, MEMBER)]           # left the server
+    as_user(api, STAFF)
+    people = api.get(f"/api/v1/guilds/{GUILD}/tickets").json()["people"]
+    assert people[str(MEMBER)] == {
+        "name": f"gone{MEMBER}",
+        "avatar_url": f"https://cdn.discordapp.com/avatars/{MEMBER}/a1.png?size=128"}

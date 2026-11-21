@@ -112,6 +112,17 @@ class DiscordBot(DiscordOAuth):
                 return None
             raise
 
+    async def user(self, user_id: int) -> dict | None:
+        """A Discord user (name and avatar) who may not be in the server anymore."""
+        if self.bot_auth is None:
+            return None
+        try:
+            return await self._call("GET", f"/users/{user_id}", headers=self.bot_auth)
+        except DiscordError as e:
+            if e.status == 404:
+                return None
+            raise
+
 
 def guild_icon_url(guild_id: int, icon: str | None) -> str | None:
     return f"https://cdn.discordapp.com/icons/{guild_id}/{icon}.png?size=128" if icon else None
