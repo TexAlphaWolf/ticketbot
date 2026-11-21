@@ -47,6 +47,26 @@ class Settings(BaseSettings):
     backup_keep: int = Field(default=7, ge=0)        # 0 disables automatic backups
     backup_interval_hours: float = Field(default=24, gt=0)
 
+    # Web dashboard (python -m ticketbot web). By default only this computer can open it;
+    # to reach it from outside, put it behind HTTPS (e.g. a tunnel or a reverse proxy).
+    web_host: str = "127.0.0.1"
+    web_port: int = Field(default=8080, ge=1, le=65535)
+    web_public_url: str | None = None              # e.g. https://tickets.example.com
+    web_api_docs: bool = True                      # interactive API docs at /api/docs
+    web_trusted_proxies: str = "127.0.0.1"         # who may set X-Forwarded-For/-Proto
+
+    @field_validator("web_public_url")
+    @classmethod
+    def _public_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip().rstrip("/")
+        scheme, sep, rest = value.partition("://")
+        if scheme not in ("http", "https") or not sep or not rest or "/" in rest:
+            raise ValueError("use the address of the dashboard only, e.g. "
+                             "https://tickets.example.com")
+        return value
+
     @field_validator("database_url")
     @classmethod
     def _supported_database(cls, value: SecretStr | None) -> SecretStr | None:
@@ -104,6 +124,10 @@ class Settings(BaseSettings):
         return Path(url.database)
 
     @property
+    def web_https(self) -> bool:
+        return bool(self.web_public_url and self.web_public_url.startswith("https://"))
+
+    @property
     def backups_path(self) -> Path:
         return self.backup_dir or self.data_dir / "backups"
 
@@ -143,6 +167,11 @@ class Settings(BaseSettings):
             ("BACKUP_DIR", str(self.backups_path)),
             ("BACKUP_KEEP", str(self.backup_keep)),
             ("BACKUP_INTERVAL_HOURS", f"{self.backup_interval_hours:g}"),
+            ("WEB_HOST", self.web_host),
+            ("WEB_PORT", str(self.web_port)),
+            ("WEB_PUBLIC_URL", self.web_public_url or "not set"),
+            ("WEB_API_DOCS", "on" if self.web_api_docs else "off"),
+            ("WEB_TRUSTED_PROXIES", self.web_trusted_proxies),
         ]
 
 

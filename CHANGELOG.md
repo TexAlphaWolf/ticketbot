@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased] - V3 Beta3
+
+### Added
+- **Web API (base)**: `python -m ticketbot web` starts a FastAPI server next to the bot
+  (by default only on this computer, `http://127.0.0.1:8080`), with
+  `GET /api/v1/health` and the interactive API documentation at `/api/docs`. It sends
+  strict security headers (Content Security Policy, no framing, no caching of the API,
+  HSTS when `WEB_PUBLIC_URL` is HTTPS) and never migrates the database: it asks to start
+  the bot first when the schema is older, and says so when the port is already in
+  use. New `WEB_*` settings in `.env.example`
+- `requirements-dev.txt` with the tools for the tests (pytest, httpx2, ruff)
+
 ## [3.0.0-beta.2] - 2026-11-21
 
 Second beta of TicketBot V3: the new ticket flow. Tickets can go to the right team for

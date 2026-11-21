@@ -1,8 +1,9 @@
 """
-Start the bot, or manage the database backups:
+Start the bot or the web dashboard, or manage the database:
 
     python -m ticketbot                    start the bot
     python -m ticketbot bot                start the bot (same as above)
+    python -m ticketbot web                start the web dashboard and API
     python -m ticketbot backup             make a backup now
     python -m ticketbot backups            list the backups
     python -m ticketbot restore <file>     restore a backup (stop the bot first)
@@ -26,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m ticketbot", description="TicketBot")
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("bot", help="start the Discord bot (default)")
+    sub.add_parser("web", help="start the web dashboard and API")
     sub.add_parser("backup", help="make a database backup now")
     sub.add_parser("backups", help="list the database backups")
     restore = sub.add_parser("restore", help="restore a backup (stop the bot first)")
@@ -64,6 +66,17 @@ def main(argv: list[str] | None = None) -> int:
         except SettingsError as e:
             print(e)
             return 2
+        return 0
+
+    if args.command == "web":
+        from .web.app import run as run_web
+        try:
+            run_web(settings)
+        except SettingsError as e:
+            print(e)
+            return 2
+        except KeyboardInterrupt:
+            pass
         return 0
 
     if args.command == "settings":

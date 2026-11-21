@@ -212,6 +212,24 @@ Every notification shows the server name, and each server only sends its own tic
 > Whoever hosts the bot technically has access to the data of every server it is in.
 > If you want full control over your tickets, host your own instance.
 
+## Web dashboard (in development)
+
+TicketBot 3 is getting a web dashboard with a REST API (FastAPI). For now it only has
+the base: start it next to the bot, on the same database.
+
+```bash
+python -m ticketbot web        # http://127.0.0.1:8080
+```
+
+- `GET /api/v1/health` tells whether the API and its database work
+- `/api/docs` is the interactive documentation of the API (`WEB_API_DOCS=false` turns
+  it off)
+- The web dashboard never changes the database schema: start the bot first after an
+  update, it makes a backup and applies the migrations
+- By default only the same computer can open it. To reach it from outside, set
+  `WEB_PUBLIC_URL` and put it behind HTTPS (a tunnel or a reverse proxy); see
+  `.env.example` for the `WEB_*` settings
+
 ## Running 24/7 (Linux)
 
 ```bash
@@ -328,15 +346,20 @@ ticketbot/
 │   ├── collect.py       # reads a ticket's messages for the transcripts
 │   ├── translator.py    # slash command translations
 │   └── common.py        # helpers shared by the bot modules
+├── web/
+│   ├── app.py           # FastAPI application and server
+│   ├── api/v1.py        # REST API, version 1
+│   ├── database.py      # opens the database (without migrating it)
+│   └── security.py      # HTTP security headers
 ├── integrations/
 │   └── telegram.py      # Telegram Bot API client
-└── __main__.py          # command line: bot, settings, db, backup, backups, restore
+└── __main__.py          # command line: bot, web, settings, db, backup, backups, restore
 ```
 
 ## Tests
 
 ```bash
-python -m pip install pytest ruff
+python -m pip install -r requirements-dev.txt
 python -m pytest     # unit tests
 ruff check .         # code style and common mistakes
 ```
