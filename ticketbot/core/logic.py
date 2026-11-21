@@ -218,6 +218,18 @@ def waiting_for_staff_since(ticket: dict) -> float | None:
             or ticket.get("opened_at"))
 
 
+def auto_escalation_level(ticket: dict, levels: list[dict], now: float) -> int | None:
+    """The highest level whose waiting time has passed without a staff reply, when it is
+    above the ticket's current level (None = nothing to do). Levels never go down."""
+    since = waiting_for_staff_since(ticket)
+    if since is None:
+        return None
+    due = [lv["level"] for lv in levels
+           if lv.get("after_hours") and now - since >= lv["after_hours"] * 3600]
+    target = max(due, default=0)
+    return target if target > (ticket.get("escalation_level") or 0) else None
+
+
 def staff_reply_hours(priority: str | None) -> int:
     hours = config.STAFF_REPLY_HOURS
     return hours.get(priority, hours[None])

@@ -31,6 +31,8 @@ BLOCK_REASON_LENGTH = 200
 # /block add durations (seconds, None = permanent)
 BLOCK_DURATIONS = {"1h": 3600, "1d": 86400, "7d": 7 * 86400, "30d": 30 * 86400,
                    "permanent": None}
+MAX_ESCALATION_LEVELS = 5      # /escalation add: levels above the normal staff
+MAX_ESCALATION_HOURS = 720.0    # auto escalation after at most 30 days
 MAX_REPLIES = 100              # quick replies per server
 MAX_REPLY_LENGTH = 1800        # leaves room for the signature (Discord: 2000)
 

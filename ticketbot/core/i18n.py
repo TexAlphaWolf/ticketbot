@@ -72,6 +72,34 @@ STRINGS["en"] = {
         "New tickets of this type are shown only to their roles and to the admins.",
     "roles.exists": "{role} already handles the {type} tickets.",
     "roles.removed": "🗑️ {role} no longer handles the {type} tickets.",
+    "escalation.automatic": "-# Escalated automatically: no staff reply in time.",
+    "escalation.by": "-# Escalated by {user}.",
+    "escalation.done": "⬆️ Ticket escalated to **level {level}**: {role} can now see and "
+        "handle it.",
+    "escalation.reason": "**Reason:** {reason}",
+    "escalation.log": "⬆️ {thread} was escalated to level {level}: {role}",
+    "escalation.none": "No escalation levels on this server yet. An admin can add them "
+        "with `/escalation add`.",
+    "escalation.top": "This ticket is already at the highest level ({top}).",
+    "escalation.no_level": "There is no level {level}: the highest is {top}.",
+    "escalation.already": "This ticket is already at level {level}.",
+    "escalation.sent": "⬆️ Ticket escalated to level {level}.",
+    "escalation.role_gone": "❌ The role of level {level} doesn't exist anymore. "
+        "An admin can fix the levels with `/escalation remove` and `/escalation add`.",
+    "escalation.title": "⬆️ Escalation levels ({count}/{max})",
+    "escalation.line": "**{level}.** {role}",
+    "escalation.after": "by itself after {hours} h without a staff reply",
+    "escalation.empty": "No levels yet: add the first one with `/escalation add`.",
+    "escalation.too_many": "You can have up to {max} escalation levels.",
+    "escalation.role_used": "{role} is already an escalation level.",
+    "escalation.hours_order": "A higher level must wait longer than the ones below it: "
+        "use more than {hours} hours.",
+    "escalation.added": "✅ Level {level} added: {role}. Staff can bring a ticket there "
+        "with `/escalate`.",
+    "escalation.added_auto": "Tickets reach it by themselves after {hours} h without a "
+        "staff reply.",
+    "escalation.not_there": "There is no level {level}.",
+    "escalation.removed": "🗑️ Level {level} removed; the levels above it moved down by one.",
     "roles.not_there": "{role} doesn't handle the {type} tickets.",
     "roles.back_to_staff": "No roles left: new tickets of this type go to {staff} again.",
     "roles.invalid": "❌ Choose a normal role (not @everyone or a bot's role).",
@@ -315,6 +343,8 @@ STRINGS["en"] = {
     "tg.high": "🔴 <b>High priority ticket</b> on <b>{guild}</b>\n#{channel} · {type}\n"
                "<b>Subject:</b> {subject}\n<b>Set by:</b> {user}\n"
                "<a href=\"{url}\">Open in Discord</a>",
+    "tg.escalated": "⬆️ <b>Ticket escalated</b> on <b>{guild}</b>\n#{channel} · "
+                    "level {level} · {role}\n<a href=\"{url}\">Open in Discord</a>",
     "tg.closed": "🔒 <b>Ticket closed</b> on <b>{guild}</b>\n#{channel} · {type} · {priority}\n"
                  "<b>Closed by:</b> {user}\n<b>Reason:</b> {reason}",
     "tg.rating": "⭐ <b>New rating</b> on <b>{guild}</b>\nTicket {ticket} · {stars}\n"
@@ -450,6 +480,35 @@ STRINGS["it"] = {
         "I nuovi ticket di questo tipo vengono mostrati solo ai suoi ruoli e agli admin.",
     "roles.exists": "{role} gestisce già i ticket {type}.",
     "roles.removed": "🗑️ {role} non gestisce più i ticket {type}.",
+    "escalation.automatic": "-# Escalation automatica: nessuna risposta dello staff in "
+        "tempo.",
+    "escalation.by": "-# Escalation fatta da {user}.",
+    "escalation.done": "⬆️ Ticket portato al **livello {level}**: ora {role} può vederlo "
+        "e gestirlo.",
+    "escalation.reason": "**Motivo:** {reason}",
+    "escalation.log": "⬆️ {thread} è passato al livello {level}: {role}",
+    "escalation.none": "Su questo server non ci sono ancora livelli di escalation. "
+        "Un admin può aggiungerli con `/escalation add`.",
+    "escalation.top": "Questo ticket è già al livello più alto ({top}).",
+    "escalation.no_level": "Il livello {level} non esiste: il più alto è il {top}.",
+    "escalation.already": "Questo ticket è già al livello {level}.",
+    "escalation.sent": "⬆️ Ticket portato al livello {level}.",
+    "escalation.role_gone": "❌ Il ruolo del livello {level} non esiste più. Un admin può "
+        "sistemare i livelli con `/escalation remove` e `/escalation add`.",
+    "escalation.title": "⬆️ Livelli di escalation ({count}/{max})",
+    "escalation.line": "**{level}.** {role}",
+    "escalation.after": "da solo dopo {hours} h senza risposta dello staff",
+    "escalation.empty": "Nessun livello: aggiungi il primo con `/escalation add`.",
+    "escalation.too_many": "Puoi avere al massimo {max} livelli di escalation.",
+    "escalation.role_used": "{role} è già un livello di escalation.",
+    "escalation.hours_order": "Un livello più alto deve aspettare più di quelli sotto: "
+        "usa più di {hours} ore.",
+    "escalation.added": "✅ Livello {level} aggiunto: {role}. Lo staff può portarci un "
+        "ticket con `/escalate`.",
+    "escalation.added_auto": "I ticket ci arrivano da soli dopo {hours} h senza risposta "
+        "dello staff.",
+    "escalation.not_there": "Il livello {level} non esiste.",
+    "escalation.removed": "🗑️ Livello {level} rimosso; quelli sopra sono scesi di uno.",
     "roles.not_there": "{role} non gestisce i ticket {type}.",
     "roles.back_to_staff": "Non ci sono più ruoli: i nuovi ticket di questo tipo tornano a "
         "{staff}.",
@@ -687,6 +746,8 @@ STRINGS["it"] = {
     "tg.high": "🔴 <b>Ticket ad alta priorità</b> su <b>{guild}</b>\n#{channel} · {type}\n"
                "<b>Oggetto:</b> {subject}\n<b>Impostata da:</b> {user}\n"
                "<a href=\"{url}\">Apri su Discord</a>",
+    "tg.escalated": "⬆️ <b>Escalation ticket</b> su <b>{guild}</b>\n#{channel} · "
+                    "livello {level} · {role}\n<a href=\"{url}\">Apri su Discord</a>",
     "tg.closed": "🔒 <b>Ticket chiuso</b> su <b>{guild}</b>\n#{channel} · {type} · {priority}\n"
                  "<b>Chiuso da:</b> {user}\n<b>Motivo:</b> {reason}",
     "tg.rating": "⭐ <b>Nuova valutazione</b> su <b>{guild}</b>\nTicket {ticket} · {stars}\n"
@@ -825,6 +886,36 @@ STRINGS["de"] = {
         "Neue Tickets dieser Art sehen nur ihre Rollen und die Admins.",
     "roles.exists": "{role} bearbeitet die {type}-Tickets bereits.",
     "roles.removed": "🗑️ {role} bearbeitet die {type}-Tickets nicht mehr.",
+    "escalation.automatic": "-# Automatisch eskaliert: keine rechtzeitige Antwort des "
+        "Teams.",
+    "escalation.by": "-# Eskaliert von {user}.",
+    "escalation.done": "⬆️ Ticket auf **Stufe {level}** eskaliert: {role} kann es jetzt "
+        "sehen und bearbeiten.",
+    "escalation.reason": "**Grund:** {reason}",
+    "escalation.log": "⬆️ {thread} wurde auf Stufe {level} eskaliert: {role}",
+    "escalation.none": "Auf diesem Server gibt es noch keine Eskalationsstufen. Ein Admin "
+        "kann sie mit `/escalation add` anlegen.",
+    "escalation.top": "Dieses Ticket ist schon auf der höchsten Stufe ({top}).",
+    "escalation.no_level": "Stufe {level} gibt es nicht: die höchste ist {top}.",
+    "escalation.already": "Dieses Ticket ist schon auf Stufe {level}.",
+    "escalation.sent": "⬆️ Ticket auf Stufe {level} eskaliert.",
+    "escalation.role_gone": "❌ Die Rolle der Stufe {level} gibt es nicht mehr. Ein Admin "
+        "kann die Stufen mit `/escalation remove` und `/escalation add` korrigieren.",
+    "escalation.title": "⬆️ Eskalationsstufen ({count}/{max})",
+    "escalation.line": "**{level}.** {role}",
+    "escalation.after": "von selbst nach {hours} Std. ohne Antwort des Teams",
+    "escalation.empty": "Noch keine Stufen: lege die erste mit `/escalation add` an.",
+    "escalation.too_many": "Du kannst höchstens {max} Eskalationsstufen haben.",
+    "escalation.role_used": "{role} ist schon eine Eskalationsstufe.",
+    "escalation.hours_order": "Eine höhere Stufe muss länger warten als die darunter: "
+        "nimm mehr als {hours} Stunden.",
+    "escalation.added": "✅ Stufe {level} angelegt: {role}. Das Team kann ein Ticket mit "
+        "`/escalate` dorthin bringen.",
+    "escalation.added_auto": "Tickets erreichen sie von selbst nach {hours} Std. ohne "
+        "Antwort des Teams.",
+    "escalation.not_there": "Stufe {level} gibt es nicht.",
+    "escalation.removed": "🗑️ Stufe {level} entfernt; die Stufen darüber rücken eins nach "
+        "unten.",
     "roles.not_there": "{role} bearbeitet die {type}-Tickets nicht.",
     "roles.back_to_staff": "Keine Rollen mehr: Neue Tickets dieser Art gehen wieder an "
         "{staff}.",
@@ -1071,6 +1162,8 @@ STRINGS["de"] = {
     "tg.high": "🔴 <b>Ticket mit hoher Priorität</b> auf <b>{guild}</b>\n#{channel} · {type}\n"
                "<b>Betreff:</b> {subject}\n<b>Gesetzt von:</b> {user}\n"
                "<a href=\"{url}\">In Discord öffnen</a>",
+    "tg.escalated": "⬆️ <b>Ticket eskaliert</b> auf <b>{guild}</b>\n#{channel} · "
+                    "Stufe {level} · {role}\n<a href=\"{url}\">In Discord öffnen</a>",
     "tg.closed": "🔒 <b>Ticket geschlossen</b> auf <b>{guild}</b>\n"
                  "#{channel} · {type} · {priority}\n"
                  "<b>Geschlossen von:</b> {user}\n<b>Grund:</b> {reason}",
@@ -1241,6 +1334,21 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Where new tickets are opened": "Dove vengono aperti i nuovi ticket",
         "Channels (one per ticket)": "Canali (uno per ticket)",
         "Private threads in the panel channel": "Thread privati nel canale del pannello",
+        "Bring this ticket to the next escalation level":
+            "Porta questo ticket al livello di escalation successivo",
+        "(Optional) Level to reach (default: the next one)":
+            "(Facoltativo) Livello da raggiungere (di base: il successivo)",
+        "(Optional) Why the ticket needs a higher level":
+            "(Facoltativo) Perché il ticket ha bisogno di un livello più alto",
+        "Escalation levels above the staff": "Livelli di escalation sopra lo staff",
+        "Show the escalation levels": "Mostra i livelli di escalation",
+        "Add the next escalation level": "Aggiungi il livello di escalation successivo",
+        "Role that takes over at this level": "Ruolo che subentra a questo livello",
+        "(Optional) Escalate by itself after these hours without a staff reply":
+            "(Facoltativo) Escalation automatica dopo queste ore senza risposta dello staff",
+        "Remove an escalation level": "Rimuovi un livello di escalation",
+        "Number of the level (see /escalation list)":
+            "Numero del livello (vedi /escalation list)",
         "Roles that handle the tickets of a type": "Ruoli che gestiscono i ticket di un tipo",
         "Let a role see and handle the tickets of a type":
             "Fai vedere e gestire a un ruolo i ticket di un tipo",
@@ -1401,6 +1509,21 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Where new tickets are opened": "Wo neue Tickets geöffnet werden",
         "Channels (one per ticket)": "Kanäle (einer pro Ticket)",
         "Private threads in the panel channel": "Private Threads im Panel-Kanal",
+        "Bring this ticket to the next escalation level":
+            "Dieses Ticket auf die nächste Eskalationsstufe bringen",
+        "(Optional) Level to reach (default: the next one)":
+            "(Optional) Zu erreichende Stufe (Standard: die nächste)",
+        "(Optional) Why the ticket needs a higher level":
+            "(Optional) Warum das Ticket eine höhere Stufe braucht",
+        "Escalation levels above the staff": "Eskalationsstufen über dem Team",
+        "Show the escalation levels": "Eskalationsstufen anzeigen",
+        "Add the next escalation level": "Die nächste Eskalationsstufe anlegen",
+        "Role that takes over at this level": "Rolle, die auf dieser Stufe übernimmt",
+        "(Optional) Escalate by itself after these hours without a staff reply":
+            "(Optional) Von selbst eskalieren nach so vielen Stunden ohne Antwort des Teams",
+        "Remove an escalation level": "Eine Eskalationsstufe entfernen",
+        "Number of the level (see /escalation list)":
+            "Nummer der Stufe (siehe /escalation list)",
         "Roles that handle the tickets of a type":
             "Rollen, die die Tickets einer Art bearbeiten",
         "Let a role see and handle the tickets of a type":

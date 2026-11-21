@@ -6,8 +6,7 @@ from types import SimpleNamespace
 
 import discord
 
-from ticketbot.bot.commands import missing_thread_permissions
-from ticketbot.bot.common import ticket_channel
+from ticketbot.bot.common import missing_thread_permissions, ticket_channel
 
 
 class Guild:

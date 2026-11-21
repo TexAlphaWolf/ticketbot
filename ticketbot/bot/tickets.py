@@ -25,6 +25,7 @@ from .common import (
     audit,
     channel_url,
     esc,
+    grant_thread_access,
     is_staff,
     is_ticket_staff,
     priority_label,
@@ -374,6 +375,52 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
 
 # ------------------------------------------------------- ticket controls ---
 
+async def escalate(client, guild: discord.Guild, channel, ticket: dict, cfg: dict,
+                   level: int, actor: discord.abc.User | None, reason: str | None,
+                   source: str = "discord") -> bool:
+    """Bring a ticket to an escalation level: its role gets access and is pinged.
+    `actor` None = automatic (the ticket waited too long). Returns False if the level's
+    role doesn't exist anymore."""
+    db = client.db
+    _ = translator(cfg)
+    found = [lv for lv in await db.escalation_levels(guild.id) if lv["level"] == level]
+    role = guild.get_role(found[0]["role_id"]) if found else None
+    if role is None:
+        return False
+
+    if isinstance(channel, discord.Thread):
+        panel = guild.get_channel(cfg.get("panel_channel") or 0)
+        if panel is not None:
+            await grant_thread_access(panel, [role])
+    else:
+        await channel.set_permissions(
+            role, view_channel=True, send_messages=True, attach_files=True,
+            read_message_history=True, manage_messages=True,
+            reason=f"Ticket escalated to level {level}")
+    await db.update_ticket(ticket["id"], escalation_level=level, escalated_at=time.time())
+    ticket.update(escalation_level=level)
+
+    text = _("escalation.done", level=level, role=role.mention)
+    if reason:
+        text += "\n" + _("escalation.reason", reason=reason)
+    text += "\n" + (_("escalation.by", user=actor.mention) if actor
+                    else _("escalation.automatic"))
+    mentions = discord.AllowedMentions(roles=[role], users=False)
+    await channel.send(text, allowed_mentions=mentions)
+    if isinstance(channel, discord.Thread):     # role mentions don't reach a private thread
+        log = guild.get_channel(cfg.get("log_channel") or 0)
+        if log is not None:
+            await log.send(_("escalation.log", level=level, role=role.mention,
+                             thread=channel.mention), allowed_mentions=mentions)
+    await db.audit(guild.id, actor.id if actor else None, "ticket.escalate",
+                   source=source if actor else "system", target=f"ticket:{ticket['id']}",
+                   details={"level": level, "reason": reason})
+    await telegram_notify(client, cfg, _(
+        "tg.escalated", guild=esc(guild.name), channel=esc(ticket_label(ticket)),
+        level=level, role=esc(role.name), url=channel_url(guild.id, channel.id)))
+    return True
+
+
 class TicketControls(discord.ui.View):
     """Buttons inside each open ticket (persistent)."""
 
@@ -397,6 +444,14 @@ class TicketControls(discord.ui.View):
         await request_close(interaction, None)
 
 
+async def ticket_roles(db, ticket: dict) -> tuple[list[int], list[int]]:
+    """(roles of the ticket's type, roles of the escalation levels it has reached)."""
+    type_roles = await db.type_roles(ticket["guild_id"], ticket["type_key"])
+    reached = ticket.get("escalation_level") or 0
+    levels = await db.escalation_levels(ticket["guild_id"]) if reached else []
+    return type_roles, [lv["role_id"] for lv in levels if lv["level"] <= reached]
+
+
 async def get_context(interaction: discord.Interaction, *, staff: bool = False,
                       allow_closed: bool = False):
     """Return (cfg, _, ticket) for a ticket channel, or None after answering with an error."""
@@ -410,9 +465,7 @@ async def get_context(interaction: discord.Interaction, *, staff: bool = False,
     if ticket["status"] == config.STATUS_CLOSED and not allow_closed:
         await respond(interaction, _("error.ticket_closed"), ephemeral=True)
         return None
-    if staff and not is_ticket_staff(interaction.user, cfg,
-                                     await db.type_roles(ticket["guild_id"],
-                                                         ticket["type_key"])):
+    if staff and not is_ticket_staff(interaction.user, cfg, *await ticket_roles(db, ticket)):
         await respond(interaction, _("error.staff_only"), ephemeral=True)
         return None
     return cfg, _, ticket
@@ -524,8 +577,8 @@ async def transfer_ticket(interaction: discord.Interaction, member: discord.Memb
     if ctx is None:
         return
     cfg, _, ticket = ctx
-    type_roles = await interaction.client.db.type_roles(ticket["guild_id"], ticket["type_key"])
-    if member.bot or not is_ticket_staff(member, cfg, type_roles):
+    if member.bot or not is_ticket_staff(member, cfg,
+                                         *await ticket_roles(interaction.client.db, ticket)):
         await interaction.response.send_message(_("transfer.not_staff", user=member.mention),
                                                 ephemeral=True)
         return

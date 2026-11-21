@@ -28,7 +28,9 @@ from .common import (
     COLOR,
     audit,
     esc,
+    grant_thread_access,
     is_staff,
+    missing_thread_permissions,
     priority_label,
     respond,
     telegram_notify,
@@ -37,6 +39,7 @@ from .common import (
 from .tickets import (
     TicketPanel,
     apply_priority,
+    escalate,
     get_context,
     guidelines_embed,
     panel_embed,
@@ -309,6 +312,126 @@ async def priority(interaction: discord.Interaction, level: app_commands.Choice[
 @app_commands.describe(member="Staff member who will handle the ticket")
 async def transfer(interaction: discord.Interaction, member: discord.Member):
     await transfer_ticket(interaction, member)
+
+
+@app_commands.command(name="escalate",
+                      description="Bring this ticket to the next escalation level")
+@app_commands.guild_only()
+@app_commands.describe(level="(Optional) Level to reach (default: the next one)",
+                       reason="(Optional) Why the ticket needs a higher level")
+async def escalate_command(interaction: discord.Interaction,
+                           level: app_commands.Range[int, 1, config.MAX_ESCALATION_LEVELS]
+                           | None = None,
+                           reason: app_commands.Range[str, 1, 300] | None = None):
+    ctx = await get_context(interaction, staff=True)
+    if ctx is None:
+        return
+    cfg, _, ticket = ctx
+    levels = await interaction.client.db.escalation_levels(interaction.guild.id)
+    if not levels:
+        await interaction.response.send_message(_("escalation.none"), ephemeral=True)
+        return
+    current = ticket.get("escalation_level") or 0
+    target = level or current + 1
+    if target > levels[-1]["level"]:
+        key = "escalation.top" if level is None else "escalation.no_level"
+        await interaction.response.send_message(
+            _(key, level=target, top=levels[-1]["level"]), ephemeral=True)
+        return
+    if target <= current:
+        await interaction.response.send_message(
+            _("escalation.already", level=current), ephemeral=True)
+        return
+    await interaction.response.defer(ephemeral=True)
+    done = await escalate(interaction.client, interaction.guild, interaction.channel, ticket,
+                          cfg, target, interaction.user, reason)
+    await interaction.followup.send(
+        _("escalation.sent", level=target) if done else _("escalation.role_gone", level=target),
+        ephemeral=True)
+
+
+class EscalationGroup(app_commands.Group):
+    """/escalation ...: the levels above the normal staff."""
+
+    def __init__(self):
+        super().__init__(name="escalation", description="Escalation levels above the staff",
+                         guild_only=True,
+                         default_permissions=discord.Permissions(administrator=True))
+
+    @app_commands.command(name="list", description="Show the escalation levels")
+    async def list_levels(self, interaction: discord.Interaction):
+        ctx = await require_setup(interaction)
+        if ctx is None:
+            return
+        _ = ctx[1]
+        levels = await interaction.client.db.escalation_levels(interaction.guild.id)
+        lines = [_("escalation.line", level=lv["level"], role=f"<@&{lv['role_id']}>")
+                 + (" · " + _("escalation.after", hours=f"{lv['after_hours']:g}")
+                    if lv["after_hours"] else "")
+                 for lv in levels]
+        embed = discord.Embed(title=_("escalation.title", count=len(levels),
+                                      max=config.MAX_ESCALATION_LEVELS),
+                              description="\n".join(lines) or _("escalation.empty"),
+                              color=COLOR)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="add", description="Add the next escalation level")
+    @app_commands.describe(
+        role="Role that takes over at this level",
+        after_hours="(Optional) Escalate by itself after these hours without a staff reply")
+    async def add_level(self, interaction: discord.Interaction, role: discord.Role,
+                        after_hours: app_commands.Range[float, 0.5,
+                                                        config.MAX_ESCALATION_HOURS]
+                        | None = None):
+        ctx = await require_setup(interaction)
+        if ctx is None:
+            return
+        cfg, _ = ctx
+        db = interaction.client.db
+        levels = await db.escalation_levels(interaction.guild.id)
+        if role.is_default() or role.managed:
+            await interaction.response.send_message(_("roles.invalid"), ephemeral=True)
+            return
+        if len(levels) >= config.MAX_ESCALATION_LEVELS:
+            await interaction.response.send_message(
+                _("escalation.too_many", max=config.MAX_ESCALATION_LEVELS), ephemeral=True)
+            return
+        if any(lv["role_id"] == role.id for lv in levels):
+            await interaction.response.send_message(
+                _("escalation.role_used", role=role.mention), ephemeral=True,
+                allowed_mentions=discord.AllowedMentions.none())
+            return
+        timed = [lv["after_hours"] for lv in levels if lv["after_hours"]]
+        if after_hours is not None and timed and after_hours <= max(timed):
+            await interaction.response.send_message(
+                _("escalation.hours_order", hours=f"{max(timed):g}"), ephemeral=True)
+            return
+        level = await db.add_escalation_level(interaction.guild.id, role.id, after_hours)
+        await audit(interaction, "escalation.add", f"level:{level}", role=role.id,
+                    after_hours=after_hours)
+        text = _("escalation.added", level=level, role=role.mention)
+        if after_hours is not None:
+            text += "\n" + _("escalation.added_auto", hours=f"{after_hours:g}")
+        if cfg.get("ticket_mode") == "thread":
+            text += "\n" + _("roles.thread_note")
+        await interaction.response.send_message(
+            text, ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
+
+    @app_commands.command(name="remove", description="Remove an escalation level")
+    @app_commands.describe(level="Number of the level (see /escalation list)")
+    async def remove_level(self, interaction: discord.Interaction,
+                           level: app_commands.Range[int, 1, config.MAX_ESCALATION_LEVELS]):
+        ctx = await require_setup(interaction)
+        if ctx is None:
+            return
+        _ = ctx[1]
+        if not await interaction.client.db.remove_escalation_level(interaction.guild.id, level):
+            await interaction.response.send_message(
+                _("escalation.not_there", level=level), ephemeral=True)
+            return
+        await audit(interaction, "escalation.remove", f"level:{level}")
+        await interaction.response.send_message(_("escalation.removed", level=level),
+                                                ephemeral=True)
 
 
 class NoteGroup(app_commands.Group):
@@ -793,37 +916,6 @@ class BlockGroup(app_commands.Group):
             description += line + "\n"
         embed.description = description.strip() or _("block.none")
         await interaction.response.send_message(embed=embed, ephemeral=True)
-
-
-# -------------------------------------------------------- private threads ---
-
-def missing_thread_permissions(panel: discord.TextChannel, me: discord.Member) -> list[str]:
-    perms = panel.permissions_for(me)
-    needed = (("Create Private Threads", perms.create_private_threads),
-              ("Send Messages in Threads", perms.send_messages_in_threads),
-              ("Manage Threads", perms.manage_threads))
-    return [name for name, ok in needed if not ok]
-
-
-async def grant_thread_access(panel: discord.TextChannel, roles) -> list[str]:
-    """Let the staff roles see every private ticket thread of the panel channel
-    (Manage Threads there). Returns the roles that could not be changed."""
-    failed = []
-    for role in roles:
-        if role is None:
-            continue
-        overwrite = panel.overwrites_for(role)
-        if overwrite.manage_threads and overwrite.send_messages_in_threads:
-            continue
-        overwrite.view_channel = True
-        overwrite.send_messages_in_threads = True
-        overwrite.manage_threads = True
-        try:
-            await panel.set_permissions(role, overwrite=overwrite,
-                                        reason="TicketBot: staff access to ticket threads")
-        except discord.HTTPException:
-            failed.append(role.mention)
-    return failed
 
 
 # ------------------------------------------------------------ ticket types ---
@@ -1439,5 +1531,6 @@ class ProfileGroup(app_commands.Group):
 
 def all_commands() -> list:
     return [setup, guidelines, audit_log, queue, mytickets, available, add, remove, close, reopen,
-            priority, transfer, stats, export_stats, reply, NoteGroup(), SettingsGroup(),
-            TypesGroup(), TelegramGroup(), ProfileGroup(), RepliesGroup(), BlockGroup()]
+            priority, transfer, escalate_command, stats, export_stats, reply, NoteGroup(),
+            SettingsGroup(), TypesGroup(), TelegramGroup(), ProfileGroup(), RepliesGroup(),
+            BlockGroup(), EscalationGroup()]

@@ -112,6 +112,18 @@ class TypeStaffRole(Base):
     role_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
 
 
+class EscalationLevel(Base):
+    """Level 1, 2... above the normal staff: a role and, optionally, after how many hours
+    without a staff reply a ticket climbs to it by itself."""
+
+    __tablename__ = "escalation_levels"
+
+    guild_id: Mapped[int] = mapped_column(BigInteger, guild_fk(), primary_key=True)
+    level: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    role_id: Mapped[int] = mapped_column(BigInteger)
+    after_hours: Mapped[float | None] = mapped_column(Double)
+
+
 class Ticket(Base):
     __tablename__ = "tickets"
     __table_args__ = (
@@ -148,6 +160,8 @@ class Ticket(Base):
     close_reason: Mapped[str | None] = mapped_column(EncryptedText("tickets.close_reason"))
     channel_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
     is_thread: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    escalation_level: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    escalated_at: Mapped[float | None] = mapped_column(Double)
     rating: Mapped[int | None] = mapped_column(Integer)
     rating_comment: Mapped[str | None] = mapped_column(EncryptedText("tickets.rating_comment"))
     rated_at: Mapped[float | None] = mapped_column(Double)

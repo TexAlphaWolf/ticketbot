@@ -46,10 +46,10 @@ leave the rotation, the staff role or the server.
 reason, the ID of the staff member who blocked them and when the block started and ends.
 
 **Audit log**: for the actions that change something or read other people's data
-(settings, ticket types, blocks, claims, transfers, closings, exports, viewing another
-member's tickets...): the server ID, the Discord user ID of who did it, the action, what
-it was about (e.g. a ticket number) and when. Details such as a closing reason are
-encrypted. For actions from the web dashboard, the IP address is recorded, encrypted.
+(settings, ticket types, blocks, claims, transfers, escalations, closings, exports,
+viewing another member's tickets...): the server ID, the Discord user ID of who did it, the action, what
+it was about (e.g. a ticket number) and when. Details such as a closing or escalation
+reason are encrypted. For actions from the web dashboard, the IP address is recorded, encrypted.
 
 **Ratings**: the score from 1 to 5 and the optional comment the user gives after a
 ticket is closed.

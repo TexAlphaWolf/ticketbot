@@ -21,6 +21,7 @@ TICKETS, NOTES, REPLIES = T["tickets"], T["notes"], T["replies"]
 STAFF, BLOCKS, REFS = T["staff_availability"], T["blocked_users"], T["transcript_refs"]
 AUDIT, COMMANDS = T["audit_log"], T["bot_commands"]
 TYPE_ROLES = T["type_staff_roles"]
+LEVELS = T["escalation_levels"]
 
 GUILD_FIELDS = {c.name for c in GUILDS.columns} - {"guild_id"}
 TYPE_FIELDS = {"label", "emoji", "description", "position"}
@@ -178,6 +179,39 @@ class Store:
         return await self._write(delete(TYPE_ROLES).where(
             TYPE_ROLES.c.guild_id == guild_id, TYPE_ROLES.c.type_key == type_key,
             TYPE_ROLES.c.role_id == role_id)) > 0
+
+    # -------------------------------------------------------- escalation ---
+
+    async def escalation_levels(self, guild_id: int) -> list[dict]:
+        return await self._all(select(LEVELS).where(LEVELS.c.guild_id == guild_id)
+                               .order_by(LEVELS.c.level))
+
+    async def add_escalation_level(self, guild_id: int, role_id: int,
+                                   after_hours: float | None) -> int:
+        """Add the next level (1, 2, 3...) and return its number."""
+        async with self.engine.begin() as conn:
+            level = (await conn.execute(
+                select(func.coalesce(func.max(LEVELS.c.level), 0) + 1)
+                .where(LEVELS.c.guild_id == guild_id))).scalar()
+            await conn.execute(insert(LEVELS).values(guild_id=guild_id, level=level,
+                                                     role_id=role_id, after_hours=after_hours))
+        return level
+
+    async def remove_escalation_level(self, guild_id: int, level: int) -> bool:
+        """Remove a level and renumber the ones above it."""
+        async with self.engine.begin() as conn:
+            removed = (await conn.execute(delete(LEVELS).where(
+                LEVELS.c.guild_id == guild_id, LEVELS.c.level == level))).rowcount
+            if removed:
+                above = (await conn.execute(
+                    select(LEVELS.c.level).where(LEVELS.c.guild_id == guild_id,
+                                                 LEVELS.c.level > level)
+                    .order_by(LEVELS.c.level))).scalars().all()
+                for old in above:
+                    await conn.execute(update(LEVELS).where(LEVELS.c.guild_id == guild_id,
+                                                            LEVELS.c.level == old)
+                                       .values(level=old - 1))
+        return removed > 0
 
     async def list_questions(self, guild_id: int, type_key: str) -> list[dict]:
         return await self._all(select(QUESTIONS).where(QUESTIONS.c.guild_id == guild_id,

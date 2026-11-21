@@ -19,6 +19,10 @@ Available in **English**, **Italian** and **German**.
   by @Developers, *Payments* by @Admins) with `/types roles add`: only those roles and
   the admins see its tickets, are pinged and can claim them, and auto-assign picks among
   them; types without roles go to the staff role
+- **Escalation levels**: up to 5 levels above the staff (e.g. 1 → @Senior, 2 →
+  @Managers) with `/escalation add`. `/escalate` brings a ticket to the next level: its
+  role gets access to the ticket and is pinged. A level can also be reached by itself
+  after some hours without a staff reply
 - **Custom questions per type**: up to 3 questions for each ticket type (e.g. *Version*
   and *Steps to reproduce* for bug reports), with short or long answers, required or
   optional, and an example inside the field
@@ -269,6 +273,7 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 | `/settings show` / `language` / `retention` / `archive` / `reminders` / `cooldown` / `autoassign` / `mode` | Admin | Shows or changes the settings |
 | `/types list` / `add` / `edit` / `remove` | Admin | Manages the ticket types |
 | `/types roles add` / `remove` | Admin | Chooses the roles that handle the tickets of a type |
+| `/escalation list` / `add` / `remove` | Admin | Manages the escalation levels |
 | `/types questions list` / `add` / `remove` | Admin | Manages the custom questions of a ticket type |
 | `/telegram link` / `verify` / `status` / `test` / `unlink` | Admin | Manages Telegram notifications |
 | `/profile name` / `avatar` / `banner` / `bio` / `reset` | Admin | Changes the bot's profile in this server only |
@@ -280,6 +285,7 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 | `/reply name` | Staff | Sends a quick reply in the ticket |
 | `/priority level` | Staff | Changes the priority of the ticket |
 | `/transfer member` | Staff | Assigns the ticket to another staff member |
+| `/escalate level reason` | Staff | Brings the ticket to a higher escalation level |
 | `/note add` / `list` | Staff | Adds or shows private staff notes |
 | `/add user` / `/remove user` | Staff | Adds or removes a member from the ticket |
 | `/reopen` | Staff | Reopens a closed ticket |

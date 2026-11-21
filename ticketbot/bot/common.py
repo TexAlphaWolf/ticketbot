@@ -56,6 +56,35 @@ async def ticket_channel(guild: discord.Guild, ticket: dict):
         return None
 
 
+def missing_thread_permissions(panel: discord.TextChannel, me: discord.Member) -> list[str]:
+    perms = panel.permissions_for(me)
+    needed = (("Create Private Threads", perms.create_private_threads),
+              ("Send Messages in Threads", perms.send_messages_in_threads),
+              ("Manage Threads", perms.manage_threads))
+    return [name for name, ok in needed if not ok]
+
+
+async def grant_thread_access(panel: discord.TextChannel, roles) -> list[str]:
+    """Let the staff roles see every private ticket thread of the panel channel
+    (Manage Threads there). Returns the roles that could not be changed."""
+    failed = []
+    for role in roles:
+        if role is None:
+            continue
+        overwrite = panel.overwrites_for(role)
+        if overwrite.manage_threads and overwrite.send_messages_in_threads:
+            continue
+        overwrite.view_channel = True
+        overwrite.send_messages_in_threads = True
+        overwrite.manage_threads = True
+        try:
+            await panel.set_permissions(role, overwrite=overwrite,
+                                        reason="TicketBot: staff access to ticket threads")
+        except discord.HTTPException:
+            failed.append(role.mention)
+    return failed
+
+
 def channel_url(guild_id: int, channel_id: int) -> str:
     return f"https://discord.com/channels/{guild_id}/{channel_id}"
 
@@ -92,9 +121,12 @@ async def telegram_notify(client: "TicketBot", cfg: dict | None, text: str,
 
 
 def is_ticket_staff(member: discord.abc.User, cfg: dict | None,
-                    type_roles: list[int]) -> bool:
+                    type_roles: list[int], extra_roles: list[int] | tuple = ()) -> bool:
     """Staff for one ticket: the type's roles when the type has some, else the staff
-    role; admins always."""
+    role; the roles of the levels the ticket was escalated to; admins always."""
+    if extra_roles and isinstance(member, discord.Member) and cfg is not None and any(
+            role.id in extra_roles for role in member.roles):
+        return True
     if not type_roles:
         return is_staff(member, cfg)
     if cfg is None or not isinstance(member, discord.Member):

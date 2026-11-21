@@ -16,6 +16,15 @@
   private thread. Closing locks the thread, reopening unlocks it, `/add` and `/remove`
   add and remove members, and archived threads are found again for the inactivity and
   cleanup checks. Tickets already open keep their mode
+- **Escalation levels**: `/escalation add`, `remove` and `list` set up to 5 levels above
+  the staff, each with a role and, optionally, after how many hours without a staff
+  reply a ticket climbs to it by itself. `/escalate` (staff) brings a ticket to the next
+  level or to a chosen one, with an optional reason: the level's role gets access to
+  the ticket (in thread mode, *Manage Threads* in the panel channel), is pinged in the
+  ticket (and in the log channel for threads) and can handle it like the staff.
+  Escalations are sent to Telegram and recorded in the audit log, automatic ones as
+  done by the system. Levels never go down; removing a level moves the ones above it
+  down by one
 
 ## [3.0.0-beta.1] - 2026-11-20
 

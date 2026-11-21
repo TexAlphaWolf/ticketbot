@@ -13,6 +13,7 @@ from .. import __version__
 from ..core import config, crypto
 from ..core.logic import (
     activity_changes,
+    auto_escalation_level,
     autoclose_action,
     expired_refs,
     format_duration,
@@ -46,8 +47,10 @@ from .tickets import (
     TicketControls,
     TicketPanel,
     close_ticket,
+    escalate,
     refresh_guidelines,
     refresh_panel,
+    ticket_roles,
 )
 from .translator import CommandTranslator
 
@@ -183,8 +186,14 @@ class TicketBot(discord.Client):
                     reason = _("auto.reason", hours=config.AUTO_CLOSE_HOURS)
                     await channel.send(f"🔒 {reason}")
                     await close_ticket(self, channel, ticket, self.user, reason)
-                elif cfg and cfg.get("staff_reminders", 1) and staff_reminder_due(ticket, now):
-                    await self.remind_staff(channel, ticket, cfg, now)
+                else:
+                    levels = await self.db.escalation_levels(guild.id) if cfg else []
+                    target = auto_escalation_level(ticket, levels, now)
+                    escalated = target is not None and await escalate(
+                        self, guild, channel, ticket, cfg, target, None, None)
+                    if not escalated and cfg and cfg.get("staff_reminders", 1) and \
+                            staff_reminder_due(ticket, now):
+                        await self.remind_staff(channel, ticket, cfg, now)
             except discord.HTTPException as e:
                 print(f"Inactivity check failed for #{channel}: {e}")
 
@@ -315,8 +324,7 @@ class TicketBot(discord.Client):
             member = guild.get_member(command["requested_by"])
             if member is None:
                 member = await guild.fetch_member(command["requested_by"])
-            type_roles = await self.db.type_roles(guild.id, ticket["type_key"])
-            if not is_ticket_staff(member, cfg, type_roles):
+            if not is_ticket_staff(member, cfg, *await ticket_roles(self.db, ticket)):
                 raise RuntimeError("only staff members can close tickets")
             reason = (payload.get("reason") or "").strip() or translator(cfg)("close.reason_staff")
             await close_ticket(self, channel, ticket, member, reason[:500], source="web")
