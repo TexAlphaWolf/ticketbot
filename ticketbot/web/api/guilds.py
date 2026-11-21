@@ -338,19 +338,30 @@ async def list_staff(request: Request, access: GuildAccess) -> list[StaffMember]
 
 
 @router.get("/{guild_id}/tickets", response_model=TicketPage)
-async def list_tickets(request: Request, access: GuildAccess,
-                       state: Literal["open", "closed", "all"] = Query("open",
-                                                                      alias="status"),
-                       type: str | None = None,
-                       before: Annotated[int | None, Query(ge=1)] = None,
-                       limit: Annotated[int, Query(ge=1, le=100)] = 50) -> TicketPage:
-    """The tickets you can see, newest first, a page at a time."""
-    rows = await request.app.state.store.list_tickets(
+async def list_tickets(
+        request: Request, access: GuildAccess,
+        state: Literal["open", "closed", "all"] = Query("open", alias="status"),
+        type: str | None = None,
+        q: Annotated[str | None, Query(max_length=100, description=(
+            "Text to find: a ticket number (12 or #12), a Discord ID, or words of the "
+            "channel name, type, subject or form answers"))] = None,
+        priority: Literal["low", "medium", "high", "none"] | None = None,
+        person: Annotated[str | None, Query(pattern=r"^\d{1,20}$", description=(
+            "Discord ID: tickets opened, claimed or assigned to them"))] = None,
+        opened_from: Annotated[float | None, Query(alias="from", ge=0,
+                                                   description="Unix time")] = None,
+        opened_to: Annotated[float | None, Query(alias="to", ge=0,
+                                                 description="Unix time")] = None,
+        before: Annotated[int | None, Query(ge=1)] = None,
+        limit: Annotated[int, Query(ge=1, le=100)] = 50) -> TicketPage:
+    """The tickets you can see, newest first, a page at a time, with filters and search."""
+    rows, next_before = await request.app.state.store.list_tickets(
         access.guild_id, status=state, type_key=type, scope=access.scope(),
-        before_id=before, limit=limit)
+        before_id=before, limit=limit, priority=priority,
+        person=int(person) if person else None, opened_from=opened_from,
+        opened_to=opened_to, text=q)
     ids = {t[k] for t in rows for k in ("owner_id", "claimed_by", "assigned_to") if t[k]}
-    return TicketPage(tickets=[summary(t) for t in rows],
-                      next_before=rows[-1]["id"] if len(rows) == limit else None,
+    return TicketPage(tickets=[summary(t) for t in rows], next_before=next_before,
                       people=await people(request, access.guild_id, ids))
 
 

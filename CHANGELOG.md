@@ -47,6 +47,13 @@
   saved at once and recorded in the audit log; the bot refreshes the panel and the
   guidelines, checks its permissions for thread mode and gives the new roles access to
   the threads
+- **Search and filters in the dashboard's ticket list**: a search bar (ticket number,
+  channel name, type, subject, form answers or a Discord ID; searched while typing) and
+  filters by priority, opening dates and person (click a name: tickets they opened,
+  claimed or were assigned). Filters live in the address, so a search can be
+  bookmarked. The API gets `q`, `priority`, `person`, `from` and `to` on
+  `GET /api/v1/guilds/{id}/tickets`; the encrypted subject and answers are decrypted and
+  searched on the server, up to 2000 tickets per page
 - **Transcripts in the database and in the dashboard**: when a ticket closes, its
   transcript (messages, embeds, attachment links, staff notes) is saved encrypted in a
   new `transcripts` table (migration 0008) and shown on the ticket's page, with *Download

@@ -224,7 +224,7 @@ def test_can_see_matches_the_query(tmp_path, roles, level, key, visible):
         tid = await store.create_ticket(guild_id=GUILD, owner_id=1, type_key=key,
                                         type_label="x", type_emoji="x", opened_at=1.0,
                                         last_activity=1.0, escalation_level=level)
-        found = await store.list_tickets(GUILD, status="all", scope=a.scope())
+        found, _next = await store.list_tickets(GUILD, status="all", scope=a.scope())
         await store.close()
         return [t["id"] for t in found] == [tid]
 

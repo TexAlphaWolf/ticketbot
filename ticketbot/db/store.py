@@ -63,6 +63,7 @@ class TicketScope:
 
 
 TICKET_STATUSES = {"open", "closed", "all"}
+SEARCH_SCAN = 2000           # tickets decrypted per page of a text search
 
 
 def _open(table=TICKETS):
@@ -356,9 +357,17 @@ class Store:
 
     async def list_tickets(self, guild_id: int, *, status: str = "open",
                            type_key: str | None = None, scope: TicketScope | None = None,
-                           before_id: int | None = None, limit: int = 50) -> list[dict]:
-        """Newest first. status: open, closed or all. Pass the last id seen as before_id
-        for the next page."""
+                           before_id: int | None = None, limit: int = 50,
+                           priority: str | None = None, person: int | None = None,
+                           opened_from: float | None = None,
+                           opened_to: float | None = None,
+                           text: str | None = None) -> tuple[list[dict], int | None]:
+        """Newest first, a page at a time: (tickets, the before_id of the next page or
+        None). status: open, closed or all; priority: low/medium/high or "none"; person:
+        who opened, claimed or was assigned the ticket. `text` looks in the number, the
+        channel name, the type, the subject and the form answers; the last two are
+        encrypted, so they are decrypted and searched here, at most SEARCH_SCAN rows per
+        page (a page may then come back short, with a next page to look further)."""
         stmt = select(TICKETS).where(TICKETS.c.guild_id == guild_id)
         if status == "open":
             stmt = stmt.where(_open())
@@ -368,9 +377,55 @@ class Store:
             stmt = stmt.where(TICKETS.c.type_key == type_key)
         if scope is not None:
             stmt = stmt.where(scope.clause())
-        if before_id is not None:
-            stmt = stmt.where(TICKETS.c.id < before_id)
-        return await self._all(stmt.order_by(TICKETS.c.id.desc()).limit(limit))
+        if priority == "none":
+            stmt = stmt.where(TICKETS.c.priority.is_(None))
+        elif priority is not None:
+            stmt = stmt.where(TICKETS.c.priority == priority)
+        if person is not None:
+            stmt = stmt.where(or_(TICKETS.c.owner_id == person, TICKETS.c.claimed_by == person,
+                                  TICKETS.c.assigned_to == person))
+        if opened_from is not None:
+            stmt = stmt.where(TICKETS.c.opened_at >= opened_from)
+        if opened_to is not None:
+            stmt = stmt.where(TICKETS.c.opened_at < opened_to)
+
+        text = (text or "").strip()
+        number = text.removeprefix("#")
+        if number.isdigit() and len(number) <= 9:           # a ticket number
+            stmt = stmt.where(TICKETS.c.number == int(number))
+            text = ""
+        elif text.isdigit() and 15 <= len(text) <= 20:     # a Discord ID
+            stmt = stmt.where(or_(TICKETS.c.owner_id == int(text),
+                                  TICKETS.c.claimed_by == int(text),
+                                  TICKETS.c.assigned_to == int(text)))
+            text = ""
+        stmt = stmt.order_by(TICKETS.c.id.desc())
+
+        if not text:
+            if before_id is not None:
+                stmt = stmt.where(TICKETS.c.id < before_id)
+            rows = await self._all(stmt.limit(limit))
+            return rows, (rows[-1]["id"] if len(rows) == limit else None)
+
+        needle = text.casefold()
+        found: list[dict] = []
+        cursor, scanned = before_id, 0
+        while scanned < SEARCH_SCAN:
+            size = min(200, SEARCH_SCAN - scanned)
+            batch_stmt = stmt.where(TICKETS.c.id < cursor) if cursor is not None else stmt
+            batch = await self._all(batch_stmt.limit(size))
+            for row in batch:
+                scanned += 1
+                cursor = row["id"]
+                haystack = " ".join(str(row[k] or "") for k in (
+                    "name", "type_label", "subject", "description")).casefold()
+                if needle in haystack:
+                    found.append(row)
+                    if len(found) == limit:
+                        return found, row["id"]
+            if len(batch) < size:
+                return found, None
+        return found, cursor          # looked at SEARCH_SCAN rows: more may follow
 
     async def tickets_since(self, guild_id: int, since: float) -> list[dict]:
         return await self._all(select(TICKETS).where(TICKETS.c.guild_id == guild_id,
