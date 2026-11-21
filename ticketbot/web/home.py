@@ -1,5 +1,6 @@
-"""A temporary home page, until the React dashboard arrives: it shows whether you are
-logged in and lets you log in and out (a form, no JavaScript)."""
+"""The home page when the React dashboard isn't built: it says how to build it, and
+still lets you log in and out (a form, no JavaScript). When it is built, / is the
+dashboard (spa.py)."""
 
 import hmac
 import html
@@ -11,6 +12,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from .. import __version__
 from .api.auth import end_session
 from .sessions import check_origin, read_session
+from .spa import built, index
 
 router = APIRouter(include_in_schema=False)
 
@@ -24,10 +26,14 @@ ERRORS = {
 
 
 @router.get("/", response_class=HTMLResponse)
-async def home(request: Request, login_error: str | None = None) -> HTMLResponse:
+async def home(request: Request, login_error: str | None = None):
+    if built(request.app.state.static_dir):
+        return index(request.app.state.static_dir)
     session = await read_session(request)
     parts = [f"<h1>TicketBot {html.escape(__version__)}</h1>",
-             "<p>The web dashboard is being built. The API is documented at "
+             "<p>The web dashboard isn't built yet: in the <code>frontend</code> folder run "
+             "<code>npm ci</code> and <code>npm run build</code>, then restart "
+             "<code>python -m ticketbot web</code>. The API is documented at "
              '<a href="/api/docs">/api/docs</a>.</p>']
     if login_error:
         parts.append(f"<p><strong>{html.escape(ERRORS.get(login_error, 'Login failed.'))}"

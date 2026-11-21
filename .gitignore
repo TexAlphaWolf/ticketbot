@@ -6,3 +6,7 @@ __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
+
+# Web dashboard: dependencies and build (python -m ticketbot web serves the build)
+frontend/node_modules/
+ticketbot/web/static/

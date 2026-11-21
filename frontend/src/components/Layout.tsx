@@ -1,0 +1,75 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { NavLink, Outlet, useNavigate, useParams } from "react-router";
+import { api, type GuildSummary, type Me } from "../api";
+import { LANGS, type Lang, useI18n } from "../i18n";
+import { Avatar } from "./ui";
+
+export function Layout({ me }: { me: Me }) {
+  const { t, lang, setLang } = useI18n();
+  const { guildId } = useParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const guilds = useQuery({ queryKey: ["guilds"], queryFn: () => api<GuildSummary[]>("/guilds") });
+  const current = guilds.data?.find((g) => g.id === guildId);
+  const name = me.user.global_name ?? me.user.username;
+
+  async function logout() {
+    await api("/auth/logout", { method: "POST" }).catch(() => undefined);
+    queryClient.clear();
+    navigate("/");
+    window.location.reload();
+  }
+
+  return (
+    <div className="shell">
+      <aside className="sidebar">
+        <NavLink to="/" className="brand" end>
+          <img src="/favicon.svg" alt="" width={28} height={28} />
+          {t("app.title")}
+        </NavLink>
+        <nav aria-label={t("nav.servers")}>
+          <p className="sidebar-label">{t("nav.servers")}</p>
+          {guilds.data?.map((g) => (
+            <NavLink key={g.id} to={`/servers/${g.id}`} className="sidebar-server" title={g.name}>
+              <Avatar src={g.icon_url} name={g.name} size={28} />
+              <span>{g.name}</span>
+            </NavLink>
+          ))}
+        </nav>
+        {current && (
+          <nav className="sidebar-section" aria-label={current.name}>
+            <NavLink to={`/servers/${current.id}`} end>
+              {t("nav.overview")}
+            </NavLink>
+            <NavLink to={`/servers/${current.id}/tickets`}>{t("nav.tickets")}</NavLink>
+          </nav>
+        )}
+        <div className="sidebar-footer">
+          <label className="lang">
+            <span className="visually-hidden">{t("nav.language")}</span>
+            <select value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
+              {Object.entries(LANGS).map(([code, label]) => (
+                <option key={code} value={code}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="me">
+            <Avatar src={me.user.avatar_url} name={name} size={32} />
+            <div>
+              <strong>{name}</strong>
+              <span className="muted">@{me.user.username}</span>
+            </div>
+          </div>
+          <button className="button button-ghost" onClick={logout}>
+            {t("nav.logout")}
+          </button>
+        </div>
+      </aside>
+      <main className="content">
+        <Outlet />
+      </main>
+    </div>
+  );
+}

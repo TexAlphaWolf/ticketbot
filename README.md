@@ -214,12 +214,21 @@ Every notification shows the server name, and each server only sends its own tic
 
 ## Web dashboard (in development)
 
-TicketBot 3 is getting a web dashboard with a REST API (FastAPI). For now it only has
-the base: start it next to the bot, on the same database.
+TicketBot 3 has a web dashboard: a React app (in `frontend/`) on a REST API (FastAPI).
+Start it next to the bot, on the same database. The dashboard is built once with
+Node.js 22.22 or newer (the build is not in the repository):
 
 ```bash
+cd frontend
+npm ci                         # the exact versions of package-lock.json
+npm run build                  # type check, then build into ticketbot/web/static
+cd ..
 python -m ticketbot web        # http://127.0.0.1:8080
 ```
+
+While changing the dashboard, `npm run dev` (in `frontend/`) serves it at
+`http://127.0.0.1:5173` with instant reload, sending the API calls to the web server on
+port 8080.
 
 - `GET /api/v1/health` tells whether the API and its database work
 - **Login with Discord** (OAuth2 with PKCE): in the [Developer Portal](https://discord.com/developers/applications)
@@ -373,6 +382,7 @@ ticketbot/
 │   └── common.py        # helpers shared by the bot modules
 ├── web/
 │   ├── app.py           # FastAPI application and server
+│   ├── spa.py           # serves the built React dashboard
 │   ├── api/v1.py        # REST API, version 1
 │   ├── api/auth.py      # login with Discord and logout
 │   ├── api/guilds.py    # servers, tickets and statistics
@@ -388,6 +398,11 @@ ticketbot/
 ├── integrations/
 │   └── telegram.py      # Telegram Bot API client
 └── __main__.py          # command line: bot, web, settings, db, backup, backups, restore
+frontend/                # web dashboard: React 19 + TypeScript, built with Vite
+├── src/api.ts           # typed client of the REST API
+├── src/i18n.ts          # texts in English, Italian and German
+├── src/pages/           # servers, overview, tickets, ticket
+└── src/components/      # layout and small building blocks
 ```
 
 ## Tests

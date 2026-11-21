@@ -340,3 +340,28 @@ def test_https_cookies(tmp_path):
         session = next(h for h in cookies if h.startswith("__Host-tb_session="))
         assert "Secure" in session and "Path=/" in session and "Domain" not in session
         assert c.get("/api/v1/auth/me").status_code == 200
+
+
+def test_built_dashboard_is_served(tmp_path):
+    asyncio.run(_prepare(tmp_path))
+    static = tmp_path / "static"
+    (static / "assets").mkdir(parents=True)
+    (static / "index.html").write_text("<!doctype html><div id=root></div>")
+    (static / "assets" / "index-abc.js").write_text("console.log(1)")
+    (static / "favicon.svg").write_text("<svg/>")
+    (tmp_path / "secret.txt").write_text("no")
+    with TestClient(create_app(make_settings(tmp_path), static_dir=static)) as c:
+        for path in ("/", "/servers/1/tickets", "/servers/1/tickets/7?status=all"):
+            r = c.get(path)
+            assert r.status_code == 200 and "id=root" in r.text, path
+            assert r.headers["cache-control"] == "no-cache"
+            assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
+        js = c.get("/assets/index-abc.js")
+        assert js.status_code == 200 and "immutable" in js.headers["cache-control"]
+        assert c.get("/favicon.svg").status_code == 200
+        assert c.get("/assets/missing.js").status_code == 404
+        assert c.get("/robots.txt").status_code == 404
+        assert c.get("/../secret.txt").status_code == 404
+        assert c.get("/assets/..%2F..%2Fsecret.txt").status_code == 404
+        assert c.get("/api/v1/nope").json() == {"detail": "Not Found"}     # API stays JSON
+        assert c.get("/api/v1/health").json()["status"] == "ok"

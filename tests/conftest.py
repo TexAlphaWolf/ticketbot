@@ -70,3 +70,10 @@ async def new_store(path: Path) -> Store:
 def unused_store() -> Store:
     """For tests that build the bot without touching the database."""
     return Store(create_engine("sqlite:///:memory:"))
+
+
+@pytest.fixture(autouse=True)
+def no_built_dashboard(tmp_path_factory, monkeypatch):
+    """Web tests don't depend on whether `npm run build` was run on this computer."""
+    from ticketbot.web import spa
+    monkeypatch.setattr(spa, "DEFAULT_DIR", tmp_path_factory.mktemp("no-dashboard"))

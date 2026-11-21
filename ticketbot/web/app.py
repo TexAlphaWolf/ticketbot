@@ -3,6 +3,7 @@
 import asyncio
 import socket
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -10,15 +11,17 @@ from starlette.exceptions import HTTPException
 
 from .. import __version__
 from ..core.settings import Settings, SettingsError
+from . import spa
 from .api import v1
 from .cache import TTLCache
 from .database import open_web_store
 from .discord_api import DiscordBot
 from .home import router as home_router
 from .security import DOCS_PATH, SecurityHeaders
+from .spa import router as spa_router
 
 
-def create_app(settings: Settings) -> FastAPI:
+def create_app(settings: Settings, static_dir: Path | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.settings = settings
@@ -39,6 +42,8 @@ def create_app(settings: Settings) -> FastAPI:
     app.add_middleware(SecurityHeaders, hsts=settings.web_https)
     app.include_router(v1.router)
     app.include_router(home_router)
+    app.include_router(spa_router)       # last: every other path is a dashboard page
+    app.state.static_dir = static_dir or spa.DEFAULT_DIR
 
     @app.exception_handler(HTTPException)
     async def http_error(_request: Request, exc: HTTPException) -> JSONResponse:

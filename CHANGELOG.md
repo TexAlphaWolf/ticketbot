@@ -47,6 +47,14 @@
   saved at once and recorded in the audit log; the bot refreshes the panel and the
   guidelines, checks its permissions for thread mode and gives the new roles access to
   the threads
+- **Web dashboard (first part)**: a React 19 + TypeScript app in `frontend/`, built
+  with Vite and served by `python -m ticketbot web`. Login with Discord, your servers,
+  the overview of a server (queue and ticket types), the tickets with filters by status
+  and type and more pages on demand, and each ticket with its form answers, notes,
+  closing and rating, with names and avatars. English, Italian and German (from the
+  browser, or chosen in the sidebar), light and dark theme. It works with the strict
+  Content Security Policy (no inline scripts, no external files except Discord's
+  avatars). The CI also type-checks and builds it
 - **Panel of servers set up with TicketBot 1**: their panel message was never saved,
   so changing types or language didn't update it. Now the bot learns it the first time
   someone presses *Open ticket* on it (and updates it at once); until then, a panel

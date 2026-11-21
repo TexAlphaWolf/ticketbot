@@ -46,6 +46,8 @@ class SecurityHeaders:
                                        "max-age=31536000; includeSubDomains")
                 if scope["path"].startswith("/api/"):
                     headers.setdefault("Cache-Control", "no-store")
+                elif "Cache-Control" not in headers:
+                    headers["Cache-Control"] = "no-cache"
             await send(message)
 
         await self.app(scope, receive, send_with_headers)
