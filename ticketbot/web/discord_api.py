@@ -1,5 +1,6 @@
 """The few Discord HTTP API calls of the web dashboard (OAuth2 login)."""
 
+import asyncio
 from urllib.parse import urlencode
 
 import aiohttp
@@ -11,6 +12,22 @@ API = "https://discord.com/api/v10"
 AUTHORIZE = "https://discord.com/oauth2/authorize"
 SCOPES = "identify guilds"
 USER_AGENT = f"DiscordBot (https://github.com/TexAlphaWolf/ticketbot, {__version__})"
+
+
+MAX_RETRY_WAIT = 5.0       # seconds: a longer rate limit is reported as an error
+
+
+async def retry_after(response: aiohttp.ClientResponse) -> float | None:
+    """How long Discord asks to wait after a 429 (body or header), in seconds."""
+    try:
+        if response.content_type == "application/json":
+            return float((await response.json())["retry_after"])
+    except (KeyError, TypeError, ValueError, aiohttp.ContentTypeError):
+        pass
+    try:
+        return float(response.headers["Retry-After"])
+    except (KeyError, ValueError):
+        return None
 
 
 class DiscordError(Exception):
@@ -49,13 +66,21 @@ class DiscordOAuth:
             "code_challenge": code_challenge, "code_challenge_method": "S256"})
 
     async def _call(self, method: str, path: str, **kwargs):
-        try:
-            async with self._http().request(method, API + path, **kwargs) as r:
-                if r.status >= 400:
-                    raise DiscordError(f"{method} {path}: HTTP {r.status}", r.status)
-                return await r.json() if r.content_type == "application/json" else {}
-        except aiohttp.ClientError as e:
-            raise DiscordError(f"{method} {path}: {e.__class__.__name__}") from None
+        for attempt in range(3):
+            try:
+                async with self._http().request(method, API + path, **kwargs) as r:
+                    if r.status == 429 and attempt < 2:
+                        # Rate limited: wait as long as Discord asks, if it's short
+                        wait = await retry_after(r)
+                        if wait is not None and wait <= MAX_RETRY_WAIT:
+                            await asyncio.sleep(wait)
+                            continue
+                    if r.status >= 400:
+                        raise DiscordError(f"{method} {path}: HTTP {r.status}", r.status)
+                    return await r.json() if r.content_type == "application/json" else {}
+            except aiohttp.ClientError as e:
+                raise DiscordError(f"{method} {path}: {e.__class__.__name__}") from None
+        raise DiscordError(f"{method} {path}: HTTP 429", 429)   # not reached
 
     async def exchange_code(self, code: str, code_verifier: str) -> dict:
         """The tokens: access_token, refresh_token, expires_in, scope."""

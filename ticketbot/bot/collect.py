@@ -41,9 +41,11 @@ async def collect_messages(channel: discord.TextChannel) -> list[TMessage]:
             created_at=msg.created_at,
             content=msg.clean_content,
             embeds=[{
+                "author": e.author.name or "",
                 "title": e.title or "",
                 "description": e.description or "",
                 "fields": [(f.name, f.value) for f in e.fields],
+                "footer": e.footer.text or "",
                 "color": str(e.color) if e.color else None,
             } for e in msg.embeds],
             attachments=[{

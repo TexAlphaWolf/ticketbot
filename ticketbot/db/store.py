@@ -474,6 +474,10 @@ class Store:
         async with self.engine.begin() as conn:
             result = await conn.execute(insert(TRANSCRIPTS).values(**values)
                                         .returning(TRANSCRIPTS.c.id))
+            # The transcript is saved a few seconds after the ticket closes: tell the
+            # open dashboards, so they show it without a reload
+            await conn.execute(update(TICKETS).where(TICKETS.c.id == values["ticket_id"])
+                               .values(updated_at=time.time()))
             return result.scalar_one()
 
     async def ticket_transcript(self, ticket_id: int) -> dict | None:
@@ -739,6 +743,18 @@ class Store:
     async def finish_command(self, command_id: int, ok: bool, result: str = "") -> None:
         await self._write(update(COMMANDS).where(COMMANDS.c.id == command_id).values(
             status="done" if ok else "failed", result=result[:500], finished_at=time.time()))
+
+    async def has_unfinished_command(self, guild_id: int, requested_by: int, kind: str) -> bool:
+        stmt = select(COMMANDS.c.id).where(
+            COMMANDS.c.guild_id == guild_id, COMMANDS.c.requested_by == requested_by,
+            COMMANDS.c.kind == kind, COMMANDS.c.status.in_(("pending", "running"))).limit(1)
+        return await self._one(stmt) is not None
+
+    async def tickets_of_owner(self, guild_id: int, owner_id: int,
+                               limit: int = 50) -> list[dict]:
+        return await self._all(select(TICKETS).where(
+            TICKETS.c.guild_id == guild_id, TICKETS.c.owner_id == owner_id)
+            .order_by(TICKETS.c.id.desc()).limit(limit))
 
     async def get_command(self, command_id: int) -> dict | None:
         return await self._one(select(COMMANDS).where(COMMANDS.c.id == command_id))

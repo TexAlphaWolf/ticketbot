@@ -101,6 +101,28 @@
   (`claim_ticket`, `change_priority`, `move_ticket`); the web actions moved to
   `bot/web_commands.py`
 - `requirements-dev.txt` with the tools for the tests (pytest, httpx2, ruff)
+- **Open a ticket from the browser**: every member of a server with TicketBot can log in
+  to the dashboard and open a ticket under *Open a ticket*: the same types, form
+  questions and FAQ as the panel on Discord, with the same limits (open tickets, cooldown,
+  blacklist). The bot opens it within a few seconds and the page links to the new
+  channel; the ticket's embed says it was opened from the web dashboard. The same page
+  lists your own tickets with a link to Discord, and the conversation of the closed ones
+  (without the staff notes). New `GET /api/v1/me/guilds`, `/me/guilds/{id}`,
+  `POST /me/guilds/{id}/tickets` and `/faq`, `GET /me/guilds/{id}/commands/{n}` and
+  `/me/guilds/{id}/tickets/{n}/transcript`
+- The dashboard asks Discord once when several pages need the same answer at the same
+  time, waits when Discord asks for a short pause (HTTP 429) and, if Discord can't
+  answer, uses the last answer of the past 10 minutes instead of an error. Right after
+  a ticket closes, its page says the transcript is being saved and shows it as soon as
+  the bot has saved it
+- Deleting a ticket everywhere (from the dashboard or by deleting its transcript from
+  the archive channel) also deletes its channel when it is still there, e.g. a ticket
+  closed a few hours ago and waiting to be deleted after the reopen time; before, the
+  channel stayed forever
+- Transcripts keep the author and the footer of embeds, so the answers sent from the
+  dashboard show who wrote them (transcripts saved before show them without)
+- The transcript in the dashboard shows stickers, reactions and image previews too,
+  like the HTML file (`stickers` and `reactions` in the transcript API)
 
 ## [3.0.0-beta.2] - 2026-11-21
 

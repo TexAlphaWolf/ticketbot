@@ -273,3 +273,45 @@ def test_open_button_teaches_the_bot_its_panel(tmp_path, world):
 
 async def _record(where, value):
     where.append(value)
+
+
+def test_open_from_the_web(tmp_path, world, monkeypatch):
+    import ticketbot.bot.web_commands as wc
+    from ticketbot.bot.tickets import OpenError
+
+    opened = []
+
+    async def fake_create(client, guild, member, ticket_type, subject, description, *,
+                          source="discord", attachments=None):
+        if subject == "blocked":
+            raise OpenError("⏳ Wait until <t:1795300000:R> in <#100>, **please**")
+        opened.append((member.id, ticket_type["key"], subject, description, source))
+        return SimpleNamespace(id=4242), "queue"
+
+    monkeypatch.setattr(wc, "create_ticket", fake_create)
+
+    async def scenario():
+        store = await new_store(tmp_path / "ticketbot.db")
+        await store.save_guild(GUILD, staff_role=5)
+        await store.add_type(GUILD, "bug", "Bug", "🐞", "")
+        bot = TicketBot(store)
+        bot.get_guild = lambda gid: world
+
+        async def run_one(by, payload):
+            cid = await store.enqueue_command(GUILD, "ticket.open", by, payload)
+            await bot.web_commands.coro(bot)
+            c = await store.get_command(cid)
+            return c["status"], c["result"]
+
+        ok = {"type_key": "bug", "subject": "Crash", "description": "At start"}
+        assert await run_one(13, ok) == ("done", "channel:4242")
+        assert opened == [(13, "bug", "Crash", "At start", "web")]
+        assert await run_one(99, ok) == ("failed", "you are not a member of this server")
+        assert await run_one(13, {**ok, "type_key": "gone"}) == \
+            ("failed", "this ticket type doesn't exist anymore")
+        status, result = await run_one(13, {**ok, "subject": "blocked"})
+        assert status == "failed"
+        assert result == "⏳ Wait until 2026-11-21 22:26 UTC in #t-100, please"
+        await store.close()
+
+    asyncio.run(scenario())

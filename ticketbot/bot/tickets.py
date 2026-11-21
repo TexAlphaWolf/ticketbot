@@ -311,43 +311,72 @@ async def forward_attachments(channel: discord.TextChannel, user: discord.abc.Us
         await channel.send(_("attachments.skipped", files=", ".join(skipped)))
 
 
+class OpenError(Exception):
+    """The ticket can't be opened; the message is for the member (translated)."""
+
+
 async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
                       subject: str, description: str,
                       attachments: list[discord.Attachment] | None = None) -> None:
-    client = interaction.client
+    """The ticket form on Discord was sent."""
+    cfg = await interaction.client.db.get_guild(interaction.guild.id)
+    _ = translator(cfg)
+    try:      # checked again: the form may stay open a while
+        await check_can_open(interaction.client, interaction.guild, cfg, interaction.user)
+    except OpenError as e:
+        await interaction.response.send_message(str(e), ephemeral=True)
+        return
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    try:
+        channel, queue = await create_ticket(
+            interaction.client, interaction.guild, interaction.user, ticket_type, subject,
+            description, attachments=attachments)
+    except OpenError as e:
+        await interaction.followup.send(str(e), ephemeral=True)
+        return
+    await interaction.followup.send(
+        _("open.created", channel=channel.mention) + "\n📊 " + queue, ephemeral=True)
+
+
+async def check_can_open(client, guild: discord.Guild, cfg: dict | None,
+                         user: discord.Member) -> None:
+    """Raises OpenError if the server isn't set up or the member can't open a ticket."""
+    _ = translator(cfg)
+    if cfg is None or guild.get_channel(cfg.get("category") or 0) is None or \
+            guild.get_role(cfg.get("staff_role") or 0) is None:
+        raise OpenError(_("error.bad_setup"))
+    problem = await open_problem(client.db, cfg, user, _)
+    if problem:
+        raise OpenError(problem)
+
+
+async def create_ticket(client, guild: discord.Guild, user: discord.Member,
+                        ticket_type: dict, subject: str, description: str, *,
+                        attachments: list[discord.Attachment] | None = None,
+                        source: str = "discord") -> tuple[discord.abc.GuildChannel, str]:
+    """Open a ticket for `user` (from the Discord form or the web form). Returns the
+    channel or thread and the queue line; raises OpenError."""
     db = client.db
-    guild = interaction.guild
-    user = interaction.user
     cfg = await db.get_guild(guild.id)
     _ = translator(cfg)
-
+    await check_can_open(client, guild, cfg, user)
     category = guild.get_channel(cfg.get("category") or 0)
     staff_role = guild.get_role(cfg.get("staff_role") or 0)
-    if category is None or staff_role is None:
-        await interaction.response.send_message(_("error.bad_setup"), ephemeral=True)
-        return
     # Roles of this type (e.g. Bug -> @Dev) see and handle the ticket instead of the staff
     type_role_ids = await db.type_roles(guild.id, ticket_type["key"])
     handlers = [r for r in (guild.get_role(i) for i in type_role_ids) if r is not None]
     if not handlers:
         handlers, type_role_ids = [staff_role], []
 
-    problem = await open_problem(db, cfg, user, _)  # checked again: the form may stay open a while
-    if problem:
-        await interaction.response.send_message(problem, ephemeral=True)
-        return
+    thread_mode = cfg.get("ticket_mode") == "thread"
+    parent = guild.get_channel(cfg.get("panel_channel") or 0) if thread_mode else None
+    if thread_mode and parent is None:
+        raise OpenError(_("error.bad_setup"))
 
-    await interaction.response.defer(ephemeral=True, thinking=True)
     waiting, in_progress = await db.queue_counts(guild.id)
     number = await db.next_ticket_number(guild.id)
     user_number = await db.next_user_number(guild.id, user.id)
     channel_name = ticket_channel_name(ticket_type["key"], user.name, user.id, user_number)
-
-    thread_mode = cfg.get("ticket_mode") == "thread"
-    parent = guild.get_channel(cfg.get("panel_channel") or 0) if thread_mode else None
-    if thread_mode and parent is None:
-        await interaction.followup.send(_("error.bad_setup"), ephemeral=True)
-        return
 
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
@@ -391,8 +420,10 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
         awaiting_staff_since=now, assigned_to=assignee.id if assignee else None,
         is_thread=thread_mode,
     )
-    await audit(interaction, "ticket.open", f"ticket:{ticket_id}", type=ticket_type["key"],
-                assigned_to=assignee.id if assignee else None)
+    await db.audit(guild.id, user.id, "ticket.open", source=source,
+                   target=f"ticket:{ticket_id}", details={
+                       "type": ticket_type["key"],
+                       **({"assigned_to": assignee.id} if assignee else {})})
 
     queue = (_("queue.line", waiting=waiting, in_progress=in_progress)
              if waiting or in_progress else _("queue.first"))
@@ -403,6 +434,8 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
     embed.add_field(name=_("field.queue"), value=queue)
     if assignee:
         embed.add_field(name=_("field.assigned"), value=assignee.mention)
+    if source == "web":
+        embed.add_field(name=_("field.source"), value=_("open.from_web"))
     embed.set_footer(text=_("open.footer", hours=config.AUTO_CLOSE_HOURS))
 
     ping = assignee.mention if assignee else " ".join(r.mention for r in handlers)
@@ -425,15 +458,13 @@ async def open_ticket(interaction: discord.Interaction, ticket_type: dict,
             except discord.HTTPException as e:
                 print(f"Could not announce the ticket in the log channel: {e}")
 
-    await interaction.followup.send(
-        _("open.created", channel=channel.mention) + "\n📊 " + queue, ephemeral=True
-    )
     await telegram_notify(client, cfg, _(
         "tg.new",
         guild=esc(guild.name), type=esc(f"{ticket_type['emoji']} {ticket_type['label']}"),
         user=esc(user), subject=esc(subject), description=esc(description[:500]),
         waiting=waiting, in_progress=in_progress, url=channel_url(guild.id, channel.id),
     ))
+    return channel, queue
 
 
 # ------------------------------------------------------- ticket controls ---

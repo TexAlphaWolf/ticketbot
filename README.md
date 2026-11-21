@@ -252,11 +252,14 @@ port 8080.
   again before acting, so the bot must be running
 - **Live updates**: `GET .../events` (Server-Sent Events) tells the dashboard when a
   ticket changes, and the open pages refresh by themselves
+- **Open a ticket from the browser**: every member can log in and open a ticket under
+  *Open a ticket* (`/api/v1/me/...`), with the same types, questions, FAQ and limits as
+  on Discord, and see their own tickets and the conversation of the closed ones
 - **Transcripts in the dashboard**: when a ticket closes, its transcript is also saved in
   the database (encrypted) and shown on the ticket's page, with a *Download HTML* button.
   Deleting the transcript message from the archive channel, or the ticket from the
-  dashboard (admins), deletes the ticket everywhere: dashboard, statistics and the
-  transcript messages in the log and archive channels. To keep a hidden copy for legal
+  dashboard (admins), deletes the ticket everywhere: dashboard, statistics, its channel
+  if it is still there and the transcript messages in the log and archive channels. To keep a hidden copy for legal
   reasons set `LEGAL_HOLD_DAYS` (e.g. `3650`); `python -m ticketbot held` lists the
   copies and saves one as HTML
 - **Server management** (admins only): `GET/PATCH .../settings` (language, retention,

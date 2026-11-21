@@ -62,7 +62,8 @@ it was about (e.g. a ticket number) and when. Details such as a closing or escal
 reason are encrypted. For actions from the web dashboard, the IP address is recorded, encrypted.
 
 **Actions from the web dashboard**: what a staff member asks from the dashboard (e.g.
-close a ticket with a reason, answer in a ticket) waits in a queue until the bot carries
+close a ticket with a reason, answer in a ticket), or a ticket a member opens from the
+dashboard (type, subject and answers), waits in a queue until the bot carries
 it out: who asked it, the server, the action and its content (encrypted), and how it
 went. Finished actions are deleted after 30 days.
 

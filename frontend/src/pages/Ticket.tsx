@@ -65,7 +65,7 @@ export function Ticket() {
             )}
           </Card>
           {open && <TicketActions guildId={guildId} ticket={d} levels={levels} part="main" />}
-          {d.status === "closed" && <TranscriptView guildId={guildId} ticketId={d.id} available={d.has_transcript} />}
+          {d.status === "closed" && <TranscriptView guildId={guildId} ticketId={d.id} available={d.has_transcript} closedAt={d.closed_at} />}
           <Card title={t("ticket.notes")}>
             {d.notes.length === 0 ? (
               <p className="muted">{t("ticket.no_notes")}</p>

@@ -14,9 +14,9 @@ DAY = 86400
 META = {"guild": "Test", "channel": "bug-mario-1", "fields": [("Type", "🐞 Bug")]}
 MESSAGES = [TMessage(author="Mario", author_id=11, avatar="https://cdn/a.png", color=None,
                      bot=False, created_at=datetime(2026, 11, 21, 12, tzinfo=UTC),
-                     content="It **crashes**", embeds=[{"title": "T", "description": "D",
-                                                        "fields": [("Game", "3.2")],
-                                                        "color": None}],
+                     content="It **crashes**",
+                     embeds=[{"author": "", "title": "T", "description": "D",
+                              "fields": [("Game", "3.2")], "footer": "", "color": None}],
                      attachments=[{"filename": "log.txt", "url": "https://cdn/log.txt",
                                    "image": False}],
                      stickers=[{"name": "wave", "id": 99, "url": "u", "image": True}],
@@ -112,8 +112,16 @@ def test_archive_deletion_deletes_everywhere(tmp_path):
                 deleted.append((self.id, mid))
             return SimpleNamespace(delete=delete)
 
+    class TicketChannel:                         # closed, waiting for the reopen window
+        id = 500
+
+        async def delete(self, reason=None):
+            deleted.append(("channel", self.id))
+
     guild = SimpleNamespace(id=1, get_channel=lambda cid: Channel(cid) if cid in (60, 70)
-                            else None)
+                            else None,
+                            get_channel_or_thread=lambda cid: TicketChannel()
+                            if cid == 500 else None)
 
     async def scenario():
         store = await new_store(tmp_path / "ticketbot.db")
@@ -125,7 +133,8 @@ def test_archive_deletion_deletes_everywhere(tmp_path):
         assert await bot.archive_messages_deleted(1, 70, [12345]) == 0
         assert await bot.archive_messages_deleted(1, 70, [500]) == 1
         assert await store.get_ticket(tid) is None
-        assert deleted == [(60, 501)]                    # the log copy; the archive's is gone
+        # the ticket's channel and the log copy; the archive's message is already gone
+        assert deleted == [("channel", 500), (60, 501)]
         assert len(await store.held_transcripts()) == 1  # LEGAL_HOLD_DAYS=10
         entries = await store.audit_entries(1)
         assert entries[0]["action"] == "ticket.delete" and entries[0]["source"] == "discord"
@@ -165,3 +174,78 @@ def test_held_command(tmp_path, monkeypatch, capsys):
         assert "crashes" in page and "Known bug" in page
     finally:
         get_settings.cache_clear()
+
+
+def test_saving_the_transcript_refreshes_the_dashboards(tmp_path):
+    async def scenario():
+        store = await new_store(tmp_path / "ticketbot.db")
+        await store.save_guild(1)
+        tid = await store.create_ticket(guild_id=1, channel_id=5, owner_id=11, type_key="bug",
+                                        type_label="Bug", type_emoji="x", opened_at=1.0,
+                                        last_activity=1.0)
+        await store.update_ticket(tid, status="closed", closed_at=1.0)
+        before = await store.tickets_version(1)
+        await asyncio.sleep(0.01)
+        await store.save_transcript(guild_id=1, ticket_id=tid, channel_name="bug-1",
+                                    content=dump_transcript(META, MESSAGES, NOTES),
+                                    created_at=2.0)
+        assert await store.tickets_version(1) != before
+        await store.close()
+
+    asyncio.run(scenario())
+
+
+def test_web_deletion_removes_the_channel_left_open(tmp_path):
+    from ticketbot.bot.client import TicketBot
+
+    deleted = []
+
+    class TicketChannel:
+        def __init__(self, cid):
+            self.id = cid
+
+        async def delete(self, reason=None):
+            deleted.append(self.id)
+
+    member = SimpleNamespace(id=9, guild_permissions=SimpleNamespace(administrator=True),
+                             roles=[])
+    guild = SimpleNamespace(id=1, owner_id=9, get_member=lambda uid: member,
+                            get_channel=lambda cid: None,
+                            get_channel_or_thread=lambda cid: TicketChannel(cid)
+                            if cid == 800 else None)
+
+    async def scenario():
+        store = await new_store(tmp_path / "ticketbot.db")
+        await store.save_guild(1, staff_role=5)
+        bot = TicketBot(store)
+        bot.get_guild = lambda gid: guild
+        ok = await store.enqueue_command(1, "transcript.delete_messages", 9,
+                                         {"channel_id": "800", "transcripts": []})
+        gone = await store.enqueue_command(1, "transcript.delete_messages", 9,
+                                           {"channel_id": "801", "transcripts": []})
+        await bot.web_commands.coro(bot)
+        assert [(await store.get_command(c))["status"] for c in (ok, gone)] == ["done"] * 2
+        assert deleted == [800]
+        await store.close()
+
+    asyncio.run(scenario())
+
+
+def test_embed_author_and_footer():
+    from dataclasses import replace
+
+    from ticketbot.core.transcripts import render_html
+
+    # Saved before 3.0.0b3: no author and footer, loaded as empty
+    before = replace(MESSAGES[0], embeds=[{"title": "T", "description": "D", "fields": [],
+                                           "color": None}])
+    _, old, _ = load_transcript(dump_transcript(META, [before], NOTES))
+    assert (old[0].embeds[0]["author"], old[0].embeds[0]["footer"]) == ("", "")
+    staff_answer = replace(MESSAGES[0], embeds=[{
+        "author": "WerewolfTex", "title": "", "description": "We are on it", "fields": [],
+        "footer": "Sent from the web dashboard", "color": None}])
+    _, new, _ = load_transcript(dump_transcript(META, [staff_answer], []))
+    assert new[0].embeds[0]["author"] == "WerewolfTex"
+    html = render_html(META, new, [], lambda key, **kw: key).decode()
+    assert "<div class='ea'>WerewolfTex</div>" in html
+    assert "<div class='efoot'>Sent from the web dashboard</div>" in html

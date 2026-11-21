@@ -364,9 +364,10 @@ async def remove_type_role(request: Request, session: Session, access: Admin,
 @router.delete("/tickets/{ticket_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_ticket(request: Request, session: Session, access: Admin,
                         ticket_id: Annotated[int, Path(ge=1)]) -> Response:
-    """Delete a closed ticket everywhere: dashboard, statistics, notes, transcript and
-    its messages in the log and archive channels (like deleting the archive message).
-    With LEGAL_HOLD_DAYS a hidden copy of the transcript stays for that long."""
+    """Delete a closed ticket everywhere: dashboard, statistics, notes, transcript, its
+    channel if still there and its messages in the log and archive channels (like
+    deleting the archive message). With LEGAL_HOLD_DAYS a hidden copy of the
+    transcript stays for that long."""
     store = request.app.state.store
     t = await store.get_ticket(ticket_id)
     if t is None or t["guild_id"] != access.guild_id:
@@ -375,9 +376,14 @@ async def delete_ticket(request: Request, session: Session, access: Admin,
         raise HTTPException(status.HTTP_409_CONFLICT, "Close the ticket first")
     removed = await store.delete_ticket(ticket_id, request.app.state.settings.legal_hold_days)
     await record(request, session, access, "ticket.delete", f"ticket:{ticket_id}")
-    if removed:
-        await queue(request, session, access, "transcript.delete_messages", transcripts=[
-            {k: str(v) if v else None for k, v in r.items() if k != "id"} for r in removed])
+    # The bot deletes what is left on Discord: the channel, if it is still there (closed
+    # tickets keep it for a while, to reopen them), and the transcript messages
+    channel_id = None if t["channel_deleted"] else str(t["channel_id"])
+    if removed or channel_id:
+        await queue(request, session, access, "transcript.delete_messages",
+                    channel_id=channel_id, transcripts=[
+                        {k: str(v) if v else None for k, v in r.items() if k != "id"}
+                        for r in removed])
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

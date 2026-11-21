@@ -113,9 +113,26 @@ class TranscriptAttachment(BaseModel):
 
 
 class TranscriptEmbed(BaseModel):
+    author: str = ""
     title: str
     description: str
     fields: list[tuple[str, str]]
+    footer: str = ""
+
+
+class TranscriptSticker(BaseModel):
+    name: str
+    id: str
+    url: str
+    image: bool                   # False: an animated (Lottie) sticker, shown by name
+
+
+class TranscriptReaction(BaseModel):
+    emoji: str                    # the emoji, or :name: for a custom one
+    id: str | None                # custom emoji only
+    url: str | None
+    count: int
+    users: list[str]              # the first REACTION_USERS_LIMIT names
 
 
 class TranscriptMessage(BaseModel):
@@ -127,6 +144,26 @@ class TranscriptMessage(BaseModel):
     content: str
     attachments: list[TranscriptAttachment]
     embeds: list[TranscriptEmbed]
+    stickers: list[TranscriptSticker]
+    reactions: list[TranscriptReaction]
+
+    @classmethod
+    def from_message(cls, m) -> "TranscriptMessage":
+        return cls(author=m.author, author_id=str(m.author_id), avatar=m.avatar, bot=m.bot,
+                   created_at=m.created_at.timestamp(), content=m.content,
+                   attachments=[TranscriptAttachment(**a) for a in m.attachments],
+                   embeds=[TranscriptEmbed(author=e.get("author", ""), title=e["title"],
+                                           description=e["description"],
+                                           fields=[(str(n), str(v)) for n, v in e["fields"]],
+                                           footer=e.get("footer", ""))
+                           for e in m.embeds],
+                   stickers=[TranscriptSticker(name=st["name"], id=str(st["id"]),
+                                               url=st["url"], image=st["image"])
+                             for st in m.stickers],
+                   reactions=[TranscriptReaction(
+                       emoji=r["emoji"], id=str(r["id"]) if r.get("id") else None,
+                       url=r.get("url"), count=r["count"], users=r.get("users", []))
+                       for r in m.reactions])
 
 
 class TranscriptNote(BaseModel):
@@ -173,51 +210,41 @@ class Stats(BaseModel):
 
 async def oauth_guilds(request: Request, session: dict) -> dict[int, dict]:
     """The servers of the logged-in user (from Discord, cached for a minute)."""
-    cache = request.app.state.guilds_cache
-    found = cache.get(session["id"])
-    if found is None:
+    async def load() -> dict[int, dict]:
         token = await discord_token(request, session)
-        try:
-            found = {int(g["id"]): g
-                     for g in await request.app.state.discord.user_guilds(token)}
-        except DiscordError as e:
-            if e.status == 401:
-                await request.app.state.store.delete_web_session(session["id"])
-                raise HTTPException(status.HTTP_401_UNAUTHORIZED,
-                                    "The Discord login expired: log in again") from None
-            raise HTTPException(status.HTTP_502_BAD_GATEWAY,
-                                "Discord can't be reached") from None
-        cache.set(session["id"], found)
-    return found
+        return {int(g["id"]): g for g in await request.app.state.discord.user_guilds(token)}
+
+    try:
+        return await request.app.state.guilds_cache.fetch(session["id"], load)
+    except DiscordError as e:
+        if e.status == 401:
+            await request.app.state.store.delete_web_session(session["id"])
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED,
+                                "The Discord login expired: log in again") from None
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Discord can't be reached") from None
 
 
 async def member(request: Request, guild_id: int, user_id: int) -> dict | None:
-    cache = request.app.state.members_cache
-    key = (guild_id, user_id)
-    found = cache.get(key)
-    if found is None:
-        try:
-            found = await request.app.state.discord.member(guild_id, user_id) or {}
-        except DiscordError:
-            raise HTTPException(status.HTTP_502_BAD_GATEWAY,
-                                "Discord can't be reached") from None
-        cache.set(key, found)
+    async def load() -> dict:
+        return await request.app.state.discord.member(guild_id, user_id) or {}
+
+    try:
+        found = await request.app.state.members_cache.fetch((guild_id, user_id), load)
+    except DiscordError:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Discord can't be reached") from None
     return found or None
 
 
 async def user_profile(request: Request, user_id: int) -> dict | None:
     """{"user": ...} like a member, for someone who isn't in the server."""
-    cache = request.app.state.members_cache
-    key = ("user", user_id)
-    found = cache.get(key)
-    if found is None:
-        try:
-            user = await request.app.state.discord.user(user_id)
-        except DiscordError:
-            raise HTTPException(status.HTTP_502_BAD_GATEWAY,
-                                "Discord can't be reached") from None
-        found = {"user": user} if user else {}
-        cache.set(key, found)
+    async def load() -> dict:
+        user = await request.app.state.discord.user(user_id)
+        return {"user": user} if user else {}
+
+    try:
+        found = await request.app.state.members_cache.fetch(("user", user_id), load)
+    except DiscordError:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Discord can't be reached") from None
     return found or None
 
 
@@ -457,13 +484,7 @@ async def get_transcript(request: Request, session: Session, access: GuildAccess
     _meta, messages, notes = load_transcript(transcript["content"])
     return TranscriptOut(
         channel_name=transcript["channel_name"], created_at=transcript["created_at"],
-        messages=[TranscriptMessage(
-            author=m.author, author_id=str(m.author_id), avatar=m.avatar, bot=m.bot,
-            created_at=m.created_at.timestamp(), content=m.content,
-            attachments=[TranscriptAttachment(**a) for a in m.attachments],
-            embeds=[TranscriptEmbed(title=e["title"], description=e["description"],
-                                    fields=[(str(n), str(v)) for n, v in e["fields"]])
-                    for e in m.embeds]) for m in messages],
+        messages=[TranscriptMessage.from_message(m) for m in messages],
         notes=[TranscriptNote(**n) for n in notes])
 
 

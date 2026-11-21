@@ -134,6 +134,8 @@ pre{background:#1e1f22;padding:8px;border-radius:4px;white-space:pre-wrap;margin
 margin:4px 0;max-width:520px}
 .embed .et{font-weight:600;color:#f2f3f5;margin-bottom:4px}
 .embed .ef{margin-top:6px}
+.embed .ea{font-size:13px;font-weight:600;color:#f2f3f5;margin-bottom:4px}
+.embed .efoot{font-size:12px;color:#949ba4;margin-top:8px}
 .embed .ef b{display:block;color:#f2f3f5}
 .att img{max-width:400px;max-height:300px;border-radius:4px;margin-top:4px;display:block}
 .att a{color:#00a8fc}
@@ -191,6 +193,8 @@ def render_html(meta: dict, messages: list[TMessage], notes: list[dict],
         for e in m.embeds:
             border = f" style='border-color:{esc(e['color'], quote=True)}'" if e["color"] else ""
             inner = ""
+            if e.get("author"):
+                inner += f"<div class='ea'>{esc(e['author'])}</div>"
             if e["title"]:
                 inner += f"<div class='et'>{markdown_to_html(e['title'])}</div>"
             if e["description"]:
@@ -198,6 +202,8 @@ def render_html(meta: dict, messages: list[TMessage], notes: list[dict],
             for name, value in e["fields"]:
                 inner += (f"<div class='ef'><b>{markdown_to_html(name)}</b>"
                           f"{markdown_to_html(value)}</div>")
+            if e.get("footer"):
+                inner += f"<div class='efoot'>{esc(e['footer'])}</div>"
             body.append(f"<div class='embed'{border}>{inner}</div>")
         for a in m.attachments:
             url = esc(a["url"], quote=True)
@@ -277,7 +283,8 @@ def load_transcript(text: str) -> tuple[dict, list[TMessage], list[dict]]:
         author=m["author"], author_id=int(m["author_id"]), avatar=m["avatar"],
         color=m.get("color"), bot=m["bot"],
         created_at=datetime.fromtimestamp(m["created_at"], UTC), content=m["content"],
-        embeds=[{**e, "fields": [tuple(f) for f in e["fields"]]} for e in m["embeds"]],
+        embeds=[{"author": "", "footer": "", **e, "fields": [tuple(f) for f in e["fields"]]}
+                for e in m["embeds"]],          # author and footer: since 3.0.0b3
         attachments=m["attachments"],
         stickers=[{**st, "id": int(st["id"])} for st in m.get("stickers", [])],
         reactions=m.get("reactions", [])) for m in data["messages"]]

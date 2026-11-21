@@ -73,6 +73,8 @@ STRINGS["en"] = {
     "roles.exists": "{role} already handles the {type} tickets.",
     "roles.removed": "🗑️ {role} no longer handles the {type} tickets.",
     "web.message_footer": "Sent from the web dashboard",
+    "field.source": "Opened from",
+    "open.from_web": "🌐 the web dashboard",
     "faq.title": "💡 Before you open a ticket · {type}",
     "faq.intro": "These answers solve many requests. If none of them helps, open a ticket "
         "and the staff will answer you.",
@@ -506,6 +508,8 @@ STRINGS["it"] = {
     "roles.exists": "{role} gestisce già i ticket {type}.",
     "roles.removed": "🗑️ {role} non gestisce più i ticket {type}.",
     "web.message_footer": "Inviato dalla dashboard web",
+    "field.source": "Origine",
+    "open.from_web": "🌐 la dashboard web",
     "faq.title": "💡 Prima di aprire un ticket · {type}",
     "faq.intro": "Queste risposte risolvono molte richieste. Se nessuna ti aiuta, apri un "
         "ticket e lo staff ti risponderà.",
@@ -938,6 +942,8 @@ STRINGS["de"] = {
     "roles.exists": "{role} bearbeitet die {type}-Tickets bereits.",
     "roles.removed": "🗑️ {role} bearbeitet die {type}-Tickets nicht mehr.",
     "web.message_footer": "Über das Web-Dashboard gesendet",
+    "field.source": "Quelle",
+    "open.from_web": "🌐 das Web-Dashboard",
     "faq.title": "💡 Bevor du ein Ticket öffnest · {type}",
     "faq.intro": "Diese Antworten lösen viele Anfragen. Wenn keine hilft, öffne ein Ticket "
         "und das Team antwortet dir.",

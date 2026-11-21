@@ -34,8 +34,9 @@ export function Layout({ me }: { me: Me }) {
           <img src="/favicon.svg" alt="" width={28} height={28} />
           {t("app.title")}
         </NavLink>
+        <NavLink to="/open" className="sidebar-open">📩 {t("nav.open")}</NavLink>
         <nav aria-label={t("nav.servers")}>
-          <p className="sidebar-label">{t("nav.servers")}</p>
+          {guilds.data && guilds.data.length > 0 && <p className="sidebar-label">{t("nav.staff")}</p>}
           {guilds.data?.map((g) => (
             <NavLink key={g.id} to={`/servers/${g.id}`} className="sidebar-server" title={g.name}>
               <Avatar src={g.icon_url} name={g.name} size={28} />

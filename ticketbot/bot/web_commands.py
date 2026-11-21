@@ -4,7 +4,9 @@ The web checks the permissions before queueing an action; the bot checks them ag
 here with the member's current roles, since they may have changed in the meantime.
 """
 
+import re
 import time
+from datetime import UTC, datetime
 
 import discord
 
@@ -19,9 +21,11 @@ from .common import (
     translator,
 )
 from .tickets import (
+    OpenError,
     change_priority,
     claim_ticket,
     close_ticket,
+    create_ticket,
     escalate,
     move_ticket,
     refresh_guidelines,
@@ -66,6 +70,8 @@ async def run_web_command(client, command: dict) -> str:
     if kind == "guidelines.refresh":
         await refresh_guidelines(guild, cfg)
         return "ok"
+    if kind == "ticket.open":
+        return await open_from_web(client, guild, cfg, command)
     if kind in ADMIN_KINDS:
         member = await get_member(guild, command["requested_by"])
         if member is None or not member.guild_permissions.administrator:
@@ -73,7 +79,9 @@ async def run_web_command(client, command: dict) -> str:
         if kind == "settings.mode":
             return await set_ticket_mode(client, guild, cfg, payload["mode"], member)
         if kind == "transcript.delete_messages":
-            await delete_transcript_messages(client, guild.id, payload["transcripts"])
+            await delete_transcript_messages(
+                client, guild.id, payload.get("transcripts", []),
+                channel_id=int(payload.get("channel_id") or 0) or None)
             return "ok"
         failed = await thread_access(client, guild, cfg,
                                      [int(r) for r in payload["role_ids"]])
@@ -132,13 +140,52 @@ async def run_web_command(client, command: dict) -> str:
     return "ok"
 
 
+def plain(guild: discord.Guild, text: str) -> str:
+    """Discord markup of the bot's messages, readable in the dashboard."""
+    def channel(m):
+        found = guild.get_channel_or_thread(int(m.group(1)))
+        return f"#{found.name}" if found else "#?"
+
+    def when(m):
+        return datetime.fromtimestamp(int(m.group(1)), UTC).strftime("%Y-%m-%d %H:%M UTC")
+
+    text = re.sub(r"<#(\d+)>", channel, text)
+    return re.sub(r"<t:(\d+)(?::\w)?>", when, text).replace("**", "")
+
+
+async def open_from_web(client, guild: discord.Guild, cfg: dict, command: dict) -> str:
+    """The web form: open a ticket as the member who sent it. Returns channel:<id>."""
+    payload = command["payload"]
+    member = await get_member(guild, command["requested_by"])
+    if member is None:
+        raise CommandError("you are not a member of this server")
+    ticket_type = await client.db.get_type(guild.id, payload["type_key"])
+    if ticket_type is None:
+        raise CommandError("this ticket type doesn't exist anymore")
+    try:
+        channel, _queue = await create_ticket(
+            client, guild, member, ticket_type, payload["subject"], payload["description"],
+            source="web")
+    except OpenError as e:
+        raise CommandError(plain(guild, str(e))) from None
+    return f"channel:{channel.id}"
+
+
 async def delete_transcript_messages(client, guild_id: int, transcripts: list[dict],
-                                     keep: int | None = None) -> None:
-    """Delete the archive and log messages of deleted tickets' transcripts (`keep`: the
-    one that was just deleted by hand)."""
+                                     keep: int | None = None,
+                                     channel_id: int | None = None) -> None:
+    """What a deleted ticket left on Discord: its channel (if it is still there, e.g.
+    closed and waiting to be deleted) and the archive and log messages of its
+    transcripts (`keep`: the one that was just deleted by hand)."""
     guild = client.get_guild(guild_id)
     if guild is None:
         return
+    channel = guild.get_channel_or_thread(channel_id) if channel_id else None
+    if channel is not None:
+        try:
+            await channel.delete(reason="Ticket deleted everywhere")
+        except discord.HTTPException:
+            pass              # already gone, or no permission
     for t in transcripts:
         for channel_key, message_key in (("archive_channel_id", "archive_message_id"),
                                          ("log_channel_id", "log_message_id")):

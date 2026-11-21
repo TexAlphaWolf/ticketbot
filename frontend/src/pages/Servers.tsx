@@ -13,7 +13,11 @@ export function Servers() {
     <>
       <h1>{t("servers.title")}</h1>
       {guilds.data.length === 0 ? (
-        <p className="card muted">{t("servers.none")}</p>
+        <div className="card">
+          <p className="muted">{t("servers.none")}</p>
+          <p>{t("servers.open_hint")}</p>
+          <Link to="/open" className="button button-primary">📩 {t("nav.open")}</Link>
+        </div>
       ) : (
         <div className="grid">
           {guilds.data.map((g) => (

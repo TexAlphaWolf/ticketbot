@@ -165,12 +165,16 @@ class TicketBot(discord.Client):
             transcript = await self.db.transcript_by_archive_message(message_id)
             if transcript is None or transcript["ticket_id"] is None:
                 continue
+            ticket = await self.db.get_ticket(transcript["ticket_id"])
             removed = await self.db.delete_ticket(transcript["ticket_id"],
                                                   self.settings.legal_hold_days)
             await self.db.audit(guild_id, None, "ticket.delete", source="discord",
                                 target=f"ticket:{transcript['ticket_id']}",
                                 details={"why": "transcript deleted from the archive"})
-            await delete_transcript_messages(self, guild_id, removed, keep=message_id)
+            channel_id = (ticket["channel_id"] if ticket and not ticket["channel_deleted"]
+                          else None)
+            await delete_transcript_messages(self, guild_id, removed, keep=message_id,
+                                             channel_id=channel_id)
             deleted += 1
         return deleted
 

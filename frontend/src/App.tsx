@@ -6,6 +6,7 @@ import { Layout } from "./components/Layout";
 import { ErrorBox, Loading } from "./components/ui";
 import { Login } from "./pages/Login";
 import { EscalationPage, FaqPage, SettingsPage, TypesPage } from "./pages/admin";
+import { OpenChooseServer, OpenTicket } from "./pages/Open";
 import { Overview } from "./pages/Overview";
 import { Servers } from "./pages/Servers";
 import { Stats } from "./pages/Stats";
@@ -33,6 +34,8 @@ export function App() {
           <Route path="servers/:guildId" element={<Overview />} />
           <Route path="servers/:guildId/tickets" element={<Tickets />} />
           <Route path="servers/:guildId/tickets/:ticketId" element={<Ticket />} />
+          <Route path="open" element={<OpenChooseServer />} />
+          <Route path="open/:guildId" element={<OpenTicket />} />
           <Route path="servers/:guildId/stats" element={<Stats />} />
           <Route path="servers/:guildId/settings" element={<SettingsPage />} />
           <Route path="servers/:guildId/types" element={<TypesPage />} />

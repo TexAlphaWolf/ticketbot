@@ -245,7 +245,9 @@ export interface TranscriptMessage {
   created_at: number;
   content: string;
   attachments: { filename: string; url: string; image: boolean }[];
-  embeds: { title: string; description: string; fields: [string, string][] }[];
+  embeds: { author: string; title: string; description: string; fields: [string, string][]; footer: string }[];
+  stickers: { name: string; id: string; url: string; image: boolean }[];
+  reactions: { emoji: string; id: string | null; url: string | null; count: number; users: string[] }[];
 }
 
 export interface Transcript {
@@ -253,4 +255,42 @@ export interface Transcript {
   created_at: number;
   messages: TranscriptMessage[];
   notes: { author: string; author_id: string; text: string; created_at: number }[];
+}
+
+// ------------------------------------------------------------- members ---
+
+export interface MemberGuild {
+  id: string;
+  name: string;
+  icon_url: string | null;
+}
+
+export interface FormType extends TicketType {
+  questions: { label: string; placeholder: string; long: boolean; required: boolean; max_length: number }[];
+  faq: { question: string; answer: string }[];
+}
+
+export interface MyTicket {
+  id: number;
+  number: number | null;
+  name: string | null;
+  type_label: string;
+  type_emoji: string;
+  subject: string | null;
+  status: Status;
+  channel_id: string | null;
+  opened_at: number;
+  closed_at: number | null;
+  has_transcript: boolean;
+}
+
+export interface MemberGuildDetail extends MemberGuild {
+  types: FormType[];
+  tickets: MyTicket[];
+}
+
+export interface MyCommand {
+  status: "pending" | "running" | "done" | "failed";
+  result: string | null;
+  channel_id: string | null;
 }

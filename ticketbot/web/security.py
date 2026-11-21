@@ -3,8 +3,10 @@
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-# The dashboard loads only its own files; avatars and icons come from Discord's CDN
-CSP = ("default-src 'self'; img-src 'self' data: https://cdn.discordapp.com; "
+# The dashboard loads only its own files; avatars, icons, emoji, stickers and images in
+# transcripts come from Discord's CDN (animated stickers from media.discordapp.net)
+CSP = ("default-src 'self'; "
+       "img-src 'self' data: https://cdn.discordapp.com https://media.discordapp.net; "
        "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 # The API docs page (Swagger UI) loads its script and style from jsDelivr
 DOCS_CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "

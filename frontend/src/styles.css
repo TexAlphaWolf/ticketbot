@@ -204,8 +204,28 @@ code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
 .message p { margin: 0.15rem 0 0; }
 .embed { border-left: 4px solid var(--accent); background: var(--bg); border-radius: 4px; padding: 0.5rem 0.75rem; margin-top: 0.4rem; }
 .embed p { margin: 0.2rem 0; }
+.attachment-image img { display: block; max-width: min(400px, 100%); max-height: 300px; border-radius: 6px; margin-top: 0.4rem; }
+.sticker { margin-top: 0.4rem; }
+.sticker img { display: block; width: 160px; height: 160px; object-fit: contain; }
+.reactions { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.4rem; }
+.reaction { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.1rem 0.5rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-size: 0.85rem; cursor: default; }
+.reaction .emoji-img { width: 18px; height: 18px; }
+.embed-author { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.2rem; }
+.embed-footer { font-size: 0.75rem; color: var(--muted); margin-top: 0.4rem; }
 .attachment { display: inline-block; margin: 0.3rem 0.5rem 0 0; }
 .badge-bot { background: var(--accent); font-size: 0.65rem; padding: 0 0.35rem; }
+
+/* Web form */
+.sidebar-open { font-weight: 600; }
+.type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; }
+.type-card { display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem; text-align: left; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); cursor: pointer; color: var(--text); }
+.type-card:hover { border-color: var(--accent); }
+.faq { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.8rem; margin-bottom: 0.5rem; }
+.faq summary { cursor: pointer; font-weight: 600; }
+.my-tickets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.my-tickets li + li { border-top: 1px solid var(--border); padding-top: 0.75rem; }
+.my-actions { margin-left: auto; display: flex; gap: 0.4rem; }
+.my-tickets .card { margin-top: 0.75rem; }
 
 /* Toasts */
 .toasts { position: fixed; right: 1rem; bottom: 1rem; display: flex; flex-direction: column; gap: 0.5rem; z-index: 10; max-width: min(420px, calc(100vw - 2rem)); }

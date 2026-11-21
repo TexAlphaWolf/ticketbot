@@ -359,7 +359,13 @@ def test_transcript_in_the_dashboard(api):
     assert not api.get(f"/api/v1/guilds/{GUILD}/tickets/2").json()["has_transcript"]
     tr = api.get(f"/api/v1/guilds/{GUILD}/tickets/4/transcript").json()
     assert tr["channel_name"] == "t-4" and tr["messages"][0]["content"] == "It **crashes**"
-    assert tr["messages"][0]["attachments"][0]["filename"] == "log.txt"
+    first = tr["messages"][0]
+    assert first["attachments"][0]["filename"] == "log.txt"
+    assert first["embeds"][0] == {"author": "", "title": "T", "description": "D",
+                                  "fields": [["Game", "3.2"]], "footer": ""}
+    assert first["stickers"] == [{"name": "wave", "id": "99", "url": "u", "image": True}]
+    assert first["reactions"] == [{"emoji": "👍", "id": None, "url": None, "count": 1,
+                                   "users": ["Tex"]}]
     assert tr["notes"][0]["text"] == "Known bug"
     r = api.get(f"/api/v1/guilds/{GUILD}/tickets/4/transcript.html")
     assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
