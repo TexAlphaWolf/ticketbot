@@ -1,6 +1,19 @@
 # Changelog
 
-## [Unreleased] - V3 Beta2
+## [3.0.0-beta.2] - 2026-11-21
+
+Second beta of TicketBot V3: the new ticket flow. Tickets can go to the right team for
+their type, be opened as private threads, climb escalation levels, and a FAQ can solve
+a request before a ticket is opened. Everything from Beta1 and 2.3 works as before. Test
+it on a test server before using it in production.
+
+### Upgrading from 3.0.0-beta.1
+1. Stop the bot and make a backup: `python -m ticketbot backup` (SQLite)
+2. Update the files; the requirements did not change
+3. Start the bot: it makes another backup and applies the migrations 0003 to 0006
+   (`[database] migrated from 0002 to 0006`)
+
+Upgrading from 2.3: follow the steps of 3.0.0-beta.1 below, then start the bot.
 
 ### Added
 - **Staff per ticket type**: `/types roles add` and `remove` choose the roles that handle

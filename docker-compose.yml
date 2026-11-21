@@ -1,7 +1,7 @@
 services:
   ticketbot:
     build: .
-    image: ticketbot:3.0.0b1
+    image: ticketbot:3.0.0b2
     container_name: ticketbot
     restart: unless-stopped
     env_file: .env
