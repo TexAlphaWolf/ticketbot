@@ -172,3 +172,104 @@ def test_gone_members_and_closed_tickets(tmp_path, world):
         ], check)
     finally:
         wc.close_ticket = original
+
+
+def test_admin_commands(tmp_path, world, monkeypatch):
+    import ticketbot.bot.web_commands as wc
+
+    world.members[20] = Member(id=20, display_name="Admin", bot=False, roles=[],
+                               guild_permissions=SimpleNamespace(administrator=True))
+    panel = SimpleNamespace(id=7, name="tickets")
+    world.channels[7] = panel
+    world.me = SimpleNamespace(id=999)
+    granted = []
+
+    async def fake_grant(channel, roles):
+        granted.append([r.id for r in roles if r is not None])
+        return []
+
+    monkeypatch.setattr(wc, "grant_thread_access", fake_grant)
+    missing = {"value": ["Manage Threads"]}
+    monkeypatch.setattr(wc, "missing_thread_permissions", lambda p, me: missing["value"])
+
+    async def scenario():
+        store = await new_store(tmp_path / "ticketbot.db")
+        await store.save_guild(GUILD, staff_role=5, panel_channel=7)
+        bot = TicketBot(store)
+        bot.get_guild = lambda gid: world
+
+        async def run_one(kind, by, payload):
+            cid = await store.enqueue_command(GUILD, kind, by, payload)
+            await bot.web_commands.coro(bot)
+            c = await store.get_command(cid)
+            return c["status"], c["result"]
+
+        assert await run_one("settings.mode", 10, {"mode": "thread"}) == \
+            ("failed", "only admins can change this")
+        assert await run_one("settings.mode", 20, {"mode": "thread"}) == \
+            ("failed", "the bot needs these permissions in #tickets: Manage Threads")
+        missing["value"] = []
+        assert await run_one("settings.mode", 20, {"mode": "thread"}) == ("done", "ok")
+        assert (await store.get_guild(GUILD))["ticket_mode"] == "thread"
+        assert granted == [[]]               # staff role 5 isn't a role of this fake guild
+        assert await run_one("thread.access", 20, {"role_ids": ["40"]}) == ("done", "ok")
+        assert granted[-1] == [40]
+        assert await run_one("settings.mode", 20, {"mode": "channel"}) == ("done", "ok")
+        assert (await store.get_guild(GUILD))["ticket_mode"] == "channel"
+        await store.close()
+
+    asyncio.run(scenario())
+
+
+def test_panel_refresh_needs_a_known_panel(tmp_path, world):
+    async def scenario():
+        store = await new_store(tmp_path / "ticketbot.db")
+        await store.save_guild(GUILD, staff_role=5)            # set up by TicketBot 1
+        bot = TicketBot(store)
+        bot.get_guild = lambda gid: world
+        cid = await store.enqueue_command(GUILD, "panel.refresh", 10)
+        await bot.web_commands.coro(bot)
+        c = await store.get_command(cid)
+        assert c["status"] == "failed" and "press 'Open ticket'" in c["result"]
+        await store.close()
+
+    asyncio.run(scenario())
+
+
+def test_open_button_teaches_the_bot_its_panel(tmp_path, world):
+    from ticketbot.bot.tickets import TicketPanel
+
+    edited = []
+    panel_channel = SimpleNamespace(
+        id=7, get_partial_message=lambda mid: SimpleNamespace(
+            edit=lambda **kw: _record(edited, mid)))
+    world.channels[7] = panel_channel
+
+    async def scenario():
+        store = await new_store(tmp_path / "ticketbot.db")
+        await store.save_guild(GUILD, staff_role=5, category=6)
+        bot = TicketBot(store)
+        sent = []
+
+        async def send_message(*a, **kw):
+            sent.append(a)
+
+        interaction = SimpleNamespace(
+            client=bot, guild=world, channel=panel_channel, message=SimpleNamespace(id=555),
+            user=Member(id=11, display_name="User", bot=False, roles=[],
+                        guild_permissions=SimpleNamespace(administrator=False)),
+            response=SimpleNamespace(send_message=send_message))
+        await TicketPanel().open_btn.callback(interaction)
+        cfg = await store.get_guild(GUILD)
+        assert (cfg["panel_channel"], cfg["panel_message"]) == (7, 555)
+        assert edited == [555]                                  # and updated it at once
+        interaction.message = SimpleNamespace(id=777)           # an older panel: ignored
+        await TicketPanel().open_btn.callback(interaction)
+        assert (await store.get_guild(GUILD))["panel_message"] == 555
+        await store.close()
+
+    asyncio.run(scenario())
+
+
+async def _record(where, value):
+    where.append(value)

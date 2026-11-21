@@ -46,6 +46,17 @@ def slugify(text: str, max_len: int = 20) -> str:
     return text[:max_len].strip("-")
 
 
+def new_type_key(name: str, existing: set[str]) -> str:
+    """The key of a new ticket type from its name: `Bug report` → `bug-report`, made
+    unique with -2, -3..."""
+    base = slugify(name) or "type"
+    key, n = base, 2
+    while key in existing:
+        key = f"{base[:17]}-{n}"
+        n += 1
+    return key
+
+
 def ticket_channel_name(type_key: str, username: str, user_id: int, user_number: int) -> str:
     """'bug', 'Mario.Rossi', 42, 2 -> 'bug-mario-rossi-2' (Discord limit: 100 characters)."""
     user = slugify(username, max_len=32) or str(user_id)[-6:]

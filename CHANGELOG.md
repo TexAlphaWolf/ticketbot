@@ -39,6 +39,18 @@
   by the bot with the staff member's name and avatar and count as a staff reply
   (first response, reminders, auto-close). Private notes are saved at once. Every
   action is recorded in the audit log with source `web`
+- **Server management from the web** (admins of the server only): settings (language,
+  transcript retention, reminders, auto-assign, cooldown) and the ticket mode; ticket
+  types with their form questions and roles; FAQ; escalation levels; the server's
+  roles to choose from. Same limits and checks as the commands on Discord (emoji, up to
+  25 types, 3 questions, 50 FAQ, 5 levels, no @everyone or bot roles). Changes are
+  saved at once and recorded in the audit log; the bot refreshes the panel and the
+  guidelines, checks its permissions for thread mode and gives the new roles access to
+  the threads
+- **Panel of servers set up with TicketBot 1**: their panel message was never saved,
+  so changing types or language didn't update it. Now the bot learns it the first time
+  someone presses *Open ticket* on it (and updates it at once); until then, a panel
+  update asked from the web fails with a clear message instead of "ok"
 - The names in the web API also cover members who left the server (from their Discord
   profile)
 - Claiming, priority changes and transfers are shared by Discord and the web

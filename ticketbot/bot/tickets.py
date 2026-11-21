@@ -116,6 +116,13 @@ class TicketPanel(discord.ui.View):
         if cfg is None or not cfg.get("category"):
             await interaction.response.send_message(_("error.not_setup"), ephemeral=True)
             return
+        if not cfg.get("panel_message") and interaction.message is not None:
+            # A server set up with TicketBot 1 never saved its panel: learn it now, so
+            # changes of types and language update it (and thread mode knows the channel)
+            cfg = await db.save_guild(interaction.guild.id,
+                                      panel_channel=interaction.channel.id,
+                                      panel_message=interaction.message.id)
+            await refresh_panel(interaction.client, interaction.guild, cfg)
         problem = await open_problem(db, cfg, interaction.user, _)
         if problem:
             await interaction.response.send_message(problem, ephemeral=True)
@@ -129,18 +136,22 @@ class TicketPanel(discord.ui.View):
         )
 
 
-async def refresh_panel(client, guild: discord.Guild, cfg: dict) -> None:
-    """Update the panel message after a change of language or ticket types."""
+async def refresh_panel(client, guild: discord.Guild, cfg: dict) -> str | None:
+    """Update the panel message after a change of language or ticket types. Returns
+    what went wrong, or None."""
+    if not cfg.get("panel_message"):
+        return "unknown panel"
     channel = guild.get_channel(cfg.get("panel_channel") or 0)
-    if channel is None or not cfg.get("panel_message"):
-        return
+    if channel is None:
+        return "panel channel deleted"
     _ = translator(cfg)
     try:
         await channel.get_partial_message(cfg["panel_message"]).edit(
             embed=panel_embed(await client.db.list_types(guild.id), _), view=TicketPanel(_)
         )
-    except discord.HTTPException:
-        pass
+    except discord.HTTPException as e:
+        return f"HTTP {e.status}: {e.text or e}"
+    return None
 
 
 class TypeSelect(discord.ui.Select):

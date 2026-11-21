@@ -112,6 +112,12 @@ class DiscordBot(DiscordOAuth):
                 return None
             raise
 
+    async def guild_roles(self, guild_id: int) -> list[dict]:
+        """The roles of a server (to choose staff, type and escalation roles)."""
+        if self.bot_auth is None:
+            return []
+        return await self._call("GET", f"/guilds/{guild_id}/roles", headers=self.bot_auth)
+
     async def user(self, user_id: int) -> dict | None:
         """A Discord user (name and avatar) who may not be in the server anymore."""
         if self.bot_auth is None:

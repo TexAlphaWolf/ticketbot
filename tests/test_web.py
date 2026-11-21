@@ -170,6 +170,14 @@ class FakeDiscord:
         self.calls += 1
         return self.guilds
 
+    async def guild_roles(self, guild_id):
+        return [{"id": str(guild_id), "name": "@everyone", "position": 0, "color": 0},
+                {"id": "30", "name": "Developers", "position": 3, "color": 1},
+                {"id": "40", "name": "Managers", "position": 4, "color": 2},
+                {"id": "41", "name": "Directors", "position": 5, "color": 3},
+                {"id": "50", "name": "Staff", "position": 2, "color": 4},
+                {"id": "60", "name": "SomeBot", "position": 1, "managed": True}]
+
     async def user(self, user_id):
         if user_id in getattr(self, "former_members", ()):
             return {"id": str(user_id), "username": f"gone{user_id}", "global_name": None,

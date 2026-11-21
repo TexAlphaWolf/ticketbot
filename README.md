@@ -241,6 +241,11 @@ python -m ticketbot web        # http://127.0.0.1:8080
   queued and carried out by the bot within a few seconds; `GET .../commands/{id}` tells
   how they went. `.../notes` saves a private note at once. The bot checks your roles
   again before acting, so the bot must be running
+- **Server management** (admins only): `GET/PATCH .../settings` (language, retention,
+  reminders, auto-assign, cooldown), `PUT .../settings/mode`, `.../types` with their
+  questions and roles, `.../faq`, `.../escalation` and `GET .../roles` (the server's
+  roles, to choose from). The same limits as the commands on Discord; the bot updates
+  the panel and the guidelines by itself
 - `/api/docs` is the interactive documentation of the API (`WEB_API_DOCS=false` turns
   it off)
 - The web dashboard never changes the database schema: start the bot first after an
@@ -372,6 +377,7 @@ ticketbot/
 │   ├── api/auth.py      # login with Discord and logout
 │   ├── api/guilds.py    # servers, tickets and statistics
 │   ├── api/actions.py   # actions on tickets (queued for the bot)
+│   ├── api/admin.py     # settings, types, FAQ and escalation (admins)
 │   ├── permissions.py   # who may see what (the same rules as the bot)
 │   ├── cache.py         # short in-memory cache of Discord's answers
 │   ├── sessions.py      # login cookies, current user, CSRF protection

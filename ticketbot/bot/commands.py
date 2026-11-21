@@ -17,8 +17,8 @@ from ..core.logic import (
     compute_stats,
     fill_reply,
     format_duration,
+    new_type_key,
     reply_name,
-    slugify,
     stars,
     valid_emoji,
     valid_profile_image,
@@ -1134,12 +1134,7 @@ class TypesGroup(app_commands.Group):
         if not valid_emoji(emoji):
             await interaction.response.send_message(_("types.bad_emoji"), ephemeral=True)
             return
-        base = slugify(name) or "type"
-        key, n = base, 2
-        existing = {t["key"] for t in types}
-        while key in existing:
-            key = f"{base[:17]}-{n}"
-            n += 1
+        key = new_type_key(name, {t["key"] for t in types})
         await db.add_type(interaction.guild.id, key, name.strip(), emoji.strip(),
                     (description or "").strip())
         await audit(interaction, "type.add", f"type:{key}", label=name.strip())

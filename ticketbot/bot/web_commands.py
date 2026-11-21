@@ -10,7 +10,14 @@ import discord
 
 from ..core import config
 from ..core.logic import activity_changes
-from .common import COLOR, is_ticket_staff, ticket_channel, translator
+from .common import (
+    COLOR,
+    grant_thread_access,
+    is_ticket_staff,
+    missing_thread_permissions,
+    ticket_channel,
+    translator,
+)
 from .tickets import (
     change_priority,
     claim_ticket,
@@ -22,6 +29,7 @@ from .tickets import (
     ticket_roles,
 )
 
+ADMIN_KINDS = {"settings.mode", "thread.access"}
 TICKET_KINDS = {"ticket.close", "ticket.claim", "ticket.priority", "ticket.transfer",
                 "ticket.escalate", "ticket.message"}
 
@@ -48,11 +56,25 @@ async def run_web_command(client, command: dict) -> str:
         raise CommandError("the bot is not in this server anymore")
     payload, kind = command["payload"], command["kind"]
     if kind == "panel.refresh":
-        await refresh_panel(client, guild, cfg)
+        problem = await refresh_panel(client, guild, cfg)
+        if problem == "unknown panel":
+            raise CommandError("the bot doesn't know the panel message yet: press "
+                               "'Open ticket' on the panel once, or run /setup again")
+        if problem:
+            raise CommandError(f"the panel couldn't be updated ({problem})")
         return "ok"
     if kind == "guidelines.refresh":
         await refresh_guidelines(guild, cfg)
         return "ok"
+    if kind in ADMIN_KINDS:
+        member = await get_member(guild, command["requested_by"])
+        if member is None or not member.guild_permissions.administrator:
+            raise CommandError("only admins can change this")
+        if kind == "settings.mode":
+            return await set_ticket_mode(client, guild, cfg, payload["mode"], member)
+        failed = await thread_access(client, guild, cfg,
+                                     [int(r) for r in payload["role_ids"]])
+        return f"could not change: {', '.join(failed)}" if failed else "ok"
     if kind not in TICKET_KINDS:
         raise CommandError(f"unknown command {kind!r}")
 
@@ -105,6 +127,40 @@ async def run_web_command(client, command: dict) -> str:
     elif kind == "ticket.message":
         await post_staff_message(client, channel, ticket, member, payload["text"], _)
     return "ok"
+
+
+async def set_ticket_mode(client, guild: discord.Guild, cfg: dict, mode: str,
+                          member: discord.Member) -> str:
+    """Channels or private threads for new tickets (like /settings mode)."""
+    if mode == "thread":
+        panel = guild.get_channel(cfg.get("panel_channel") or 0)
+        if panel is None:
+            raise CommandError("the panel channel doesn't exist anymore: run /setup again")
+        missing = missing_thread_permissions(panel, guild.me)
+        if missing:
+            raise CommandError(f"the bot needs these permissions in #{panel.name}: "
+                               + ", ".join(missing))
+        roles = {cfg["staff_role"]} | {
+            r for ids in (await client.db.all_type_roles(guild.id)).values() for r in ids}
+        failed = await grant_thread_access(panel, [guild.get_role(r) for r in roles])
+    else:
+        failed = []
+    await client.db.save_guild(guild.id, ticket_mode=mode)
+    await client.db.audit(guild.id, member.id, "settings.mode", source="web",
+                          details={"value": mode})
+    return f"ok; could not give access to: {', '.join(failed)}" if failed else "ok"
+
+
+async def thread_access(client, guild: discord.Guild, cfg: dict,
+                        role_ids: list[int]) -> list[str]:
+    """In thread mode, roles that handle tickets need Manage Threads in the panel."""
+    if cfg.get("ticket_mode") != "thread":
+        return []
+    panel = guild.get_channel(cfg.get("panel_channel") or 0)
+    if panel is None:
+        return []
+    failed = await grant_thread_access(panel, [guild.get_role(r) for r in role_ids])
+    return [f.strip("<@&>") for f in failed]
 
 
 async def post_staff_message(client, channel, ticket: dict, member: discord.Member,

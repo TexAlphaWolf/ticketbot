@@ -45,7 +45,7 @@ class PriorityBody(BaseModel):
 
 
 class TransferBody(BaseModel):
-    member_id: str = Field(pattern=r"^\d{15,25}$")
+    member_id: str = Field(pattern=r"^\d{1,20}$")
 
 
 class EscalateBody(BaseModel):
