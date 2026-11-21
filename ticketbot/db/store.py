@@ -299,7 +299,8 @@ class Store:
     async def create_ticket(self, **fields) -> int:
         _check(fields, TICKET_FIELDS)
         async with self.engine.begin() as conn:
-            result = await conn.execute(insert(TICKETS).values(**fields)
+            result = await conn.execute(insert(TICKETS).values(updated_at=time.time(),
+                                                               **fields)
                                         .returning(TICKETS.c.id))
             return result.scalar_one()
 
@@ -313,7 +314,8 @@ class Store:
     async def update_ticket(self, ticket_id: int, **fields) -> None:
         _check(fields, TICKET_FIELDS)
         if fields:
-            await self._write(update(TICKETS).where(TICKETS.c.id == ticket_id).values(**fields))
+            await self._write(update(TICKETS).where(TICKETS.c.id == ticket_id)
+                              .values(**{"updated_at": time.time(), **fields}))
 
     async def open_ticket_of_owner(self, guild_id: int, owner_id: int) -> dict | None:
         return await self._one(select(TICKETS).where(
@@ -339,7 +341,8 @@ class Store:
         """The channel is gone: forget the content, keep the metadata for /stats."""
         async with self.engine.begin() as conn:
             await conn.execute(update(TICKETS).where(TICKETS.c.id == ticket_id)
-                               .values(channel_deleted=True, subject=None, description=None))
+                               .values(channel_deleted=True, subject=None, description=None,
+                                       updated_at=time.time()))
             await conn.execute(delete(NOTES).where(NOTES.c.ticket_id == ticket_id))
 
     async def last_ticket_of_owner(self, guild_id: int, owner_id: int) -> dict | None:
@@ -426,6 +429,15 @@ class Store:
             if len(batch) < size:
                 return found, None
         return found, cursor          # looked at SEARCH_SCAN rows: more may follow
+
+    async def tickets_version(self, guild_id: int, scope: TicketScope | None = None) -> tuple:
+        """Changes when a visible ticket is opened, changed or deleted (live dashboard)."""
+        stmt = select(func.count(), func.max(TICKETS.c.id), func.max(TICKETS.c.updated_at)) \
+            .where(TICKETS.c.guild_id == guild_id)
+        if scope is not None:
+            stmt = stmt.where(scope.clause())
+        async with self.engine.connect() as conn:
+            return tuple((await conn.execute(stmt)).one())
 
     async def tickets_since(self, guild_id: int, since: float) -> list[dict]:
         return await self._all(select(TICKETS).where(TICKETS.c.guild_id == guild_id,
@@ -553,8 +565,11 @@ class Store:
 
     async def add_note(self, ticket_id: int, author_id: int, text: str,
                        created_at: float) -> None:
-        await self._write(insert(NOTES).values(ticket_id=ticket_id, author_id=author_id,
-                                               text=text, created_at=created_at))
+        async with self.engine.begin() as conn:
+            await conn.execute(insert(NOTES).values(ticket_id=ticket_id, author_id=author_id,
+                                                    text=text, created_at=created_at))
+            await conn.execute(update(TICKETS).where(TICKETS.c.id == ticket_id)
+                               .values(updated_at=time.time()))
 
     async def list_notes(self, ticket_id: int) -> list[dict]:
         return await self._all(select(NOTES).where(NOTES.c.ticket_id == ticket_id)

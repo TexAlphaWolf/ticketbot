@@ -74,6 +74,11 @@ select { background: var(--panel); border: 1px solid var(--border); border-radiu
 .me strong, .me span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .content { padding: 2rem; max-width: 1200px; width: 100%; }
 
+/* Live updates */
+.live { display: flex; align-items: center; gap: 0.45rem; padding: 0.4rem 0.5rem 0; font-size: 0.8rem; color: var(--muted); }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--closed); }
+.live-on .live-dot { background: var(--success); box-shadow: 0 0 0 3px rgba(36, 128, 70, 0.25); }
+
 /* Building blocks */
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1rem; color: var(--text); display: block; }
 .card-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }

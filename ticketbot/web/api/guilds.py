@@ -1,10 +1,12 @@
 """Servers, tickets and statistics, read-only, for the admins and staff of each server."""
 
 import asyncio
+import json
 import time
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ...core import config
@@ -363,6 +365,49 @@ async def list_tickets(
     ids = {t[k] for t in rows for k in ("owner_id", "claimed_by", "assigned_to") if t[k]}
     return TicketPage(tickets=[summary(t) for t in rows], next_before=next_before,
                       people=await people(request, access.guild_id, ids))
+
+
+EVENTS_POLL_SECONDS = 3       # how often the database is checked for changes
+EVENTS_STREAM_SECONDS = 1800  # then the browser reconnects (and the login is checked)
+
+
+@router.get("/{guild_id}/events", response_class=StreamingResponse,
+            responses={200: {"content": {"text/event-stream": {}}}})
+async def events(request: Request, session: Session, access: GuildAccess):
+    """Server-Sent Events: `tickets` when a ticket you can see is opened, changed or
+    deleted, so the dashboard refreshes by itself. `: ping` keeps the connection open."""
+    store = request.app.state.store
+    scope = access.scope()
+    server = getattr(request.app.state, "server", None)
+
+    def stopping() -> bool:
+        return server is not None and server.should_exit
+
+    async def stream():
+        yield "retry: 5000\n\n"                  # reconnect after 5 s if it drops
+        last = await store.tickets_version(access.guild_id, scope)
+        started = time.monotonic()
+        while time.monotonic() - started < EVENTS_STREAM_SECONDS:
+            for _ in range(10):                     # wake up often to notice a Ctrl+C
+                await asyncio.sleep(EVENTS_POLL_SECONDS / 10)
+                if stopping():
+                    return
+            if await request.is_disconnected():
+                return
+            current = await store.tickets_version(access.guild_id, scope)
+            if current != last:
+                last = current
+                yield f"event: tickets\ndata: {json.dumps({'at': time.time()})}\n\n"
+            else:
+                yield ": ping\n\n"
+            alive = await store.get_web_session(session["id"])
+            if alive is None or alive["expires_at"] <= time.time():
+                yield "event: logout\ndata: {}\n\n"
+                return
+
+    return StreamingResponse(stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-store",
+                                      "X-Accel-Buffering": "no"})
 
 
 @router.get("/{guild_id}/tickets/{ticket_id}", response_model=TicketDetail)

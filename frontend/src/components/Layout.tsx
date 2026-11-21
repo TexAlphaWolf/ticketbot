@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router";
 import { api, type GuildDetail, type GuildSummary, type Me } from "../api";
 import { LANGS, type Lang, useI18n } from "../i18n";
+import { useLiveUpdates } from "../live";
 import { Avatar } from "./ui";
 
 export function Layout({ me }: { me: Me }) {
@@ -17,6 +18,7 @@ export function Layout({ me }: { me: Me }) {
     enabled: !!current,
   });
   const name = me.user.global_name ?? me.user.username;
+  const live = useLiveUpdates(current?.id);
 
   async function logout() {
     await api("/auth/logout", { method: "POST" }).catch(() => undefined);
@@ -48,6 +50,9 @@ export function Layout({ me }: { me: Me }) {
             </NavLink>
             <NavLink to={`/servers/${current.id}/tickets`}>{t("nav.tickets")}</NavLink>
             {detail.data?.can_see_stats && <NavLink to={`/servers/${current.id}/stats`}>{t("nav.stats")}</NavLink>}
+            <span className={`live ${live ? "live-on" : ""}`} title={live ? t("live.on") : t("live.off")}>
+              <span className="live-dot" aria-hidden /> {live ? t("live.on") : t("live.off")}
+            </span>
           </nav>
         )}
         {current?.role === "admin" && (

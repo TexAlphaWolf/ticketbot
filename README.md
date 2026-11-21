@@ -250,6 +250,8 @@ port 8080.
   queued and carried out by the bot within a few seconds; `GET .../commands/{id}` tells
   how they went. `.../notes` saves a private note at once. The bot checks your roles
   again before acting, so the bot must be running
+- **Live updates**: `GET .../events` (Server-Sent Events) tells the dashboard when a
+  ticket changes, and the open pages refresh by themselves
 - **Transcripts in the dashboard**: when a ticket closes, its transcript is also saved in
   the database (encrypted) and shown on the ticket's page, with a *Download HTML* button.
   Deleting the transcript message from the archive channel, or the ticket from the

@@ -166,6 +166,7 @@ class Ticket(Base):
     __tablename__ = "tickets"
     __table_args__ = (
         Index("idx_tickets_guild_status", "guild_id", "status"),
+        Index("ix_tickets_guild_updated", "guild_id", "updated_at"),
         {"sqlite_autoincrement": True},   # never reuse the id of a deleted ticket
     )
 
@@ -203,6 +204,7 @@ class Ticket(Base):
     rating: Mapped[int | None] = mapped_column(Integer)
     rating_comment: Mapped[str | None] = mapped_column(EncryptedText("tickets.rating_comment"))
     rated_at: Mapped[float | None] = mapped_column(Double)
+    updated_at: Mapped[float | None] = mapped_column(Double)   # any change: live dashboard
 
 
 class Transcript(Base):

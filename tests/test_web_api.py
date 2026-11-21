@@ -387,3 +387,37 @@ def test_admin_deletes_a_ticket(api):
     assert api.get(f"/api/v1/guilds/{GUILD}/tickets/4").status_code == 404
     assert api.delete(f"/api/v1/guilds/{GUILD}/tickets/4", headers=h).status_code == 404
     assert [c[0] for c in commands(api)] == ["transcript.delete_messages"]
+
+
+def test_live_events(api, monkeypatch):
+    import threading
+
+    from ticketbot.web.api import guilds as guilds_module
+
+    monkeypatch.setattr(guilds_module, "EVENTS_POLL_SECONDS", 0.05)
+    monkeypatch.setattr(guilds_module, "EVENTS_STREAM_SECONDS", 0.6)
+    as_user(api, STAFF)
+
+    def change(sql, delay=0.15):
+        def run():
+            time.sleep(delay)
+            conn = sqlite3.connect(api.db_path)
+            with conn:
+                conn.execute(sql)
+            conn.close()
+        threading.Thread(target=run).start()
+
+    change("UPDATE tickets SET priority = 'high', updated_at = 9e9 WHERE id = 2")
+    with api.stream("GET", f"/api/v1/guilds/{GUILD}/events") as r:
+        assert r.headers["content-type"].startswith("text/event-stream")
+        body = "".join(r.iter_text())
+    assert body.startswith("retry: 5000") and body.count("event: tickets") == 1
+    assert ": ping" in body
+
+    change("UPDATE tickets SET updated_at = 9e10 WHERE id = 1")      # bug: not theirs
+    with api.stream("GET", f"/api/v1/guilds/{GUILD}/events") as r:
+        assert "event: tickets" not in "".join(r.iter_text())
+
+    change("DELETE FROM web_sessions")
+    with api.stream("GET", f"/api/v1/guilds/{GUILD}/events") as r:
+        assert "event: logout" in "".join(r.iter_text())

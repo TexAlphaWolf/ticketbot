@@ -79,6 +79,10 @@ def run(settings: Settings) -> None:
     _check_port(settings.web_host, settings.web_port)
     print(f"[web] http://{settings.web_host}:{settings.web_port}"
           + (f" (public: {settings.web_public_url})" if settings.web_public_url else ""))
-    uvicorn.run(create_app(settings), host=settings.web_host, port=settings.web_port,
-                proxy_headers=True, forwarded_allow_ips=settings.web_trusted_proxies,
-                server_header=False, log_level="info")
+    app = create_app(settings)
+    server = uvicorn.Server(uvicorn.Config(
+        app, host=settings.web_host, port=settings.web_port, proxy_headers=True,
+        forwarded_allow_ips=settings.web_trusted_proxies, server_header=False,
+        log_level="info", timeout_graceful_shutdown=5))
+    app.state.server = server          # live connections end when it's stopping
+    server.run()

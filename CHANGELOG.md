@@ -47,6 +47,11 @@
   saved at once and recorded in the audit log; the bot refreshes the panel and the
   guidelines, checks its permissions for thread mode and gives the new roles access to
   the threads
+- **Live dashboard**: `GET /api/v1/guilds/{id}/events` (Server-Sent Events) tells the
+  dashboard when a ticket you can see is opened, answered, claimed, closed or deleted,
+  and the lists, the ticket page and the statistics reload by themselves; a dot in the
+  sidebar shows the live connection. Tickets have a new `updated_at` (migration 0009).
+  Stopping the web server with Ctrl+C ends the live connections at once
 - **Search and filters in the dashboard's ticket list**: a search bar (ticket number,
   channel name, type, subject, form answers or a Discord ID; searched while typing) and
   filters by priority, opening dates and person (click a name: tickets they opened,
