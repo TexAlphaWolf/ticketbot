@@ -12,6 +12,7 @@ Start the bot or the web dashboard, or manage the database:
     python -m ticketbot db copy <url>      copy all the data to another (empty) database
     python -m ticketbot db encrypt         encrypt with the current key (after a key change)
     python -m ticketbot keygen             make a new ENCRYPTION_KEY
+    python -m ticketbot keygen --metrics   make a METRICS_TOKEN (Prometheus)
     python -m ticketbot held [id]          hidden transcripts of deleted tickets
 """
 
@@ -47,13 +48,21 @@ def main(argv: list[str] | None = None) -> int:
     copy.add_argument("--yes", action="store_true", help="don't ask for confirmation")
     db_sub.add_parser("encrypt", help="encrypt everything with the current ENCRYPTION_KEY "
                                       "(after changing it; the bot also does it at start)")
-    sub.add_parser("keygen", help="make a new random ENCRYPTION_KEY for the .env file")
+    keygen = sub.add_parser("keygen", help="make a new random ENCRYPTION_KEY for the "
+                                           ".env file (--metrics: a METRICS_TOKEN)")
+    keygen.add_argument("--metrics", action="store_true",
+                        help="a token for the Prometheus metrics instead")
     held = sub.add_parser("held", help="transcripts of deleted tickets kept for "
                                        "LEGAL_HOLD_DAYS: list them, or save one as HTML")
     held.add_argument("id", nargs="?", type=int, help="number of the transcript to save")
     held.add_argument("--out", help="file to write (default: held-<id>.html)")
     args = parser.parse_args(argv)
 
+    if args.command == "keygen" and args.metrics:
+        import secrets
+        print(f"METRICS_TOKEN={secrets.token_urlsafe(32)}")
+        print("Add this line to .env; Prometheus sends it as a bearer token.")
+        return 0
     if args.command == "keygen":
         from .core.crypto import generate_key
         print(f"ENCRYPTION_KEY={generate_key()}")

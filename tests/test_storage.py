@@ -425,3 +425,40 @@ def test_db_commands(tmp_path, monkeypatch, capsys):
         assert cli.main(["db", "copy", other]) == 0
     finally:
         get_settings.cache_clear()
+
+
+def test_metrics_queries_on_both_databases(url):
+    """The aggregates of the Prometheus metrics (CASE inside SUM/AVG/MIN) and the
+    heartbeat upsert."""
+    from ticketbot.db import Store
+
+    async def scenario():
+        store = Store(create_engine(url))
+        await migrate.prepare(store.engine)
+        g, now = BIG_ID, 1_000_000.0
+        await store.save_guild(g)
+        a = await store.create_ticket(guild_id=g, channel_id=1, owner_id=5, type_key="b",
+                                      type_label="B", type_emoji="x", opened_at=now - 3600,
+                                      last_activity=now, awaiting_staff_since=now - 600)
+        await store.update_ticket(a, priority="high", escalation_level=1,
+                                  first_response_at=now - 3000)
+        b = await store.create_ticket(guild_id=g, channel_id=2, owner_id=6, type_key="b",
+                                      type_label="B", type_emoji="x", opened_at=now - 7200,
+                                      last_activity=now)
+        await store.update_ticket(b, status="closed", closed_at=now - 1200, rating=4)
+        snap = await store.metrics_snapshot(now)
+        assert [(r["status"], r["priority"], r["n"]) for r in snap["open"]] == \
+            [("waiting", "high", 1)]
+        row = snap["guilds"][0]
+        assert (row["opened_24h"], row["closed_24h"], row["escalated"]) == (2, 1, 1)
+        assert (row["first_response_7d"], row["resolution_7d"], row["rating_30d"]) == \
+            (600, 6000, 4)
+        assert row["oldest_waiting"] == now - 600
+        assert snap["bot"] is None and snap["pending_commands"] == 0
+        for guilds in (2, 3):
+            await store.save_bot_status(version="x", started_at=now, heartbeat_at=now,
+                                        guilds=guilds, latency=None)
+        assert (await store.bot_status())["guilds"] == 3
+        await store.close()
+
+    run(scenario())

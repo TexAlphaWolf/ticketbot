@@ -379,3 +379,17 @@ class TelegramMessage(Base):
     ticket_id: Mapped[int] = mapped_column(Integer,
                                            ForeignKey("tickets.id", ondelete="CASCADE"))
     created_at: Mapped[float] = mapped_column(Double)
+
+
+class BotStatus(Base):
+    """One row, written by the bot every 30 seconds: the web server (dashboard, metrics)
+    runs in another process and learns from it whether the bot is alive."""
+
+    __tablename__ = "bot_status"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    version: Mapped[str] = mapped_column(Text)
+    started_at: Mapped[float] = mapped_column(Double)
+    heartbeat_at: Mapped[float] = mapped_column(Double)
+    guilds: Mapped[int] = mapped_column(Integer)
+    latency: Mapped[float | None] = mapped_column(Double)     # seconds, Discord gateway

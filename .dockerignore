@@ -12,3 +12,4 @@ tests
 frontend/node_modules
 ticketbot/web/static
 *.zip
+monitoring

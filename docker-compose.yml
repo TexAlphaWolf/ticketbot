@@ -2,6 +2,7 @@
 #
 #   docker compose up -d --build                     bot + dashboard, SQLite in ./data
 #   docker compose --profile postgres up -d --build  the same, plus a PostgreSQL server
+#   docker compose --profile monitoring up -d        Prometheus and Grafana (see below)
 #
 # The dashboard is on http://127.0.0.1:8080 (only from this computer). To reach it from
 # outside, put a reverse proxy or a tunnel in front of it and set WEB_PUBLIC_URL in .env.
@@ -60,5 +61,52 @@ services:
       timeout: 5s
       retries: 10
 
+  # Optional: Prometheus and Grafana with a ready TicketBot dashboard. Set in .env
+  #   METRICS_TOKEN=...      (python -m ticketbot keygen --metrics)
+  #   GRAFANA_PASSWORD=...   (the "admin" user of Grafana)
+  # then: docker compose --profile monitoring up -d
+  # Grafana: http://127.0.0.1:3000 · Prometheus: http://127.0.0.1:9090
+  prometheus:
+    image: prom/prometheus:v3.13.5             # LTS release
+    container_name: ticketbot-prometheus
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    command: ["--config.file=/etc/prometheus/prometheus.yml",
+              "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=90d"]
+    configs:
+      - source: metrics_token
+        target: /etc/prometheus/metrics_token
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      - web
+
+  grafana:
+    image: grafana/grafana:13.3.1
+    container_name: ticketbot-grafana
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-}   # empty: admin/admin, changed at first login
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+
+configs:
+  metrics_token:
+    content: ${METRICS_TOKEN:-}
+
 volumes:
   postgres:
+  prometheus:
+  grafana:

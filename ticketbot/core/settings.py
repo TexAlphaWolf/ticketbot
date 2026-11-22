@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     web_api_docs: bool = True                      # interactive API docs at /api/docs
     web_trusted_proxies: str = "127.0.0.1"         # who may set X-Forwarded-For/-Proto
     web_session_days: int = Field(default=7, ge=1, le=30)
+    # Prometheus metrics at /metrics, only with this token (Authorization: Bearer ...);
+    # not set: there are no metrics. Make one: python -m ticketbot keygen --metrics
+    metrics_token: SecretStr | None = None
 
     # A deleted ticket's transcript stays hidden in the database for these days (0 = it
     # is deleted at once). Set it only if you must keep transcripts for a reason (e.g.
@@ -70,6 +73,13 @@ class Settings(BaseSettings):
     # Login with Discord: OAuth2 page of the bot's application in the Developer Portal
     discord_client_id: str | None = None
     discord_client_secret: SecretStr | None = None
+
+    @field_validator("metrics_token")
+    @classmethod
+    def _metrics_token(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None and len(value.get_secret_value().strip()) < 24:
+            raise ValueError("use a long random token (at least 24 characters)")
+        return value
 
     @field_validator("report_timezone")
     @classmethod
@@ -236,6 +246,7 @@ class Settings(BaseSettings):
             ("WEB_API_DOCS", "on" if self.web_api_docs else "off"),
             ("WEB_TRUSTED_PROXIES", self.web_trusted_proxies),
             ("WEB_SESSION_DAYS", str(self.web_session_days)),
+            ("METRICS_TOKEN", secret(self.metrics_token)),
             ("LEGAL_HOLD_DAYS", f"{self.legal_hold_days:g}"),
             ("Weekly report", f"{self.report_day} {self.report_hour:02d}:00 "
                               f"({self.report_timezone})"),

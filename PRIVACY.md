@@ -124,6 +124,12 @@ The data is **never sold, shared for advertising or used for any other purpose**
   people who only send `/start` or `/id` to the Telegram bot are not stored.
   When the server allows it (on by default, `/telegram messages`), what users write in
   their open tickets is sent to that chat too, so the staff can answer from Telegram.
+- **Metrics** (optional, for whoever hosts the bot): numbers about the tickets of each
+  server (counts, average times, ratings) and the web server's requests, for Prometheus.
+  They contain no names, messages or user IDs: servers are identified by their IDs and
+  web requests by their route (e.g. `/api/v1/guilds/{guild_id}/tickets`), never by the
+  real address. The bot writes its own status (version, start time, servers, latency)
+  to the database every 30 seconds.
 - **Weekly report**: a summary of the week's tickets (counts, average times and ratings,
   and the display names of the most active staff members) is posted in the server's log
   channel and, if linked, in its Telegram chat. It contains no ticket content.

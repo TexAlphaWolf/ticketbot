@@ -10,4 +10,5 @@ asyncpg>=0.32
 cryptography>=50
 fastapi>=0.165,<1
 uvicorn>=0.54,<1
+prometheus-client>=0.26,<1
 tzdata>=2026.1          # time zones for the weekly report (Windows has none)

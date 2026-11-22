@@ -18,6 +18,8 @@ from .cache import TTLCache
 from .database import open_web_store
 from .discord_api import DiscordBot
 from .home import router as home_router
+from .metrics import CountRequests
+from .metrics import router as metrics_router
 from .security import DOCS_PATH, SecurityHeaders
 from .spa import router as spa_router
 
@@ -41,7 +43,9 @@ def create_app(settings: Settings, static_dir: Path | None = None) -> FastAPI:
                   redoc_url=None,
                   openapi_url="/api/openapi.json" if settings.web_api_docs else None)
     app.add_middleware(SecurityHeaders, hsts=settings.web_https)
+    app.add_middleware(CountRequests)
     app.include_router(v1.router)
+    app.include_router(metrics_router)   # /metrics, with METRICS_TOKEN
     app.include_router(home_router)
     app.include_router(spa_router)       # last: every other path is a dashboard page
     app.state.static_dir = static_dir or spa.DEFAULT_DIR

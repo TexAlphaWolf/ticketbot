@@ -10,7 +10,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlalchemy import Table, and_, delete, func, insert, or_, select, update
+from sqlalchemy import Table, and_, case, delete, func, insert, or_, select, update
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -27,6 +27,7 @@ FAQ, FAQ_RESULTS = T["faq_entries"], T["faq_results"]
 SESSIONS = T["web_sessions"]
 TRANSCRIPTS = T["transcripts"]
 TG_ACCOUNTS, TG_MESSAGES = T["telegram_accounts"], T["telegram_messages"]
+BOT_STATUS = T["bot_status"]
 
 GUILD_FIELDS = {c.name for c in GUILDS.columns} - {"guild_id"}
 TYPE_FIELDS = {"label", "emoji", "description", "position"}
@@ -479,6 +480,55 @@ class Store:
                                       now or time.time())
             await conn.execute(delete(TICKETS).where(TICKETS.c.id == ticket_id))
         return found
+
+    # --------------------------------------------------------- metrics ---
+
+    async def save_bot_status(self, **values) -> None:
+        stmt = self._insert(BOT_STATUS).values(id=1, **values)
+        await self._write(stmt.on_conflict_do_update(index_elements=["id"], set_=values))
+
+    async def bot_status(self) -> dict | None:
+        return await self._one(select(BOT_STATUS).where(BOT_STATUS.c.id == 1))
+
+    async def metrics_snapshot(self, now: float) -> dict:
+        """Everything the Prometheus metrics show, in a few queries: per server and in
+        total. Averages over 7 days (times) and 30 days (ratings), counts over 24 hours."""
+        day, week, month = now - 86400, now - 7 * 86400, now - 30 * 86400
+        g = TICKETS.c.guild_id
+        open_rows = await self._all(
+            select(g, TICKETS.c.status, TICKETS.c.priority, func.count().label("n"))
+            .where(_open()).group_by(g, TICKETS.c.status, TICKETS.c.priority))
+        per_guild = await self._all(select(
+            g,
+            func.sum(case((TICKETS.c.opened_at >= day, 1), else_=0)).label("opened_24h"),
+            func.sum(case((and_(TICKETS.c.status == "closed", TICKETS.c.closed_at >= day), 1),
+                          else_=0)).label("closed_24h"),
+            func.avg(case((and_(TICKETS.c.opened_at >= week,
+                                TICKETS.c.first_response_at.is_not(None)),
+                           TICKETS.c.first_response_at - TICKETS.c.opened_at)))
+            .label("first_response_7d"),
+            func.avg(case((and_(TICKETS.c.status == "closed", TICKETS.c.closed_at >= week),
+                           TICKETS.c.closed_at - TICKETS.c.opened_at)))
+            .label("resolution_7d"),
+            func.avg(case((and_(TICKETS.c.closed_at >= month, TICKETS.c.rating.is_not(None)),
+                           TICKETS.c.rating))).label("rating_30d"),
+            func.sum(case((and_(_open(), TICKETS.c.escalation_level > 0), 1), else_=0))
+            .label("escalated"),
+            func.min(case((_open(), TICKETS.c.awaiting_staff_since))).label("oldest_waiting"),
+        ).group_by(g))
+        return {
+            "open": open_rows,
+            "guilds": per_guild,
+            "pending_commands": await self._scalar(
+                select(func.count()).select_from(COMMANDS)
+                .where(COMMANDS.c.status.in_(("pending", "running")))),
+            "web_sessions": await self._scalar(
+                select(func.count()).select_from(SESSIONS)
+                .where(SESSIONS.c.expires_at > now)),
+            "telegram_accounts": await self._scalar(
+                select(func.count()).select_from(TG_ACCOUNTS)),
+            "bot": await self.bot_status(),
+        }
 
     # --------------------------------------------------------- privacy ---
     # What the bot stores about one person (/privacy export and delete)

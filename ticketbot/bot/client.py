@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import math
 import sqlite3
 import time
 
@@ -99,9 +100,11 @@ class TicketBot(discord.Client):
         retried = await self.db.reset_running_commands()
         if retried:
             print(f"[web] {retried} interrupted command(s) will be retried")
+        self.started_at = time.time()
         self.maintenance.start()
         self.hourly_cleanup.start()
         self.web_commands.start()
+        self.heartbeat.start()
 
     async def close(self):
         if self._telegram_poller is not None:
@@ -338,6 +341,17 @@ class TicketBot(discord.Client):
             print(f"Purged {purged} old closed ticket(s)")
 
     # ------------------------------------------------- commands from the web ---
+
+    @tasks.loop(seconds=config.HEARTBEAT_SECONDS)
+    async def heartbeat(self):
+        """Tell the web server (dashboard, Prometheus metrics) that the bot is alive."""
+        latency = self.latency if math.isfinite(self.latency) else None
+        try:
+            await self.db.save_bot_status(
+                version=__version__, started_at=getattr(self, "started_at", time.time()),
+                heartbeat_at=time.time(), guilds=len(self.guilds), latency=latency)
+        except Exception as e:                       # e.g. the database is restarting
+            print(f"[heartbeat] {e}")
 
     @tasks.loop(seconds=config.WEB_COMMAND_POLL_SECONDS)
     async def web_commands(self):

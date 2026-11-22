@@ -4,9 +4,10 @@
 
 ### Upgrading from 3.0.0-beta.3
 Update the files, run `python -m pip install -r requirements.txt` (new: `tzdata`, the time
-zones for the weekly report) and start the bot: it makes a backup and applies the
-migrations 0010 and 0011 (`[database] migrated from 0009 to 0011`). Optional: set
-`REPORT_TIMEZONE`, `REPORT_DAY` and `REPORT_HOUR` in `.env` (default: Monday 9:00 UTC).
+zones for the weekly report, and `prometheus-client`) and start the bot: it makes a
+backup and applies the migrations 0010 to 0012 (`[database] migrated from 0009 to
+0012`). Optional, in `.env`: `REPORT_TIMEZONE`, `REPORT_DAY` and `REPORT_HOUR` (default:
+Monday 9:00 UTC), `METRICS_TOKEN` for the Prometheus metrics.
 
 ### Added
 - **Two-way Telegram**: the notifications about a ticket (new ticket, high priority,
@@ -34,6 +35,15 @@ migrations 0010 and 0011 (`[database] migrated from 0009 to 0011`). Optional: se
   on Telegram; sent once a week also across restarts, skipped when there are no tickets.
   `/report` shows the last 7 days at any time; the dashboard's settings turn it on or off
 - Migration 0011: `guilds.weekly_report`, `report_channel` and `last_report_at`
+- **Prometheus metrics** at `/metrics` of the web server, with a bearer token
+  (`METRICS_TOKEN`, made by `python -m ticketbot keygen --metrics`; without it the
+  endpoint doesn't exist): open tickets by server, status and priority, escalated ones,
+  the longest wait, tickets opened and closed in 24 hours, average first answer and
+  resolution time, rating, whether the bot is online (its heartbeat, every 30 seconds,
+  in the new `bot_status` table, migration 0012), its latency, and the web server's
+  requests and response times by route. No personal data in the labels
+- `docker compose --profile monitoring up -d`: Prometheus 3.13 LTS and Grafana 13.3,
+  ready with a TicketBot dashboard (`monitoring/`)
 - **`/privacy`**: everyone can download (`/privacy export`, a JSON file) or delete
   (`/privacy delete`, with a confirmation) the data the bot stores about them in a
   server, also from the dashboard (*Your data* on the page *Open a ticket*). Deleting

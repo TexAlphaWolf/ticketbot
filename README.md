@@ -279,6 +279,34 @@ REPORT_HOUR=9
 `/report` shows the report of the last 7 days at any time (staff), `/settings report`
 turns it on or off and chooses the channel (admins, also in the dashboard's settings).
 
+## Monitoring (Prometheus and Grafana)
+
+The web server publishes [Prometheus](https://prometheus.io) metrics at `/metrics`, only
+with a token: set `METRICS_TOKEN` in `.env` (`python -m ticketbot keygen --metrics` makes
+one); without it there are no metrics. Prometheus sends it as a bearer token.
+
+- **Tickets, per server**: open tickets by status and priority, escalated ones, the
+  longest wait for the staff, tickets opened and closed in the last 24 hours, average
+  first answer and resolution time (7 days), average rating (30 days)
+- **The bot**: online or not (from its heartbeat in the database, every 30 seconds),
+  latency to Discord, servers, version
+- **The web server**: requests by route and status, response times, active logins,
+  dashboard actions waiting for the bot
+
+The labels hold no personal data: servers are their IDs, routes their templates.
+
+With Docker, Prometheus and Grafana come ready, with a TicketBot dashboard: set
+`METRICS_TOKEN` and `GRAFANA_PASSWORD` in `.env`, then
+
+```bash
+docker compose --profile monitoring up -d
+```
+
+Grafana is on `http://127.0.0.1:3000` (user `admin`), Prometheus on
+`http://127.0.0.1:9090`. Without Docker, `monitoring/prometheus.yml` and
+`monitoring/grafana/` work with your own Prometheus and Grafana (set the target to
+`127.0.0.1:8080`).
+
 ## Web dashboard (beta)
 
 TicketBot 3 has a web dashboard: a React app (in `frontend/`) on a REST API (FastAPI).

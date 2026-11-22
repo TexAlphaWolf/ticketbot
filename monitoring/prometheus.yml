@@ -1,0 +1,15 @@
+# Prometheus for TicketBot: docker compose --profile monitoring up -d
+# (without Docker: set the target to 127.0.0.1:8080 and write the token in the file
+# below, or use `credentials: <METRICS_TOKEN>` instead of `credentials_file`)
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: ticketbot
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/metrics_token     # METRICS_TOKEN from .env
+    static_configs:
+      - targets: ["web:8080"]
