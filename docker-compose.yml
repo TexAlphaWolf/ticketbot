@@ -9,7 +9,7 @@
 
 x-ticketbot: &ticketbot
   build: .
-  image: ticketbot:3.0.0b3
+  image: ticketbot:3.0.0b4
   restart: unless-stopped
   env_file: .env
   volumes:

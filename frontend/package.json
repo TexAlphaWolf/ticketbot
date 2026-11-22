@@ -1,7 +1,7 @@
 {
   "name": "ticketbot-dashboard",
   "private": true,
-  "version": "3.0.0-beta.3",
+  "version": "3.0.0-beta.4",
   "description": "Web dashboard of TicketBot (React + TypeScript, built with Vite)",
   "type": "module",
   "engines": {

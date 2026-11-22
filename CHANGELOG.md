@@ -1,6 +1,11 @@
 # Changelog
 
-## [Unreleased] - V3 Beta4
+## [3.0.0-beta.4] - 2026-11-22
+
+Fourth beta of TicketBot V3: the staff answers tickets from Telegram, every server gets
+a weekly report, everyone can download or delete their own data with `/privacy`, and
+the web server publishes Prometheus metrics, with a ready Grafana dashboard. Test it on
+a test server before using it in production.
 
 ### Upgrading from 3.0.0-beta.3
 Update the files, run `python -m pip install -r requirements.txt` (new: `tzdata`, the time
