@@ -330,6 +330,27 @@ STRINGS["en"] = {
     "stats.staff": "👥 Staff",
     "stats.staff_line": "{rank}. {user} · {handled} tickets · {rating} · {response}",
     "stats.empty": "No tickets in this period.",
+    "report.title": "Weekly report · {guild}",
+    "report.period": "From {start} to {end}",
+    "report.tickets_value":
+        "Opened: **{opened}** ({opened_change}) · Closed: **{closed}** ({closed_change}) "
+        "· Still open: **{open}**",
+    "report.escalated": "⬆️ Escalated",
+    "report.top_staff": "👥 Most active staff",
+    "report.top_types": "🏷️ Busiest types",
+    "report.staff_line": "{rank}. {user} · {closed} closed · {rating}",
+    "report.footer": "In brackets: the change from the week before · /report shows it any time",
+    "report.none": "No tickets in the last two weeks.",
+    "settings.report": "📊 Weekly report",
+    "settings.report_on": "Every {day} at {hour}:00 ({timezone}) in {channel}",
+    "settings.report_off": "Off · turn it on with /settings report",
+    "day.monday": "Monday",
+    "day.tuesday": "Tuesday",
+    "day.wednesday": "Wednesday",
+    "day.thursday": "Thursday",
+    "day.friday": "Friday",
+    "day.saturday": "Saturday",
+    "day.sunday": "Sunday",
     # settings
     "settings.title": "⚙️ Ticket settings",
     "settings.language": "Language",
@@ -805,6 +826,29 @@ STRINGS["it"] = {
     "stats.staff": "👥 Staff",
     "stats.staff_line": "{rank}. {user} · {handled} ticket · {rating} · {response}",
     "stats.empty": "Nessun ticket in questo periodo.",
+    "report.title": "Report settimanale · {guild}",
+    "report.period": "Dal {start} al {end}",
+    "report.tickets_value":
+        "Aperti: **{opened}** ({opened_change}) · Chiusi: **{closed}** ({closed_change}) "
+        "· Ancora aperti: **{open}**",
+    "report.escalated": "⬆️ Escalation",
+    "report.top_staff": "👥 Staff più attivo",
+    "report.top_types": "🏷️ Tipi più usati",
+    "report.staff_line": "{rank}. {user} · {closed} chiusi · {rating}",
+    "report.footer":
+        "Tra parentesi: la differenza con la settimana prima · /report lo mostra quando "
+        "vuoi",
+    "report.none": "Nessun ticket nelle ultime due settimane.",
+    "settings.report": "📊 Report settimanale",
+    "settings.report_on": "Ogni {day} alle {hour}:00 ({timezone}) in {channel}",
+    "settings.report_off": "Disattivato · attivalo con /settings report",
+    "day.monday": "lunedì",
+    "day.tuesday": "martedì",
+    "day.wednesday": "mercoledì",
+    "day.thursday": "giovedì",
+    "day.friday": "venerdì",
+    "day.saturday": "sabato",
+    "day.sunday": "domenica",
     "settings.title": "⚙️ Impostazioni ticket",
     "settings.language": "Lingua",
     "settings.staff_role": "Ruolo staff",
@@ -1292,6 +1336,27 @@ STRINGS["de"] = {
     "stats.staff": "👥 Team",
     "stats.staff_line": "{rank}. {user} · {handled} Tickets · {rating} · {response}",
     "stats.empty": "Keine Tickets in diesem Zeitraum.",
+    "report.title": "Wochenbericht · {guild}",
+    "report.period": "Vom {start} bis {end}",
+    "report.tickets_value":
+        "Geöffnet: **{opened}** ({opened_change}) · Geschlossen: **{closed}** "
+        "({closed_change}) · Noch offen: **{open}**",
+    "report.escalated": "⬆️ Eskaliert",
+    "report.top_staff": "👥 Aktivstes Team",
+    "report.top_types": "🏷️ Häufigste Typen",
+    "report.staff_line": "{rank}. {user} · {closed} geschlossen · {rating}",
+    "report.footer": "In Klammern: die Änderung zur Vorwoche · /report zeigt ihn jederzeit",
+    "report.none": "Keine Tickets in den letzten zwei Wochen.",
+    "settings.report": "📊 Wochenbericht",
+    "settings.report_on": "Jeden {day} um {hour}:00 Uhr ({timezone}) in {channel}",
+    "settings.report_off": "Aus · einschalten mit /settings report",
+    "day.monday": "Montag",
+    "day.tuesday": "Dienstag",
+    "day.wednesday": "Mittwoch",
+    "day.thursday": "Donnerstag",
+    "day.friday": "Freitag",
+    "day.saturday": "Samstag",
+    "day.sunday": "Sonntag",
     "settings.title": "⚙️ Ticket-Einstellungen",
     "settings.language": "Sprache",
     "settings.staff_role": "Team-Rolle",
@@ -1678,6 +1743,13 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Show whether your Telegram account is linked":
             "Mostra se il tuo account Telegram è collegato",
         "Unlink your Telegram account": "Scollega il tuo account Telegram",
+        "Turn the weekly report on or off": "Attiva o disattiva il report settimanale",
+        "A summary of the week's tickets, compared with the week before":
+            "Un riepilogo dei ticket della settimana, confrontato con la settimana prima",
+        "Where to send it (default: the log channel)":
+            "Dove inviarlo (predefinito: il canale di log)",
+        "Show the weekly report of the last 7 days":
+            "Mostra il report settimanale degli ultimi 7 giorni",
     },
     "de": {
         "Custom questions of the ticket form": "Eigene Fragen des Ticket-Formulars",
@@ -1874,5 +1946,12 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Show whether your Telegram account is linked":
             "Anzeigen, ob dein Telegram-Konto verknüpft ist",
         "Unlink your Telegram account": "Dein Telegram-Konto trennen",
+        "Turn the weekly report on or off": "Wochenbericht ein- oder ausschalten",
+        "A summary of the week's tickets, compared with the week before":
+            "Eine Zusammenfassung der Tickets der Woche, verglichen mit der Vorwoche",
+        "Where to send it (default: the log channel)":
+            "Wohin er gesendet wird (Standard: der Log-Kanal)",
+        "Show the weekly report of the last 7 days":
+            "Den Wochenbericht der letzten 7 Tage anzeigen",
     },
 }

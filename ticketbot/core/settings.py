@@ -61,9 +61,35 @@ class Settings(BaseSettings):
     # the law for a business) and write it in your privacy policy.
     legal_hold_days: float = Field(default=0, ge=0, le=3660)
 
+    # Weekly report of each server (in its log channel and on Telegram): the day and the
+    # hour, in this time zone (e.g. Europe/Rome; daylight saving time included)
+    report_timezone: str = "UTC"
+    report_day: str = "monday"
+    report_hour: int = Field(default=9, ge=0, le=23)
+
     # Login with Discord: OAuth2 page of the bot's application in the Developer Portal
     discord_client_id: str | None = None
     discord_client_secret: SecretStr | None = None
+
+    @field_validator("report_timezone")
+    @classmethod
+    def _timezone(cls, value: str) -> str:
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        value = value.strip()
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise ValueError("use a time zone name like Europe/Rome or UTC") from None
+        return value
+
+    @field_validator("report_day")
+    @classmethod
+    def _day(cls, value: str) -> str:
+        from .report import DAYS
+        value = value.strip().lower()
+        if value not in DAYS:
+            raise ValueError("use a day in English, e.g. monday")
+        return value
 
     @field_validator("discord_client_id")
     @classmethod
@@ -211,6 +237,8 @@ class Settings(BaseSettings):
             ("WEB_TRUSTED_PROXIES", self.web_trusted_proxies),
             ("WEB_SESSION_DAYS", str(self.web_session_days)),
             ("LEGAL_HOLD_DAYS", f"{self.legal_hold_days:g}"),
+            ("Weekly report", f"{self.report_day} {self.report_hour:02d}:00 "
+                              f"({self.report_timezone})"),
             ("DISCORD_CLIENT_ID", self.discord_client_id or "not set"),
             ("DISCORD_CLIENT_SECRET", secret(self.discord_client_secret)),
             ("OAuth2 redirect", self.oauth_redirect_uri),

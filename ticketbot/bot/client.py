@@ -41,6 +41,7 @@ from .common import (
     ticket_channel,
     translator,
 )
+from .report import send_weekly_reports
 from .tickets import (
     ClosedControls,
     RatingButton,
@@ -198,6 +199,11 @@ class TicketBot(discord.Client):
     @tasks.loop(minutes=5)
     async def maintenance(self):
         now = time.time()
+
+        try:
+            await send_weekly_reports(self, now)
+        except Exception as e:                     # never stop the other checks
+            print(f"[report] {e}")
 
         # Inactivity: warn, then close tickets waiting on the user
         for ticket in await self.db.active_tickets():

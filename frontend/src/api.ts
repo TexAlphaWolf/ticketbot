@@ -202,6 +202,7 @@ export interface Settings {
   auto_assign: boolean;
   ticket_cooldown: number;
   telegram_messages: boolean;
+  weekly_report: boolean;
   ticket_mode: "channel" | "thread";
   staff_role: string | null;
 }

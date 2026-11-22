@@ -38,6 +38,7 @@ from .common import (
     telegram_notify,
     translator,
 )
+from .report import build_report, is_empty, report_embed
 from .tickets import (
     TicketPanel,
     apply_priority,
@@ -574,6 +575,34 @@ async def stats(interaction: discord.Interaction,
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
+def report_setting(client, guild: discord.Guild, cfg: dict, _) -> str:
+    if not cfg.get("weekly_report", True):
+        return _("settings.report_off")
+    channel = guild.get_channel(cfg.get("report_channel") or cfg.get("log_channel") or 0)
+    s = client.settings
+    return _("settings.report_on", channel=channel.mention if channel else "-",
+             day=_("day." + s.report_day), hour=f"{s.report_hour:02d}",
+             timezone=s.report_timezone)
+
+
+@app_commands.command(name="report", description="Show the weekly report of the last 7 days")
+@app_commands.guild_only()
+async def report_command(interaction: discord.Interaction):
+    ctx = await require_setup(interaction)
+    if ctx is None:
+        return
+    cfg, _ = ctx
+    if not is_staff(interaction.user, cfg):
+        await interaction.response.send_message(_("error.staff_only"), ephemeral=True)
+        return
+    report = await build_report(interaction.client, interaction.guild.id, time.time())
+    if is_empty(report):
+        await interaction.response.send_message(_("report.none"), ephemeral=True)
+        return
+    await interaction.response.send_message(
+        embed=report_embed(report, interaction.guild, _), ephemeral=True)
+
+
 @app_commands.command(name="export", description="Download the ticket statistics as a file")
 @app_commands.guild_only()
 @app_commands.describe(period="Time period", file_format="File type")
@@ -666,6 +695,8 @@ class SettingsGroup(app_commands.Group):
         cooldown = cfg.get("ticket_cooldown") or 0
         embed.add_field(name=_("settings.cooldown"),
                         value=format_duration(cooldown * 60) if cooldown else _("settings.off"))
+        embed.add_field(name=_("settings.report"), value=report_setting(
+            interaction.client, interaction.guild, cfg, _))
         types = await interaction.client.db.list_types(interaction.guild.id)
         embed.add_field(name=_("settings.types"), value=str(len(types)))
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -705,6 +736,25 @@ class SettingsGroup(app_commands.Group):
         await interaction.response.send_message(_("settings.retention_set", days=days),
                                                 ephemeral=True)
         await refresh_guidelines(interaction.guild, cfg)
+
+    @app_commands.command(name="report", description="Turn the weekly report on or off")
+    @app_commands.describe(
+        enabled="A summary of the week's tickets, compared with the week before",
+        channel="Where to send it (default: the log channel)")
+    async def report(self, interaction: discord.Interaction, enabled: bool,
+                     channel: discord.TextChannel | None = None):
+        ctx = await require_setup(interaction)
+        if ctx is None:
+            return
+        changes = {"weekly_report": enabled}
+        if channel is not None:
+            changes["report_channel"] = channel.id
+        cfg = await interaction.client.db.save_guild(interaction.guild.id, **changes)
+        await audit(interaction, "settings.report", value=enabled,
+                    **({"channel": channel.id} if channel else {}))
+        _ = translator(cfg)
+        await interaction.response.send_message(
+            report_setting(interaction.client, interaction.guild, cfg, _), ephemeral=True)
 
     @app_commands.command(name="reminders", description="Turn the staff reminders on or off")
     @app_commands.describe(
@@ -1735,6 +1785,7 @@ class ProfileGroup(app_commands.Group):
 
 def all_commands() -> list:
     return [setup, guidelines, audit_log, queue, mytickets, available, add, remove, close, reopen,
-            priority, transfer, escalate_command, stats, export_stats, reply, NoteGroup(),
+            priority, transfer, escalate_command, stats, report_command, export_stats, reply,
+            NoteGroup(),
             SettingsGroup(), TypesGroup(), TelegramGroup(), TelegramAccountGroup(),
             ProfileGroup(), RepliesGroup(), BlockGroup(), EscalationGroup(), FaqGroup()]

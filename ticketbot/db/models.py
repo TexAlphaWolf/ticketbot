@@ -69,6 +69,10 @@ class Guild(Base):
     ticket_mode: Mapped[str] = mapped_column(Text, server_default=text("'channel'"))
     # Two-way Telegram: also send there what users write in their tickets
     telegram_messages: Mapped[bool] = mapped_column(Boolean, server_default=true())
+    # Weekly report: on or off, where (default: the log channel), when it was last sent
+    weekly_report: Mapped[bool] = mapped_column(Boolean, server_default=true())
+    report_channel: Mapped[int | None] = mapped_column(BigInteger)
+    last_report_at: Mapped[float | None] = mapped_column(Double)
 
 
 class TicketType(Base):

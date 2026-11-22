@@ -444,6 +444,17 @@ class Store:
         return await self._all(select(TICKETS).where(TICKETS.c.guild_id == guild_id,
                                                      TICKETS.c.opened_at >= since))
 
+    async def report_tickets(self, guild_id: int, since: float) -> list[dict]:
+        """Tickets opened, closed or escalated since `since` (the weekly report)."""
+        return await self._all(select(TICKETS).where(
+            TICKETS.c.guild_id == guild_id,
+            or_(TICKETS.c.opened_at >= since, TICKETS.c.closed_at >= since,
+                TICKETS.c.escalated_at >= since)))
+
+    async def open_ticket_count(self, guild_id: int) -> int:
+        return await self._scalar(select(func.count()).select_from(TICKETS).where(
+            TICKETS.c.guild_id == guild_id, _open()))
+
     async def purge_closed_before(self, before: float, hold_days: float = 0,
                                   now: float | None = None) -> int:
         old = and_(TICKETS.c.status == "closed", TICKETS.c.channel_deleted.is_(True),

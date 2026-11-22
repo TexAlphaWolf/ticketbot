@@ -124,6 +124,9 @@ The data is **never sold, shared for advertising or used for any other purpose**
   people who only send `/start` or `/id` to the Telegram bot are not stored.
   When the server allows it (on by default, `/telegram messages`), what users write in
   their open tickets is sent to that chat too, so the staff can answer from Telegram.
+- **Weekly report**: a summary of the week's tickets (counts, average times and ratings,
+  and the display names of the most active staff members) is posted in the server's log
+  channel and, if linked, in its Telegram chat. It contains no ticket content.
 - **Two-way Telegram** (optional): a staff member who links their Telegram account
   (`/telegram-account link`) has their Telegram user ID stored next to their Discord
   user ID, until they unlink it (`/telegram-account unlink` on Discord or `/unlink` on

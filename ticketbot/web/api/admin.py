@@ -99,6 +99,7 @@ class Settings(BaseModel):
     auto_assign: bool
     ticket_cooldown: int          # minutes, 0 = off
     telegram_messages: bool       # the users' messages in tickets also go to Telegram
+    weekly_report: bool           # a summary every week in the log channel and Telegram
     ticket_mode: Literal["channel", "thread"]
     staff_role: str | None
 
@@ -109,6 +110,7 @@ class SettingsChange(BaseModel):
     staff_reminders: bool | None = None
     auto_assign: bool | None = None
     telegram_messages: bool | None = None
+    weekly_report: bool | None = None
     ticket_cooldown: int | None = Field(default=None, ge=0,
                                         le=config.MAX_TICKET_COOLDOWN_MINUTES)
 
@@ -129,6 +131,7 @@ def settings_of(cfg: dict) -> Settings:
                     auto_assign=bool(cfg.get("auto_assign")),
                     ticket_cooldown=cfg.get("ticket_cooldown") or 0,
                     telegram_messages=bool(cfg.get("telegram_messages", True)),
+                    weekly_report=bool(cfg.get("weekly_report", True)),
                     ticket_mode=cfg.get("ticket_mode") or "channel",
                     staff_role=str(cfg["staff_role"]) if cfg.get("staff_role") else None)
 
@@ -148,6 +151,7 @@ async def change_settings(request: Request, session: Session, access: Admin,
         return settings_of(access.cfg)
     cfg = await request.app.state.store.save_guild(access.guild_id, **changes)
     names = {"retention_days": "retention", "staff_reminders": "reminders",
+             "weekly_report": "report",
              "auto_assign": "autoassign", "ticket_cooldown": "cooldown"}
     for field, value in changes.items():
         await record(request, session, access, "settings." + names.get(field, field),

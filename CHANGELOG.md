@@ -3,8 +3,10 @@
 ## [Unreleased] - V3 Beta4
 
 ### Upgrading from 3.0.0-beta.3
-Update the files and start the bot: it makes a backup and applies the migration 0010
-(`[database] migrated from 0009 to 0010`). The requirements did not change.
+Update the files, run `python -m pip install -r requirements.txt` (new: `tzdata`, the time
+zones for the weekly report) and start the bot: it makes a backup and applies the
+migrations 0010 and 0011 (`[database] migrated from 0009 to 0011`). Optional: set
+`REPORT_TIMEZONE`, `REPORT_DAY` and `REPORT_HOUR` in `.env` (default: Monday 9:00 UTC).
 
 ### Added
 - **Two-way Telegram**: the notifications about a ticket (new ticket, high priority,
@@ -24,6 +26,14 @@ Update the files and start the bot: it makes a backup and applies the migration 
 - Deleting a ticket everywhere (dashboard, or its transcript in the archive channel) also
   deletes the bot's notifications about it on Telegram, the closing one with the
   transcript included (Telegram allows it in the first 48 hours)
+- **Weekly report**: every week (default Monday 9:00, `REPORT_TIMEZONE`, `REPORT_DAY`,
+  `REPORT_HOUR` in `.env`, summer time included) each server gets a summary of its
+  tickets compared with the week before: opened, closed, still open, average first
+  response and resolution, rating, escalations, the most active staff and the busiest
+  types, FAQ results. In the log channel (or the one chosen with `/settings report`) and
+  on Telegram; sent once a week also across restarts, skipped when there are no tickets.
+  `/report` shows the last 7 days at any time; the dashboard's settings turn it on or off
+- Migration 0011: `guilds.weekly_report`, `report_channel` and `last_report_at`
 - Migration 0010: `telegram_accounts`, `telegram_messages` (chat and message IDs of the
   notifications, kept 30 days or until the ticket is deleted) and
   `guilds.telegram_messages`

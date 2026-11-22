@@ -259,6 +259,26 @@ notifications, not what users write in their tickets. `/telegram-account status`
 > Whoever hosts the bot technically has access to the data of every server it is in.
 > If you want full control over your tickets, host your own instance.
 
+## Weekly report
+
+Every week each server gets a summary of its tickets, compared with the week before: tickets
+opened, closed and still open, average first response and resolution time, average rating,
+escalations, the most active staff members, the busiest ticket types and the FAQ results.
+It goes to the log channel (or the channel chosen with `/settings report`) and to the
+linked Telegram chat; a server without any ticket in two weeks gets none.
+
+By default it is sent on Monday at 9:00 UTC: set the day, the hour and your time zone in
+`.env` (summer time is handled):
+
+```bash
+REPORT_TIMEZONE=Europe/Rome
+REPORT_DAY=monday
+REPORT_HOUR=9
+```
+
+`/report` shows the report of the last 7 days at any time (staff), `/settings report`
+turns it on or off and chooses the channel (admins, also in the dashboard's settings).
+
 ## Web dashboard (beta)
 
 TicketBot 3 has a web dashboard: a React app (in `frontend/`) on a REST API (FastAPI).
@@ -388,7 +408,7 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 | `/setup` | Admin | Sets up the ticket system and posts the panel |
 | `/audit member` | Admin | Shows the latest actions done in the server (who, what, when) |
 | `/guidelines` | Admin | Posts and pins the priority guidelines in the log channel |
-| `/settings show` / `language` / `retention` / `archive` / `reminders` / `cooldown` / `autoassign` / `mode` | Admin | Shows or changes the settings |
+| `/settings show` / `language` / `retention` / `archive` / `reminders` / `cooldown` / `autoassign` / `mode` / `report` | Admin | Shows or changes the settings |
 | `/types list` / `add` / `edit` / `remove` | Admin | Manages the ticket types |
 | `/types roles add` / `remove` | Admin | Chooses the roles that handle the tickets of a type |
 | `/escalation list` / `add` / `remove` | Admin | Manages the escalation levels |
@@ -400,6 +420,7 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 | `/available enabled` | Staff | Joins or leaves the auto-assign rotation |
 | `/block add` / `remove` / `list` | Staff | Blocks members from opening tickets |
 | `/stats period member` | Staff | Shows ticket statistics |
+| `/report` | Staff | Shows the weekly report of the last 7 days |
 | `/export period format` | Staff | Downloads the tickets of a period as Excel or CSV |
 | `/replies list` / `add` / `edit` / `remove` | Admin | Manages the quick replies |
 | `/reply name` | Staff | Sends a quick reply in the ticket |
