@@ -324,7 +324,8 @@ port 8080.
   ticket changes, and the open pages refresh by themselves
 - **Open a ticket from the browser**: every member can log in and open a ticket under
   *Open a ticket* (`/api/v1/me/...`), with the same types, questions, FAQ and limits as
-  on Discord, and see their own tickets and the conversation of the closed ones
+  on Discord, and see their own tickets and the conversation of the closed ones; under
+  *Your data* they can download or delete what the bot stores about them (`/privacy`)
 - **Transcripts in the dashboard**: when a ticket closes, its transcript is also saved in
   the database (encrypted) and shown on the ticket's page, with a *Download HTML* button.
   Deleting the transcript message from the archive channel, or the ticket from the
@@ -416,6 +417,7 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 | `/types questions list` / `add` / `remove` | Admin | Manages the custom questions of a ticket type |
 | `/telegram link` / `verify` / `status` / `test` / `unlink` / `messages` | Admin | Manages Telegram notifications |
 | `/telegram-account link` / `status` / `unlink` | Everyone | Links your Telegram account to answer tickets from Telegram |
+| `/privacy export` / `delete` | Everyone | Downloads or deletes the data the bot stores about you in the server |
 | `/profile name` / `avatar` / `banner` / `bio` / `reset` | Admin | Changes the bot's profile in this server only |
 | `/available enabled` | Staff | Joins or leaves the auto-assign rotation |
 | `/block add` / `remove` / `list` | Staff | Blocks members from opening tickets |

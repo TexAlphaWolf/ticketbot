@@ -223,6 +223,43 @@ export function OpenTicket() {
           </ul>
         )}
       </Card>
+
+      <MyData guildId={guildId} />
     </>
+  );
+}
+
+/** Download everything the bot stores about you in this server, or delete it. */
+function MyData({ guildId }: { guildId: string }) {
+  const { t } = useI18n();
+  const [error, setError] = useState<string | null>(null);
+  const [deleted, setDeleted] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function erase() {
+    if (!window.confirm(t("privacy.confirm"))) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api<{ tickets: number }>(`/me/guilds/${guildId}/privacy`, { method: "DELETE" });
+      setDeleted(r.tickets);
+      setTimeout(() => { window.location.href = "/"; }, 4000);   // logged out: login page
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card title={t("privacy.title")}>
+      <p className="muted">{t("privacy.text")}</p>
+      {deleted !== null ? <p>✅ {t("privacy.deleted", { count: deleted })}</p> : (
+        <div className="row">
+          <a className="button" href={`/api/v1/me/guilds/${guildId}/privacy`} download>📦 {t("privacy.download")}</a>
+          <button className="button button-danger" disabled={busy} onClick={erase}>🗑️ {t("privacy.delete")}</button>
+        </div>
+      )}
+      {error && <p className="notice notice-error" role="alert">{error}</p>}
+    </Card>
   );
 }

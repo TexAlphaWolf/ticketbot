@@ -1,6 +1,7 @@
 """Slash commands."""
 
 import io
+import json
 import re
 import secrets
 import time
@@ -23,6 +24,7 @@ from ..core.logic import (
     valid_emoji,
     valid_profile_image,
 )
+from ..core.privacy import PrivacyError, erase_personal_data, export_personal_data
 from ..integrations.telegram import TelegramError
 from . import telegram_bridge
 from .common import (
@@ -53,6 +55,7 @@ from .tickets import (
     ticket_label,
     transfer_ticket,
 )
+from .web_commands import delete_leftovers
 
 admin_only = app_commands.default_permissions(administrator=True)
 
@@ -1382,6 +1385,70 @@ class TelegramGroup(app_commands.Group):
             _("tg.messages_on" if enabled else "tg.messages_off"), ephemeral=True)
 
 
+class PrivacyGroup(app_commands.Group):
+    """Everyone's own data: download it, or delete it (PRIVACY.md, section 7)."""
+
+    def __init__(self):
+        super().__init__(name="privacy", description="Download or delete your data",
+                         guild_only=True)
+
+    @app_commands.command(name="export",
+                          description="Download what the bot stores about you in this server")
+    async def export(self, interaction: discord.Interaction):
+        cfg = await interaction.client.db.get_guild(interaction.guild.id)
+        _ = translator(cfg)
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        data = await export_personal_data(interaction.client.db, interaction.guild.id,
+                                          interaction.user.id)
+        await audit(interaction, "privacy.export")
+        file = discord.File(io.BytesIO(json.dumps(data, ensure_ascii=False, indent=2)
+                                       .encode()),
+                            filename=f"ticketbot-data-{interaction.guild.id}.json")
+        await interaction.followup.send(_("privacy.exported"), file=file, ephemeral=True)
+
+    @app_commands.command(name="delete",
+                          description="Delete your tickets and data in this server")
+    async def delete(self, interaction: discord.Interaction):
+        cfg = await interaction.client.db.get_guild(interaction.guild.id)
+        _ = translator(cfg)
+        await interaction.response.send_message(_("privacy.confirm"),
+                                                view=PrivacyDeleteView(_), ephemeral=True)
+
+
+class PrivacyDeleteView(discord.ui.View):
+    """Deleting can't be undone: one more click, within two minutes."""
+
+    def __init__(self, _):
+        super().__init__(timeout=120)
+        self.delete_btn.label = _("privacy.delete_button")
+        self.cancel_btn.label = _("privacy.cancel_button")
+        self._ = _
+
+    @discord.ui.button(style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def delete_btn(self, interaction: discord.Interaction, _button: discord.ui.Button):
+        _ = self._
+        client = interaction.client
+        try:
+            result = await erase_personal_data(client.db, interaction.guild.id,
+                                               interaction.user.id,
+                                               client.settings.legal_hold_days)
+        except PrivacyError:
+            await interaction.response.edit_message(content=_("privacy.open_tickets"),
+                                                    view=None)
+            return
+        await interaction.response.edit_message(
+            content=_("privacy.deleted", tickets=result["tickets"]), view=None)
+        await audit(interaction, "privacy.delete", tickets=result["tickets"])
+        await delete_leftovers(client, interaction.guild.id, result["leftovers"])
+        self.stop()
+
+    @discord.ui.button(style=discord.ButtonStyle.secondary)
+    async def cancel_btn(self, interaction: discord.Interaction, _button: discord.ui.Button):
+        await interaction.response.edit_message(content=self._("privacy.cancelled"),
+                                                view=None)
+        self.stop()
+
+
 class TelegramAccountGroup(app_commands.Group):
     """Two-way Telegram: each staff member links their own Telegram account, then
     answers the ticket notifications there."""
@@ -1788,4 +1855,5 @@ def all_commands() -> list:
             priority, transfer, escalate_command, stats, report_command, export_stats, reply,
             NoteGroup(),
             SettingsGroup(), TypesGroup(), TelegramGroup(), TelegramAccountGroup(),
+            PrivacyGroup(),
             ProfileGroup(), RepliesGroup(), BlockGroup(), EscalationGroup(), FaqGroup()]

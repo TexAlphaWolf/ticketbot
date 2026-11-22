@@ -330,6 +330,21 @@ STRINGS["en"] = {
     "stats.staff": "👥 Staff",
     "stats.staff_line": "{rank}. {user} · {handled} tickets · {rating} · {response}",
     "stats.empty": "No tickets in this period.",
+    "privacy.exported":
+        "📦 Here is what TicketBot stores about you in this server (JSON, times in UTC).",
+    "privacy.confirm":
+        "🗑️ This deletes **everywhere** your closed tickets in this server (with their "
+        "channels, transcripts and Telegram notifications), your Telegram link and your "
+        "dashboard logins. It can't be undone: download a copy first with `/privacy "
+        "export` if you want one.\n\nKept: blocks, the log of actions (deleted after 365 "
+        "days) and what you did as staff in other people's tickets.",
+    "privacy.delete_button": "Delete my data",
+    "privacy.cancel_button": "Cancel",
+    "privacy.open_tickets": "Close your open tickets first, then try again.",
+    "privacy.deleted":
+        "✅ Done: {tickets} ticket(s) deleted. Their messages on Discord and Telegram are "
+        "being deleted now.",
+    "privacy.cancelled": "Nothing was deleted.",
     "report.title": "Weekly report · {guild}",
     "report.period": "From {start} to {end}",
     "report.tickets_value":
@@ -826,6 +841,22 @@ STRINGS["it"] = {
     "stats.staff": "👥 Staff",
     "stats.staff_line": "{rank}. {user} · {handled} ticket · {rating} · {response}",
     "stats.empty": "Nessun ticket in questo periodo.",
+    "privacy.exported":
+        "📦 Ecco cosa TicketBot salva su di te in questo server (JSON, orari in UTC).",
+    "privacy.confirm":
+        "🗑️ Questo cancella **ovunque** i tuoi ticket chiusi in questo server (con i loro "
+        "canali, transcript e notifiche Telegram), il collegamento con Telegram e i tuoi "
+        "login alla dashboard. Non si può annullare: se vuoi una copia, scaricala prima "
+        "con `/privacy export`.\n\nRestano: i blocchi, il registro delle azioni "
+        "(cancellato dopo 365 giorni) e quello che hai fatto come staff nei ticket di "
+        "altre persone.",
+    "privacy.delete_button": "Cancella i miei dati",
+    "privacy.cancel_button": "Annulla",
+    "privacy.open_tickets": "Chiudi prima i tuoi ticket aperti, poi riprova.",
+    "privacy.deleted":
+        "✅ Fatto: {tickets} ticket cancellati. I loro messaggi su Discord e Telegram "
+        "vengono cancellati adesso.",
+    "privacy.cancelled": "Non è stato cancellato niente.",
     "report.title": "Report settimanale · {guild}",
     "report.period": "Dal {start} al {end}",
     "report.tickets_value":
@@ -1336,6 +1367,22 @@ STRINGS["de"] = {
     "stats.staff": "👥 Team",
     "stats.staff_line": "{rank}. {user} · {handled} Tickets · {rating} · {response}",
     "stats.empty": "Keine Tickets in diesem Zeitraum.",
+    "privacy.exported":
+        "📦 Das speichert TicketBot auf diesem Server über dich (JSON, Zeiten in UTC).",
+    "privacy.confirm":
+        "🗑️ Das löscht **überall** deine geschlossenen Tickets auf diesem Server (mit "
+        "ihren Kanälen, Transkripten und Telegram-Benachrichtigungen), deine "
+        "Telegram-Verknüpfung und deine Dashboard-Anmeldungen. Es kann nicht rückgängig "
+        "gemacht werden: lade vorher mit `/privacy export` eine Kopie herunter, wenn du "
+        "eine willst.\n\nBleiben erhalten: Sperren, das Aktionsprotokoll (nach 365 Tagen "
+        "gelöscht) und was du als Team in den Tickets anderer getan hast.",
+    "privacy.delete_button": "Meine Daten löschen",
+    "privacy.cancel_button": "Abbrechen",
+    "privacy.open_tickets": "Schließe zuerst deine offenen Tickets und versuche es dann erneut.",
+    "privacy.deleted":
+        "✅ Erledigt: {tickets} Ticket(s) gelöscht. Ihre Nachrichten auf Discord und "
+        "Telegram werden jetzt gelöscht.",
+    "privacy.cancelled": "Es wurde nichts gelöscht.",
     "report.title": "Wochenbericht · {guild}",
     "report.period": "Vom {start} bis {end}",
     "report.tickets_value":
@@ -1750,6 +1797,11 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
             "Dove inviarlo (predefinito: il canale di log)",
         "Show the weekly report of the last 7 days":
             "Mostra il report settimanale degli ultimi 7 giorni",
+        "Download or delete your data": "Scarica o cancella i tuoi dati",
+        "Download what the bot stores about you in this server":
+            "Scarica cosa il bot salva su di te in questo server",
+        "Delete your tickets and data in this server":
+            "Cancella i tuoi ticket e i tuoi dati in questo server",
     },
     "de": {
         "Custom questions of the ticket form": "Eigene Fragen des Ticket-Formulars",
@@ -1953,5 +2005,10 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
             "Wohin er gesendet wird (Standard: der Log-Kanal)",
         "Show the weekly report of the last 7 days":
             "Den Wochenbericht der letzten 7 Tage anzeigen",
+        "Download or delete your data": "Deine Daten herunterladen oder löschen",
+        "Download what the bot stores about you in this server":
+            "Herunterladen, was der Bot auf diesem Server über dich speichert",
+        "Delete your tickets and data in this server":
+            "Deine Tickets und Daten auf diesem Server löschen",
     },
 }

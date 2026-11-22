@@ -178,8 +178,25 @@ separate from the code. Only the developer has access to the host.
 
 ## 7. Your rights
 
-You can ask to access or delete the data about you, or ask any question about
-this policy, by opening an issue at
+You can see and delete the data about you yourself, in each server:
+
+- **`/privacy export`** on Discord, or **Download my data** in the web dashboard (page
+  *Open a ticket*), gives you a JSON file with everything the bot stores about you in
+  that server: your tickets with their form answers and conversation (not the staff's
+  internal notes), the tickets you handled and the notes you wrote as staff, a block,
+  your actions in the audit log, your dashboard logins and your Telegram link.
+- **`/privacy delete`** on Discord (after a confirmation), or **Delete my data** in the
+  dashboard, deletes your closed tickets in that server everywhere (database,
+  channels, transcripts in the log and archive channels, Telegram notifications), your
+  Telegram link, your dashboard logins and your availability for automatic assignment.
+  Open tickets must be closed first. With `LEGAL_HOLD_DAYS` set by whoever hosts the
+  bot, a hidden copy of the transcripts is kept for that long (section 6).
+- **Kept** after a deletion, because the server has a legitimate interest in them:
+  blocks (they stop abuse, and end when they expire or are removed), the audit log
+  (security; deleted after 365 days) and what you did as staff in other people's
+  tickets (it is part of their tickets).
+
+You can also ask any question about this policy by opening an issue at
 <https://github.com/TexAlphaWolf/ticketbot/issues>. Server admins can delete all
 the data of their server at any time by removing the bot from the server.
 

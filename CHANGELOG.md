@@ -34,6 +34,14 @@ migrations 0010 and 0011 (`[database] migrated from 0009 to 0011`). Optional: se
   on Telegram; sent once a week also across restarts, skipped when there are no tickets.
   `/report` shows the last 7 days at any time; the dashboard's settings turn it on or off
 - Migration 0011: `guilds.weekly_report`, `report_channel` and `last_report_at`
+- **`/privacy`**: everyone can download (`/privacy export`, a JSON file) or delete
+  (`/privacy delete`, with a confirmation) the data the bot stores about them in a
+  server, also from the dashboard (*Your data* on the page *Open a ticket*). Deleting
+  removes their closed tickets everywhere (database, channels, transcript messages,
+  Telegram notifications), their Telegram link, dashboard logins and availability;
+  open tickets must be closed first. Blocks, the audit log and what they did as staff
+  in other people's tickets are kept, as PRIVACY.md explains. New
+  `GET`/`DELETE /api/v1/me/guilds/{id}/privacy`
 - Migration 0010: `telegram_accounts`, `telegram_messages` (chat and message IDs of the
   notifications, kept 30 days or until the ticket is deleted) and
   `guilds.telegram_messages`

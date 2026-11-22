@@ -73,6 +73,9 @@ async def run_web_command(client, command: dict) -> str:
         return "ok"
     if kind == "ticket.open":
         return await open_from_web(client, guild, cfg, command)
+    if kind == "privacy.cleanup":         # what a deleted person's tickets left behind
+        await delete_leftovers(client, guild.id, payload["leftovers"])
+        return "ok"
     if kind in ADMIN_KINDS:
         member = await get_member(guild, command["requested_by"])
         if member is None or not member.guild_permissions.administrator:
@@ -203,6 +206,15 @@ async def delete_transcript_messages(client, guild_id: int, transcripts: list[di
                 await channel.get_partial_message(int(message_id)).delete()
             except discord.HTTPException:
                 pass          # already gone, or no permission: nothing else to do
+
+
+async def delete_leftovers(client, guild_id: int, leftovers: list[dict]) -> None:
+    """For each deleted ticket: its channel, transcript messages and notifications."""
+    for left in leftovers:
+        await delete_transcript_messages(
+            client, guild_id, left.get("transcripts", []),
+            channel_id=int(left.get("channel_id") or 0) or None,
+            telegram=left.get("telegram"))
 
 
 async def delete_telegram_messages(client, pairs: list) -> None:

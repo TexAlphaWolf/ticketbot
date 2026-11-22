@@ -480,6 +480,40 @@ class Store:
             await conn.execute(delete(TICKETS).where(TICKETS.c.id == ticket_id))
         return found
 
+    # --------------------------------------------------------- privacy ---
+    # What the bot stores about one person (/privacy export and delete)
+
+    async def handled_tickets(self, guild_id: int, user_id: int) -> list[dict]:
+        """Other people's tickets this member claimed as staff."""
+        return await self._all(select(TICKETS).where(
+            TICKETS.c.guild_id == guild_id, TICKETS.c.claimed_by == user_id,
+            TICKETS.c.owner_id != user_id).order_by(TICKETS.c.id))
+
+    async def notes_by_author(self, guild_id: int, user_id: int) -> list[dict]:
+        return await self._all(
+            select(NOTES).join(TICKETS, NOTES.c.ticket_id == TICKETS.c.id)
+            .where(TICKETS.c.guild_id == guild_id, NOTES.c.author_id == user_id)
+            .order_by(NOTES.c.id))
+
+    async def audit_of_actor(self, guild_id: int, user_id: int) -> list[dict]:
+        rows = await self._all(select(AUDIT).where(
+            AUDIT.c.guild_id == guild_id, AUDIT.c.actor_id == user_id).order_by(AUDIT.c.id))
+        for row in rows:
+            row["details"] = json.loads(row["details"]) if row["details"] else {}
+        return rows
+
+    async def is_available(self, guild_id: int, user_id: int) -> bool:
+        return await self._one(select(STAFF.c.user_id).where(
+            STAFF.c.guild_id == guild_id, STAFF.c.user_id == user_id)) is not None
+
+    async def web_sessions_of(self, user_id: int) -> list[dict]:
+        return await self._all(select(SESSIONS).where(SESSIONS.c.user_id == user_id)
+                               .order_by(SESSIONS.c.created_at))
+
+    async def delete_web_sessions_of(self, user_id: int) -> int:
+        """Log a person out of the dashboard everywhere."""
+        return await self._write(delete(SESSIONS).where(SESSIONS.c.user_id == user_id))
+
     # -------------------------------------------------------- telegram ---
 
     async def link_telegram_account(self, telegram_user_id: int, discord_user_id: int,

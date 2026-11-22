@@ -3,15 +3,19 @@ same form as on Discord, with the FAQ first) and see your own tickets and transc
 The bot opens the ticket on Discord, with the same checks (blocks, cooldown, one open
 ticket at a time)."""
 
+import json
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Path, Request, status
+from fastapi import APIRouter, HTTPException, Path, Request, Response, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from ...core import config
 from ...core.logic import answers_text
+from ...core.privacy import PrivacyError, erase_personal_data, export_personal_data
 from ...core.transcripts import load_transcript
 from ..discord_api import guild_icon_url
+from ..sessions import clear_session_cookie, client_ip
 from .guilds import Session, TranscriptMessage, TranscriptOut, oauth_guilds
 
 router = APIRouter(prefix="/me/guilds", tags=["members"])
@@ -227,3 +231,47 @@ async def my_transcript(request: Request, session: Session, guild_id: GuildId,
         channel_name=transcript["channel_name"], created_at=transcript["created_at"],
         messages=[TranscriptMessage.from_message(m) for m in messages], notes=[])
 
+
+class Erased(BaseModel):
+    tickets: int                  # tickets deleted (the bot deletes what is on Discord)
+
+
+@router.get("/{guild_id}/privacy", response_class=Response,
+            responses={200: {"content": {"application/json": {}}}})
+async def export_my_data(request: Request, session: Session, guild_id: GuildId) -> Response:
+    """Download everything TicketBot stores about you in this server (JSON)."""
+    await member_guild(request, session, guild_id)
+    store = request.app.state.store
+    data = await export_personal_data(store, guild_id, session["user_id"])
+    await store.audit(guild_id, session["user_id"], "privacy.export", source="web",
+                      ip=client_ip(request))
+    return Response(json.dumps(data, ensure_ascii=False, indent=2),
+                    media_type="application/json",
+                    headers={"Content-Disposition":
+                             f'attachment; filename="ticketbot-data-{guild_id}.json"',
+                             "Cache-Control": "no-store"})
+
+
+@router.delete("/{guild_id}/privacy", response_model=Erased)
+async def erase_my_data(request: Request, session: Session, guild_id: GuildId) -> Response:
+    """Delete your tickets in this server everywhere, your Telegram link and your logins
+    (this one too: you are logged out). Open tickets must be closed first."""
+    await member_guild(request, session, guild_id)
+    store, settings = request.app.state.store, request.app.state.settings
+    try:
+        result = await erase_personal_data(store, guild_id, session["user_id"],
+                                           settings.legal_hold_days)
+    except PrivacyError:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "Close your open tickets first") from None
+    leftovers = [x for x in result["leftovers"]
+                 if x["channel_id"] or x["telegram"] or x["transcripts"]]
+    if leftovers:             # the bot deletes the channels and messages on Discord
+        await store.enqueue_command(guild_id, "privacy.cleanup", session["user_id"],
+                                    {"leftovers": leftovers})
+    await store.audit(guild_id, session["user_id"], "privacy.delete", source="web",
+                      details={"tickets": result["tickets"]}, ip=client_ip(request))
+    request.app.state.guilds_cache.drop(session["id"])
+    response = JSONResponse(Erased(tickets=result["tickets"]).model_dump())
+    clear_session_cookie(response, settings)
+    return response
