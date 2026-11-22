@@ -21,6 +21,7 @@ TicketBot only collects the data it needs to run the ticket system.
   them) and quick replies written by the admins
 - Settings such as the transcript retention period and the ticket counter
 - The ID of the Telegram chat linked to the server, if Telegram notifications are enabled
+- Whether what users write in their tickets is also sent to the linked Telegram chat
 
 **Tickets**:
 - Discord user ID of the member who opened the ticket and of the staff member who
@@ -121,6 +122,17 @@ The data is **never sold, shared for advertising or used for any other purpose**
   description, rating comment and transcript, are sent to that chat through the
   Telegram Bot API. Only chats that were verified with a code are used. Chat IDs of
   people who only send `/start` or `/id` to the Telegram bot are not stored.
+  When the server allows it (on by default, `/telegram messages`), what users write in
+  their open tickets is sent to that chat too, so the staff can answer from Telegram.
+- **Two-way Telegram** (optional): a staff member who links their Telegram account
+  (`/telegram-account link`) has their Telegram user ID stored next to their Discord
+  user ID, until they unlink it (`/telegram-account unlink` on Discord or `/unlink` on
+  Telegram). Their answers to the notifications are posted in the ticket with their
+  Discord name and recorded in the audit log. For each notification about a ticket the
+  bot keeps the Telegram chat and message ID (not the text) for 30 days, to know which
+  ticket an answer is for; they are deleted earlier with the ticket. Deleting a ticket
+  everywhere also deletes the bot's notifications about it from the Telegram chat, when
+  Telegram still allows it (in the first 48 hours).
 
 Discord and Telegram process this data under their own privacy policies.
 
@@ -150,7 +162,8 @@ Discord and Telegram process this data under their own privacy policies.
   the transcript is kept for that many days after the deletion, for legal reasons only:
   it isn't shown in the dashboard, can only be read from the server's command line, and
   every read is recorded in the audit log.
-- **Telegram verification codes** are kept in memory only, for up to 10 minutes.
+- **Telegram verification and account link codes** are kept in memory only, for up to
+  10 minutes, and work once.
 
 ## 6. Security
 

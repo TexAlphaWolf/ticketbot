@@ -102,6 +102,7 @@ export function SettingsPage() {
           </label>
           <label className="check"><input type="checkbox" checked={form.staff_reminders} onChange={(e) => set("staff_reminders", e.target.checked)} /> {t("settings.reminders")}</label>
           <label className="check"><input type="checkbox" checked={form.auto_assign} onChange={(e) => set("auto_assign", e.target.checked)} /> {t("settings.auto_assign")}</label>
+          <label className="check"><input type="checkbox" checked={form.telegram_messages} onChange={(e) => set("telegram_messages", e.target.checked)} /> {t("settings.telegram_messages")}</label>
           <div><button className="button button-primary" disabled={busy}>{t("settings.save")}</button></div>
         </form>
       </Card>

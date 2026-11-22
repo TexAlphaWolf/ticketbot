@@ -103,21 +103,46 @@ def user_name(guild: discord.Guild | None, user_id: int | None, client=None) -> 
     return str(user) if user else str(user_id)
 
 
+def ticket_buttons(_: Translate, ticket: dict | None = None) -> list[tuple[str, str]]:
+    """The buttons under a Telegram notification about a ticket: only what can still be
+    done (Claim while nobody has it, Close while it's open)."""
+    if ticket is not None and ticket.get("status") == config.STATUS_CLOSED:
+        return []
+    close = [(_("tg.btn_close"), "close")]
+    if ticket is not None and ticket.get("claimed_by"):
+        return close
+    return [(_("tg.btn_claim"), "claim"), *close]
+
+
 async def telegram_notify(client: "TicketBot", cfg: dict | None, text: str,
-                          document: bytes | None = None, filename: str | None = None) -> None:
-    """Send a notification to the Telegram chat linked to this server only."""
+                          document: bytes | None = None, filename: str | None = None,
+                          *, ticket_id: int | None = None, answerable: bool = True) -> None:
+    """Send a notification to the Telegram chat linked to this server only. With a
+    `ticket_id` it is deleted with the ticket and, if `answerable`, answering it on
+    Telegram answers in that ticket (two-way Telegram)."""
     tg = client.telegram
     chat_id = (cfg or {}).get("telegram_chat_id")
     if tg is None or not chat_id:
         return
     from ..integrations.telegram import TelegramError
     try:
+        buttons = None
         if document is not None:
-            await tg.send_document(chat_id, document, filename or "transcript.html", caption=text)
+            sent = await tg.send_document(chat_id, document, filename or "transcript.html",
+                                          caption=text)
+        elif ticket_id is not None and answerable:
+            _ = translator(cfg)
+            text += "\n\n" + _("tg.reply_hint")
+            buttons = ticket_buttons(_, await client.db.get_ticket(ticket_id))
+            sent = await tg.send_message(chat_id, text, buttons=buttons)
         else:
-            await tg.send_message(chat_id, text)
+            sent = await tg.send_message(chat_id, text)
     except TelegramError as e:
         print(f"[telegram] could not notify guild {cfg.get('guild_id')}: {e}")
+        return
+    if ticket_id is not None and sent.get("message_id"):
+        await client.db.track_telegram_message(int(chat_id), sent["message_id"],
+                                               cfg["guild_id"], ticket_id)
 
 
 def is_ticket_staff(member: discord.abc.User, cfg: dict | None,

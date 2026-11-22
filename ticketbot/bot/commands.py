@@ -24,12 +24,14 @@ from ..core.logic import (
     valid_profile_image,
 )
 from ..integrations.telegram import TelegramError
+from . import telegram_bridge
 from .common import (
     COLOR,
     audit,
     esc,
     grant_thread_access,
     is_staff,
+    lang_of,
     missing_thread_permissions,
     priority_label,
     respond,
@@ -1316,6 +1318,73 @@ class TelegramGroup(app_commands.Group):
         interaction.client.pending_links.pop(interaction.guild.id, None)
         await interaction.response.send_message(_("tg.unlinked"), ephemeral=True)
 
+    @app_commands.command(name="messages",
+                          description="Also send to Telegram what users write in their tickets")
+    @app_commands.describe(enabled="On: every message of a user in a ticket reaches the chat")
+    async def messages(self, interaction: discord.Interaction, enabled: bool):
+        ctx = await self.ready(interaction)
+        if ctx is None:
+            return
+        _ = ctx[1]
+        await interaction.client.db.save_guild(interaction.guild.id, telegram_messages=enabled)
+        await audit(interaction, "settings.telegram_messages", enabled=enabled)
+        await interaction.response.send_message(
+            _("tg.messages_on" if enabled else "tg.messages_off"), ephemeral=True)
+
+
+class TelegramAccountGroup(app_commands.Group):
+    """Two-way Telegram: each staff member links their own Telegram account, then
+    answers the ticket notifications there."""
+
+    def __init__(self):
+        super().__init__(name="telegram-account",
+                         description="Answer tickets from Telegram with your account",
+                         guild_only=True)
+
+    async def _ready(self, interaction: discord.Interaction):
+        cfg = await interaction.client.db.get_guild(interaction.guild.id)
+        _ = translator(cfg)
+        if interaction.client.telegram is None:
+            await interaction.response.send_message(_("tg.disabled"), ephemeral=True)
+            return None
+        return cfg, _
+
+    @app_commands.command(name="link", description="Link your Telegram account")
+    async def link(self, interaction: discord.Interaction):
+        ctx = await self._ready(interaction)
+        if ctx is None:
+            return
+        cfg, _ = ctx
+        client = interaction.client
+        code = telegram_bridge.new_account_code(client, interaction.user.id, lang_of(cfg))
+        bot = client.telegram.username
+        await interaction.response.send_message(_(
+            "tg.account_code", bot=bot, code=code, link=f"https://t.me/{bot}?start={code}",
+            minutes=telegram_bridge.CODE_TTL // 60), ephemeral=True)
+
+    @app_commands.command(name="status", description="Show whether your Telegram account is linked")
+    async def status(self, interaction: discord.Interaction):
+        ctx = await self._ready(interaction)
+        if ctx is None:
+            return
+        _ = ctx[1]
+        account = await interaction.client.db.telegram_account_of(interaction.user.id)
+        await interaction.response.send_message(
+            _("tg.account_status", since=f"<t:{int(account['linked_at'])}:D>") if account
+            else _("tg.account_status_none"), ephemeral=True)
+
+    @app_commands.command(name="unlink", description="Unlink your Telegram account")
+    async def unlink(self, interaction: discord.Interaction):
+        ctx = await self._ready(interaction)
+        if ctx is None:
+            return
+        _ = ctx[1]
+        removed = await interaction.client.db.unlink_telegram_account(
+            discord_user_id=interaction.user.id)
+        await interaction.response.send_message(
+            _("tg.account_unlinked_discord" if removed else "tg.account_status_none"),
+            ephemeral=True)
+
 
 # ---------------------------------------------------------- quick replies ---
 
@@ -1667,5 +1736,5 @@ class ProfileGroup(app_commands.Group):
 def all_commands() -> list:
     return [setup, guidelines, audit_log, queue, mytickets, available, add, remove, close, reopen,
             priority, transfer, escalate_command, stats, export_stats, reply, NoteGroup(),
-            SettingsGroup(), TypesGroup(), TelegramGroup(), ProfileGroup(), RepliesGroup(),
-            BlockGroup(), EscalationGroup(), FaqGroup()]
+            SettingsGroup(), TypesGroup(), TelegramGroup(), TelegramAccountGroup(),
+            ProfileGroup(), RepliesGroup(), BlockGroup(), EscalationGroup(), FaqGroup()]

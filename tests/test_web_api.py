@@ -383,6 +383,13 @@ def test_transcript_in_the_dashboard(api):
 
 def test_admin_deletes_a_ticket(api):
     add_transcript(api.db_path, 4)
+
+    async def notified():                       # a Telegram notification about it
+        store = await new_store(api.db_path)
+        await store.track_telegram_message(-100, 77, GUILD, 4)
+        await store.close()
+
+    asyncio.run(notified())
     as_user(api, STAFF)
     assert api.delete(f"/api/v1/guilds/{GUILD}/tickets/4", headers=csrf(api)).status_code \
         == 403
@@ -393,6 +400,15 @@ def test_admin_deletes_a_ticket(api):
     assert api.get(f"/api/v1/guilds/{GUILD}/tickets/4").status_code == 404
     assert api.delete(f"/api/v1/guilds/{GUILD}/tickets/4", headers=h).status_code == 404
     assert [c[0] for c in commands(api)] == ["transcript.delete_messages"]
+
+    async def payload():
+        store = await new_store(api.db_path)
+        command = await store.get_command(1)
+        await store.close()
+        return command["payload"]
+
+    import json
+    assert json.loads(asyncio.run(payload()))["telegram"] == [[-100, 77]]   # deleted too
 
 
 def test_live_events(api, monkeypatch):

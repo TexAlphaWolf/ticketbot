@@ -29,6 +29,7 @@ from ..db.engine import create_engine
 from ..db.legacy import migrate_legacy_config
 from ..db.migrate import prepare
 from ..integrations.telegram import TelegramError, TelegramNotifier
+from . import telegram_bridge
 from .commands import all_commands
 from .common import (
     channel_url,
@@ -64,6 +65,7 @@ class TicketBot(discord.Client):
         self.http_session: aiohttp.ClientSession | None = None
         self.telegram: TelegramNotifier | None = None
         self.pending_links: dict[int, dict] = {}
+        self.telegram_codes: dict[str, dict] = {}       # /telegram-account link codes
         self._telegram_poller: asyncio.Task | None = None
 
     async def setup_hook(self):
@@ -88,7 +90,9 @@ class TicketBot(discord.Client):
                 print(f"[telegram] disabled, invalid TELEGRAM_BOT_TOKEN: {e}")
             else:
                 self.telegram = notifier
-                self._telegram_poller = asyncio.create_task(notifier.poll_forever())
+                self._telegram_poller = asyncio.create_task(notifier.poll_forever(
+                    lambda message: telegram_bridge.handle_message(self, message),
+                    lambda query: telegram_bridge.handle_button(self, query)))
                 print(f"[telegram] connected as @{notifier.username}")
 
         retried = await self.db.reset_running_commands()
@@ -130,6 +134,8 @@ class TicketBot(discord.Client):
         from_staff = message.author.id != ticket["owner_id"] and is_staff(message.author, cfg)
         changes = activity_changes(ticket, time.time(), from_staff)
         await self.db.update_ticket(ticket["id"], **changes)
+        if cfg:
+            await telegram_bridge.forward_user_message(self, message, ticket, cfg)
 
     async def on_guild_channel_delete(self, channel):
         ticket = await self.db.ticket_by_channel(channel.id)
@@ -166,6 +172,7 @@ class TicketBot(discord.Client):
             if transcript is None or transcript["ticket_id"] is None:
                 continue
             ticket = await self.db.get_ticket(transcript["ticket_id"])
+            telegram = await self.db.telegram_messages_of(transcript["ticket_id"])
             removed = await self.db.delete_ticket(transcript["ticket_id"],
                                                   self.settings.legal_hold_days)
             await self.db.audit(guild_id, None, "ticket.delete", source="discord",
@@ -174,7 +181,7 @@ class TicketBot(discord.Client):
             channel_id = (ticket["channel_id"] if ticket and not ticket["channel_deleted"]
                           else None)
             await delete_transcript_messages(self, guild_id, removed, keep=message_id,
-                                             channel_id=channel_id)
+                                             channel_id=channel_id, telegram=telegram)
             deleted += 1
         return deleted
 
@@ -262,7 +269,7 @@ class TicketBot(discord.Client):
         await telegram_notify(self, cfg, _(
             "tg.reminder", guild=esc(channel.guild.name), channel=esc(channel.name),
             priority=priority, waited=waited, url=channel_url(channel.guild.id, channel.id),
-        ))
+        ), ticket_id=ticket["id"])
 
     async def run_backup_if_due(self) -> None:
         """Back up the database every BACKUP_INTERVAL_HOURS, keeping the last BACKUP_KEEP.
@@ -316,6 +323,7 @@ class TicketBot(discord.Client):
         await self.db.purge_audit_before(now - config.AUDIT_KEEP_DAYS * 86400)
         await self.db.purge_faq_results_before(now - config.STATS_KEEP_DAYS * 86400)
         await self.db.purge_web_sessions(now)
+        await self.db.purge_telegram_messages_before(telegram_bridge.purge_before(now))
         await self.db.purge_finished_commands(now - config.COMMANDS_KEEP_DAYS * 86400)
         await self.db.purge_held_transcripts(now)
         purged = await self.db.purge_closed_before(now - config.STATS_KEEP_DAYS * 86400,

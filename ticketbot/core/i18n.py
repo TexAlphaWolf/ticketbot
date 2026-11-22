@@ -399,6 +399,46 @@ STRINGS["en"] = {
     "tg.test": "🔔 Test notification from <b>{guild}</b>.",
     "tg.test_sent": "🔔 Test notification sent.",
     "tg.unlinked": "🔕 Telegram notifications disabled.",
+    "telegram.message_footer": "Sent from Telegram",
+    "tg.reply_hint": "↩️ <i>Reply to this message to answer in the ticket</i>",
+    "tg.btn_claim": "✋ Claim",
+    "tg.btn_close": "🔒 Close",
+    "tg.btn_confirm_close": "🔒 Yes, close it",
+    "tg.btn_keep": "↩️ Keep it open",
+    "tg.btn_back": "↩️ Back",
+    "tg.choose_priority": "Choose the priority of the ticket:",
+    "tg.button_old":
+        "This notification is too old, or its chat isn't linked to the server anymore.",
+    "tg.reply_needed":
+        "Which ticket? Use the buttons under a ticket notification, or reply to it with "
+        "/claim or /close reason.",
+    "tg.user_message":
+        "💬 <b>{user}</b> in #{channel} on <b>{guild}</b>\n\n{text}{attachments}\n<a "
+        "href=\"{url}\">Open in Discord</a>",
+    "tg.attachments": "\n📎 {count} attachment(s), see Discord",
+    "tg.account_needed":
+        "🔗 Link your Telegram account first: run <code>/telegram-account link</code> on "
+        "Discord.",
+    "tg.account_linked":
+        "✅ Linked to the Discord account <b>{user}</b>. Reply to the ticket notifications "
+        "to answer in the tickets.",
+    "tg.account_bad_code":
+        "❌ This code is wrong or expired. Run <code>/telegram-account link</code> on "
+        "Discord again.",
+    "tg.account_unlinked": "🔓 This Telegram account is not linked to Discord anymore.",
+    "tg.only_text": "Only text answers reach Discord: send files in the ticket on Discord.",
+    "tg.unknown_command": "Answer with a text, /claim or /close reason.",
+    "tg.failed": "❌ Not done: {reason}",
+    "tg.done": "✅ Done.",
+    "tg.account_code":
+        "🔗 Open **@{bot}** on Telegram and send `/link {code}`, or open {link} and press "
+        "**Start**. The code works for {minutes} minutes, once. Then reply to the ticket "
+        "notifications to answer in the tickets.",
+    "tg.account_status": "✅ Your Telegram account is linked (since {since}).",
+    "tg.account_status_none": "❌ No Telegram account linked. Use `/telegram-account link`.",
+    "tg.account_unlinked_discord": "🔓 Your Telegram account was unlinked.",
+    "tg.messages_on": "💬 What users write in their tickets will be sent to Telegram too.",
+    "tg.messages_off": "🔕 Only the notifications go to Telegram, not the users' messages.",
     "profile.name_set": "✅ In this server I'm now called **{name}**.",
     "profile.avatar_set": "✅ Avatar updated for this server.",
     "profile.banner_set": "✅ Banner updated for this server.",
@@ -831,6 +871,49 @@ STRINGS["it"] = {
     "tg.test": "🔔 Notifica di prova da <b>{guild}</b>.",
     "tg.test_sent": "🔔 Notifica di prova inviata.",
     "tg.unlinked": "🔕 Notifiche Telegram disattivate.",
+    "telegram.message_footer": "Inviato da Telegram",
+    "tg.reply_hint": "↩️ <i>Rispondi a questo messaggio per scrivere nel ticket</i>",
+    "tg.btn_claim": "✋ Prendi in carico",
+    "tg.btn_close": "🔒 Chiudi",
+    "tg.btn_confirm_close": "🔒 Sì, chiudilo",
+    "tg.btn_keep": "↩️ Lascialo aperto",
+    "tg.btn_back": "↩️ Indietro",
+    "tg.choose_priority": "Scegli la priorità del ticket:",
+    "tg.button_old":
+        "Questa notifica è troppo vecchia, oppure la sua chat non è più collegata al "
+        "server.",
+    "tg.reply_needed":
+        "Quale ticket? Usa i pulsanti sotto la notifica di un ticket, oppure rispondi "
+        "alla notifica con /claim o /close motivo.",
+    "tg.user_message":
+        "💬 <b>{user}</b> in #{channel} su <b>{guild}</b>\n\n{text}{attachments}\n<a "
+        "href=\"{url}\">Apri su Discord</a>",
+    "tg.attachments": "\n📎 {count} allegati, vedi Discord",
+    "tg.account_needed":
+        "🔗 Collega prima il tuo account Telegram: usa <code>/telegram-account link</code> "
+        "su Discord.",
+    "tg.account_linked":
+        "✅ Collegato all'account Discord <b>{user}</b>. Rispondi alle notifiche dei "
+        "ticket per scrivere nei ticket.",
+    "tg.account_bad_code":
+        "❌ Codice errato o scaduto. Rilancia <code>/telegram-account link</code> su "
+        "Discord.",
+    "tg.account_unlinked": "🔓 Questo account Telegram non è più collegato a Discord.",
+    "tg.only_text":
+        "Su Discord arrivano solo le risposte di testo: manda i file nel ticket su "
+        "Discord.",
+    "tg.unknown_command": "Rispondi con un testo, /claim oppure /close motivo.",
+    "tg.failed": "❌ Non fatto: {reason}",
+    "tg.done": "✅ Fatto.",
+    "tg.account_code":
+        "🔗 Apri **@{bot}** su Telegram e invia `/link {code}`, oppure apri {link} e premi "
+        "**Avvia**. Il codice vale {minutes} minuti, una volta sola. Poi rispondi alle "
+        "notifiche dei ticket per scrivere nei ticket.",
+    "tg.account_status": "✅ Il tuo account Telegram è collegato (dal {since}).",
+    "tg.account_status_none": "❌ Nessun account Telegram collegato. Usa `/telegram-account link`.",
+    "tg.account_unlinked_discord": "🔓 Il tuo account Telegram è stato scollegato.",
+    "tg.messages_on": "💬 Anche quello che gli utenti scrivono nei ticket arriverà su Telegram.",
+    "tg.messages_off": "🔕 Su Telegram arrivano solo le notifiche, non i messaggi degli utenti.",
     "profile.name_set": "✅ In questo server ora mi chiamo **{name}**.",
     "profile.avatar_set": "✅ Avatar aggiornato per questo server.",
     "profile.banner_set": "✅ Banner aggiornato per questo server.",
@@ -1277,6 +1360,49 @@ STRINGS["de"] = {
     "tg.test": "🔔 Test-Benachrichtigung von <b>{guild}</b>.",
     "tg.test_sent": "🔔 Test-Benachrichtigung gesendet.",
     "tg.unlinked": "🔕 Telegram-Benachrichtigungen deaktiviert.",
+    "telegram.message_footer": "Über Telegram gesendet",
+    "tg.reply_hint": "↩️ <i>Antworte auf diese Nachricht, um im Ticket zu schreiben</i>",
+    "tg.btn_claim": "✋ Übernehmen",
+    "tg.btn_close": "🔒 Schließen",
+    "tg.btn_confirm_close": "🔒 Ja, schließen",
+    "tg.btn_keep": "↩️ Offen lassen",
+    "tg.btn_back": "↩️ Zurück",
+    "tg.choose_priority": "Wähle die Priorität des Tickets:",
+    "tg.button_old":
+        "Diese Benachrichtigung ist zu alt, oder ihr Chat ist nicht mehr mit dem Server "
+        "verknüpft.",
+    "tg.reply_needed":
+        "Welches Ticket? Nutze die Schaltflächen unter einer Ticket-Benachrichtigung, "
+        "oder antworte darauf mit /claim oder /close Grund.",
+    "tg.user_message":
+        "💬 <b>{user}</b> in #{channel} auf <b>{guild}</b>\n\n{text}{attachments}\n<a "
+        "href=\"{url}\">In Discord öffnen</a>",
+    "tg.attachments": "\n📎 {count} Anhang/Anhänge, siehe Discord",
+    "tg.account_needed":
+        "🔗 Verknüpfe zuerst dein Telegram-Konto: <code>/telegram-account link</code> auf "
+        "Discord.",
+    "tg.account_linked":
+        "✅ Mit dem Discord-Konto <b>{user}</b> verknüpft. Antworte auf die "
+        "Ticket-Benachrichtigungen, um in den Tickets zu schreiben.",
+    "tg.account_bad_code":
+        "❌ Der Code ist falsch oder abgelaufen. Führe <code>/telegram-account link</code> "
+        "auf Discord erneut aus.",
+    "tg.account_unlinked": "🔓 Dieses Telegram-Konto ist nicht mehr mit Discord verknüpft.",
+    "tg.only_text": "Nur Textantworten erreichen Discord: sende Dateien im Ticket auf Discord.",
+    "tg.unknown_command": "Antworte mit einem Text, /claim oder /close Grund.",
+    "tg.failed": "❌ Nicht ausgeführt: {reason}",
+    "tg.done": "✅ Erledigt.",
+    "tg.account_code":
+        "🔗 Öffne **@{bot}** auf Telegram und sende `/link {code}`, oder öffne {link} und "
+        "tippe auf **Starten**. Der Code gilt {minutes} Minuten und nur einmal. Danach "
+        "antwortest du auf die Ticket-Benachrichtigungen, um in den Tickets zu schreiben.",
+    "tg.account_status": "✅ Dein Telegram-Konto ist verknüpft (seit {since}).",
+    "tg.account_status_none": "❌ Kein Telegram-Konto verknüpft. Nutze `/telegram-account link`.",
+    "tg.account_unlinked_discord": "🔓 Dein Telegram-Konto wurde getrennt.",
+    "tg.messages_on": "💬 Was Nutzer in ihren Tickets schreiben, wird auch an Telegram gesendet.",
+    "tg.messages_off":
+        "🔕 An Telegram gehen nur die Benachrichtigungen, nicht die Nachrichten der "
+        "Nutzer.",
     "profile.name_set": "✅ Auf diesem Server heiße ich jetzt **{name}**.",
     "profile.avatar_set": "✅ Avatar für diesen Server aktualisiert.",
     "profile.banner_set": "✅ Banner für diesen Server aktualisiert.",
@@ -1542,6 +1668,16 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Show the Telegram link of this server": "Mostra il collegamento Telegram di questo server",
         "Send a test notification to Telegram": "Invia una notifica di prova su Telegram",
         "Stop sending notifications to Telegram": "Smetti di inviare notifiche su Telegram",
+        "Also send to Telegram what users write in their tickets":
+            "Invia su Telegram anche quello che gli utenti scrivono nei ticket",
+        "On: every message of a user in a ticket reaches the chat":
+            "Attivo: ogni messaggio di un utente in un ticket arriva nella chat",
+        "Answer tickets from Telegram with your account":
+            "Rispondi ai ticket da Telegram con il tuo account",
+        "Link your Telegram account": "Collega il tuo account Telegram",
+        "Show whether your Telegram account is linked":
+            "Mostra se il tuo account Telegram è collegato",
+        "Unlink your Telegram account": "Scollega il tuo account Telegram",
     },
     "de": {
         "Custom questions of the ticket form": "Eigene Fragen des Ticket-Formulars",
@@ -1728,5 +1864,15 @@ COMMAND_TEXT: dict[str, dict[str, str]] = {
         "Send a test notification to Telegram": "Test-Benachrichtigung an Telegram senden",
         "Stop sending notifications to Telegram":
             "Keine Benachrichtigungen mehr an Telegram senden",
+        "Also send to Telegram what users write in their tickets":
+            "Auch an Telegram senden, was Nutzer in ihre Tickets schreiben",
+        "On: every message of a user in a ticket reaches the chat":
+            "An: jede Nachricht eines Nutzers in einem Ticket erreicht den Chat",
+        "Answer tickets from Telegram with your account":
+            "Tickets mit deinem Konto aus Telegram beantworten",
+        "Link your Telegram account": "Dein Telegram-Konto verknüpfen",
+        "Show whether your Telegram account is linked":
+            "Anzeigen, ob dein Telegram-Konto verknüpft ist",
+        "Unlink your Telegram account": "Dein Telegram-Konto trennen",
     },
 }

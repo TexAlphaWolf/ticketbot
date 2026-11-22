@@ -235,6 +235,27 @@ A Telegram chat can be linked to more than one Discord server: run
 `/telegram link` and `/telegram verify` with the same chat ID in each server.
 Every notification shows the server name, and each server only sends its own tickets.
 
+### Answering from Telegram
+
+The notifications about a ticket (new ticket, high priority, escalation, reminder, and
+what the user writes in the ticket) can be answered on Telegram:
+
+1. Each staff member links their Telegram account once: `/telegram-account link` on
+   Discord gives a one-time code; send `/link <code>` to the Telegram bot, or open the
+   link it shows and press **Start**.
+2. **Reply** to a notification with a text: the bot posts it in the ticket with your name
+   (footer "Sent from Telegram") and reacts 👍 on Telegram.
+3. The buttons under the notification take the ticket (**✋ Claim**, then the priority,
+   like on Discord) or close it (**🔒 Close**, then **Yes, close it**). Replying
+   `/claim high` (or `low`, `medium`, in any of the bot's languages) or
+   `/close <reason>` to the notification does the same.
+
+The same permissions as on Discord apply: only the staff of that ticket can answer, and
+an answer to an unlinked chat or an old notification (after 30 days) does nothing.
+`/telegram messages enabled:False` (or the dashboard's settings) sends only the
+notifications, not what users write in their tickets. `/telegram-account status` and
+`unlink` show and remove your link; `/unlink` on Telegram does the same.
+
 > Whoever hosts the bot technically has access to the data of every server it is in.
 > If you want full control over your tickets, host your own instance.
 
@@ -288,7 +309,9 @@ port 8080.
   the database (encrypted) and shown on the ticket's page, with a *Download HTML* button.
   Deleting the transcript message from the archive channel, or the ticket from the
   dashboard (admins), deletes the ticket everywhere: dashboard, statistics, its channel
-  if it is still there and the transcript messages in the log and archive channels. To keep a hidden copy for legal
+  if it is still there, the transcript messages in the log and archive channels and its
+  Telegram notifications (Telegram lets a bot delete them only in the first 48 hours).
+  **Delete now** on Discord deletes only the channel: the ticket stays in the dashboard. To keep a hidden copy for legal
   reasons set `LEGAL_HOLD_DAYS` (e.g. `3650`); `python -m ticketbot held` lists the
   copies and saves one as HTML
 - **Server management** (admins only): `GET/PATCH .../settings` (language, retention,
@@ -371,7 +394,8 @@ commands with `docker compose exec ticketbot python -m ticketbot backup` (and
 | `/escalation list` / `add` / `remove` | Admin | Manages the escalation levels |
 | `/faq list` / `add` / `edit` / `remove` | Admin | Manages the FAQ shown before the ticket form |
 | `/types questions list` / `add` / `remove` | Admin | Manages the custom questions of a ticket type |
-| `/telegram link` / `verify` / `status` / `test` / `unlink` | Admin | Manages Telegram notifications |
+| `/telegram link` / `verify` / `status` / `test` / `unlink` / `messages` | Admin | Manages Telegram notifications |
+| `/telegram-account link` / `status` / `unlink` | Everyone | Links your Telegram account to answer tickets from Telegram |
 | `/profile name` / `avatar` / `banner` / `bio` / `reset` | Admin | Changes the bot's profile in this server only |
 | `/available enabled` | Staff | Joins or leaves the auto-assign rotation |
 | `/block add` / `remove` / `list` | Staff | Blocks members from opening tickets |

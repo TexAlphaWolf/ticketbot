@@ -1,5 +1,33 @@
 # Changelog
 
+## [Unreleased] - V3 Beta4
+
+### Upgrading from 3.0.0-beta.3
+Update the files and start the bot: it makes a backup and applies the migration 0010
+(`[database] migrated from 0009 to 0010`). The requirements did not change.
+
+### Added
+- **Two-way Telegram**: the notifications about a ticket (new ticket, high priority,
+  escalation, staff reminder) can be answered on Telegram. Each staff member links their
+  Telegram account once with `/telegram-account link` (a one-time code, sent to the
+  Telegram bot with `/link` or by opening a link); then a **reply** to a notification is
+  posted in the ticket with their name ("Sent from Telegram"), and the buttons under
+  it take the ticket (**Claim**, then the priority, like on Discord) or close it
+  (**Close**, with a confirmation); answering `/claim high` or `/close reason` does the
+  same. The same permissions as on Discord and in the
+  dashboard apply, every action is in the audit log (source `telegram`), and the bot
+  reacts 👍 when the answer reached Discord or says why not
+- What users write in their tickets (the owner included, even when staff) is also sent
+  to the Telegram chat, and can be answered the same way: `/telegram messages enabled:False` or the dashboard's settings
+  turn it off
+- `/telegram-account status` and `unlink` on Discord, `/unlink` on Telegram
+- Deleting a ticket everywhere (dashboard, or its transcript in the archive channel) also
+  deletes the bot's notifications about it on Telegram, the closing one with the
+  transcript included (Telegram allows it in the first 48 hours)
+- Migration 0010: `telegram_accounts`, `telegram_messages` (chat and message IDs of the
+  notifications, kept 30 days or until the ticket is deleted) and
+  `guilds.telegram_messages`
+
 ## [3.0.0-beta.3] - 2026-11-22
 
 Third beta of TicketBot V3: the web dashboard. Staff and admins handle tickets, read

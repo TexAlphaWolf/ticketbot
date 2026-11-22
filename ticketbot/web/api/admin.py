@@ -98,6 +98,7 @@ class Settings(BaseModel):
     staff_reminders: bool
     auto_assign: bool
     ticket_cooldown: int          # minutes, 0 = off
+    telegram_messages: bool       # the users' messages in tickets also go to Telegram
     ticket_mode: Literal["channel", "thread"]
     staff_role: str | None
 
@@ -107,6 +108,7 @@ class SettingsChange(BaseModel):
     retention_days: int | None = Field(default=None, ge=1, le=365)
     staff_reminders: bool | None = None
     auto_assign: bool | None = None
+    telegram_messages: bool | None = None
     ticket_cooldown: int | None = Field(default=None, ge=0,
                                         le=config.MAX_TICKET_COOLDOWN_MINUTES)
 
@@ -126,6 +128,7 @@ def settings_of(cfg: dict) -> Settings:
                     staff_reminders=bool(cfg.get("staff_reminders", True)),
                     auto_assign=bool(cfg.get("auto_assign")),
                     ticket_cooldown=cfg.get("ticket_cooldown") or 0,
+                    telegram_messages=bool(cfg.get("telegram_messages", True)),
                     ticket_mode=cfg.get("ticket_mode") or "channel",
                     staff_role=str(cfg["staff_role"]) if cfg.get("staff_role") else None)
 
@@ -365,23 +368,25 @@ async def remove_type_role(request: Request, session: Session, access: Admin,
 async def delete_ticket(request: Request, session: Session, access: Admin,
                         ticket_id: Annotated[int, Path(ge=1)]) -> Response:
     """Delete a closed ticket everywhere: dashboard, statistics, notes, transcript, its
-    channel if still there and its messages in the log and archive channels (like
-    deleting the archive message). With LEGAL_HOLD_DAYS a hidden copy of the
-    transcript stays for that long."""
+    channel if still there, its messages in the log and archive channels and its
+    Telegram notifications (like deleting the archive message). With LEGAL_HOLD_DAYS a
+    hidden copy of the transcript stays for that long."""
     store = request.app.state.store
     t = await store.get_ticket(ticket_id)
     if t is None or t["guild_id"] != access.guild_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ticket not found")
     if t["status"] != config.STATUS_CLOSED:
         raise HTTPException(status.HTTP_409_CONFLICT, "Close the ticket first")
+    telegram = await store.telegram_messages_of(ticket_id)   # gone with the ticket's row
     removed = await store.delete_ticket(ticket_id, request.app.state.settings.legal_hold_days)
     await record(request, session, access, "ticket.delete", f"ticket:{ticket_id}")
     # The bot deletes what is left on Discord: the channel, if it is still there (closed
-    # tickets keep it for a while, to reopen them), and the transcript messages
+    # tickets keep it for a while, to reopen them), the transcript messages and the
+    # notifications on Telegram
     channel_id = None if t["channel_deleted"] else str(t["channel_id"])
-    if removed or channel_id:
+    if removed or channel_id or telegram:
         await queue(request, session, access, "transcript.delete_messages",
-                    channel_id=channel_id, transcripts=[
+                    channel_id=channel_id, telegram=telegram, transcripts=[
                         {k: str(v) if v else None for k, v in r.items() if k != "id"}
                         for r in removed])
     return Response(status_code=status.HTTP_204_NO_CONTENT)

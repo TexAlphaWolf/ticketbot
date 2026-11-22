@@ -201,6 +201,7 @@ export interface Settings {
   staff_reminders: boolean;
   auto_assign: boolean;
   ticket_cooldown: number;
+  telegram_messages: boolean;
   ticket_mode: "channel" | "thread";
   staff_role: string | null;
 }

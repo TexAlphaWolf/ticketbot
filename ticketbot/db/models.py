@@ -67,6 +67,8 @@ class Guild(Base):
     ticket_cooldown: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     auto_assign: Mapped[bool] = mapped_column(Boolean, server_default=false())
     ticket_mode: Mapped[str] = mapped_column(Text, server_default=text("'channel'"))
+    # Two-way Telegram: also send there what users write in their tickets
+    telegram_messages: Mapped[bool] = mapped_column(Boolean, server_default=true())
 
 
 class TicketType(Base):
@@ -345,3 +347,31 @@ class BotCommand(Base):
     result: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[float] = mapped_column(Double)
     finished_at: Mapped[float | None] = mapped_column(Double)
+
+
+class TelegramAccount(Base):
+    """A Telegram account linked to a Discord account (with a one-time code), so its
+    answers to the notifications can act as that member, with their permissions."""
+
+    __tablename__ = "telegram_accounts"
+
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True,
+                                                  autoincrement=False)
+    discord_user_id: Mapped[int] = mapped_column(BigInteger, unique=True)
+    linked_at: Mapped[float] = mapped_column(Double)
+
+
+class TelegramMessage(Base):
+    """A notification sent to Telegram about a ticket: an answer to it goes to that
+    ticket. Deleted with the ticket, and after TELEGRAM_MESSAGE_DAYS."""
+
+    __tablename__ = "telegram_messages"
+    __table_args__ = (Index("ix_telegram_messages_created", "created_at"),)
+
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    message_id: Mapped[int] = mapped_column(BigInteger, primary_key=True,
+                                            autoincrement=False)
+    guild_id: Mapped[int] = mapped_column(BigInteger, guild_fk())
+    ticket_id: Mapped[int] = mapped_column(Integer,
+                                           ForeignKey("tickets.id", ondelete="CASCADE"))
+    created_at: Mapped[float] = mapped_column(Double)

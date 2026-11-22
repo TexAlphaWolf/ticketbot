@@ -26,6 +26,7 @@ LEVELS = T["escalation_levels"]
 FAQ, FAQ_RESULTS = T["faq_entries"], T["faq_results"]
 SESSIONS = T["web_sessions"]
 TRANSCRIPTS = T["transcripts"]
+TG_ACCOUNTS, TG_MESSAGES = T["telegram_accounts"], T["telegram_messages"]
 
 GUILD_FIELDS = {c.name for c in GUILDS.columns} - {"guild_id"}
 TYPE_FIELDS = {"label", "emoji", "description", "position"}
@@ -467,6 +468,54 @@ class Store:
                                       now or time.time())
             await conn.execute(delete(TICKETS).where(TICKETS.c.id == ticket_id))
         return found
+
+    # -------------------------------------------------------- telegram ---
+
+    async def link_telegram_account(self, telegram_user_id: int, discord_user_id: int,
+                                    now: float | None = None) -> None:
+        """One Telegram account per Discord account and the other way round: a new link
+        replaces the old ones of both."""
+        async with self.engine.begin() as conn:
+            await conn.execute(delete(TG_ACCOUNTS).where(
+                (TG_ACCOUNTS.c.telegram_user_id == telegram_user_id)
+                | (TG_ACCOUNTS.c.discord_user_id == discord_user_id)))
+            await conn.execute(insert(TG_ACCOUNTS).values(
+                telegram_user_id=telegram_user_id, discord_user_id=discord_user_id,
+                linked_at=now or time.time()))
+
+    async def telegram_account(self, telegram_user_id: int) -> dict | None:
+        return await self._one(select(TG_ACCOUNTS).where(
+            TG_ACCOUNTS.c.telegram_user_id == telegram_user_id))
+
+    async def telegram_account_of(self, discord_user_id: int) -> dict | None:
+        return await self._one(select(TG_ACCOUNTS).where(
+            TG_ACCOUNTS.c.discord_user_id == discord_user_id))
+
+    async def unlink_telegram_account(self, *, discord_user_id: int | None = None,
+                                      telegram_user_id: int | None = None) -> bool:
+        column, value = ((TG_ACCOUNTS.c.discord_user_id, discord_user_id)
+                         if discord_user_id is not None
+                         else (TG_ACCOUNTS.c.telegram_user_id, telegram_user_id))
+        return await self._write(delete(TG_ACCOUNTS).where(column == value)) > 0
+
+    async def track_telegram_message(self, chat_id: int, message_id: int, guild_id: int,
+                                     ticket_id: int, now: float | None = None) -> None:
+        await self._write(insert(TG_MESSAGES).values(
+            chat_id=chat_id, message_id=message_id, guild_id=guild_id,
+            ticket_id=ticket_id, created_at=now or time.time()))
+
+    async def telegram_message(self, chat_id: int, message_id: int) -> dict | None:
+        return await self._one(select(TG_MESSAGES).where(
+            TG_MESSAGES.c.chat_id == chat_id, TG_MESSAGES.c.message_id == message_id))
+
+    async def telegram_messages_of(self, ticket_id: int) -> list[list[int]]:
+        """[chat ID, message ID] of the Telegram notifications about a ticket."""
+        return [[r["chat_id"], r["message_id"]] for r in await self._all(
+            select(TG_MESSAGES.c.chat_id, TG_MESSAGES.c.message_id)
+            .where(TG_MESSAGES.c.ticket_id == ticket_id))]
+
+    async def purge_telegram_messages_before(self, before: float) -> int:
+        return await self._write(delete(TG_MESSAGES).where(TG_MESSAGES.c.created_at < before))
 
     # ------------------------------------------------------- transcripts ---
 

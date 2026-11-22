@@ -59,6 +59,7 @@ async def run_web_command(client, command: dict) -> str:
     if guild is None or cfg is None:
         raise CommandError("the bot is not in this server anymore")
     payload, kind = command["payload"], command["kind"]
+    source = command.get("source", "web")      # "telegram": an answer to a notification
     if kind == "panel.refresh":
         problem = await refresh_panel(client, guild, cfg)
         if problem == "unknown panel":
@@ -81,7 +82,8 @@ async def run_web_command(client, command: dict) -> str:
         if kind == "transcript.delete_messages":
             await delete_transcript_messages(
                 client, guild.id, payload.get("transcripts", []),
-                channel_id=int(payload.get("channel_id") or 0) or None)
+                channel_id=int(payload.get("channel_id") or 0) or None,
+                telegram=payload.get("telegram"))
             return "ok"
         failed = await thread_access(client, guild, cfg,
                                      [int(r) for r in payload["role_ids"]])
@@ -107,15 +109,15 @@ async def run_web_command(client, command: dict) -> str:
 
     if kind == "ticket.close":
         reason = (payload.get("reason") or "").strip() or _("close.reason_staff")
-        await close_ticket(client, channel, ticket, member, reason[:500], source="web")
+        await close_ticket(client, channel, ticket, member, reason[:500], source=source)
     elif kind == "ticket.claim":
         if ticket.get("claimed_by"):
             raise CommandError("the ticket was already claimed")
         await claim_ticket(client, channel, ticket, cfg, member, payload["priority"],
-                           source="web")
+                           source=source)
     elif kind == "ticket.priority":
         await change_priority(client, channel, ticket, cfg, member, payload["priority"],
-                              source="web")
+                              source=source)
     elif kind == "ticket.transfer":
         target = await get_member(guild, int(payload["member_id"]))
         if target is None or target.bot or not is_ticket_staff(
@@ -123,7 +125,7 @@ async def run_web_command(client, command: dict) -> str:
             raise CommandError("that member is not staff for this ticket")
         if ticket.get("claimed_by") == target.id:
             raise CommandError("the ticket is already theirs")
-        await move_ticket(client, channel, ticket, cfg, target, member, source="web")
+        await move_ticket(client, channel, ticket, cfg, target, member, source=source)
     elif kind == "ticket.escalate":
         levels = await client.db.escalation_levels(guild.id)
         current = ticket.get("escalation_level") or 0
@@ -133,10 +135,11 @@ async def run_web_command(client, command: dict) -> str:
         if target <= current:
             raise CommandError(f"the ticket is already at level {current}")
         if not await escalate(client, guild, channel, ticket, cfg, target, member,
-                              payload.get("reason"), source="web"):
+                              payload.get("reason"), source=source):
             raise CommandError(f"the role of level {target} doesn't exist anymore")
     elif kind == "ticket.message":
-        await post_staff_message(client, channel, ticket, member, payload["text"], _)
+        await post_staff_message(client, channel, ticket, member, payload["text"], _,
+                                 source=source)
     return "ok"
 
 
@@ -173,10 +176,13 @@ async def open_from_web(client, guild: discord.Guild, cfg: dict, command: dict) 
 
 async def delete_transcript_messages(client, guild_id: int, transcripts: list[dict],
                                      keep: int | None = None,
-                                     channel_id: int | None = None) -> None:
-    """What a deleted ticket left on Discord: its channel (if it is still there, e.g.
-    closed and waiting to be deleted) and the archive and log messages of its
-    transcripts (`keep`: the one that was just deleted by hand)."""
+                                     channel_id: int | None = None,
+                                     telegram: list | None = None) -> None:
+    """What a deleted ticket left: its channel (if it is still there, e.g. closed and
+    waiting to be deleted), the archive and log messages of its transcripts (`keep`: the
+    one that was just deleted by hand) and its notifications on Telegram ([chat, message]
+    pairs; Telegram lets a bot delete them only in the first 48 hours)."""
+    await delete_telegram_messages(client, telegram or [])
     guild = client.get_guild(guild_id)
     if guild is None:
         return
@@ -197,6 +203,20 @@ async def delete_transcript_messages(client, guild_id: int, transcripts: list[di
                 await channel.get_partial_message(int(message_id)).delete()
             except discord.HTTPException:
                 pass          # already gone, or no permission: nothing else to do
+
+
+async def delete_telegram_messages(client, pairs: list) -> None:
+    if client.telegram is None or not pairs:
+        return
+    from ..integrations.telegram import TelegramError
+    chats: dict[str, list[int]] = {}
+    for chat_id, message_id in pairs:
+        chats.setdefault(str(chat_id), []).append(int(message_id))
+    for chat_id, ids in chats.items():
+        try:
+            await client.telegram.delete_messages(chat_id, sorted(ids))
+        except TelegramError as e:      # older than 48 hours, or already deleted
+            print(f"[telegram] could not delete the notifications of a ticket: {e}")
 
 
 async def set_ticket_mode(client, guild: discord.Guild, cfg: dict, mode: str,
@@ -234,15 +254,16 @@ async def thread_access(client, guild: discord.Guild, cfg: dict,
 
 
 async def post_staff_message(client, channel, ticket: dict, member: discord.Member,
-                             text: str, _) -> None:
-    """A staff reply written in the dashboard, posted by the bot with the author's name.
-    It counts as a staff answer (first response, reminders, auto-close)."""
+                             text: str, _, *, source: str = "web") -> None:
+    """A staff reply written in the dashboard or on Telegram, posted by the bot with the
+    author's name. It counts as a staff answer (first response, reminders, auto-close)."""
     embed = discord.Embed(description=text[:4000], color=COLOR)
     embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
-    embed.set_footer(text=_("web.message_footer"))
+    embed.set_footer(text=_("telegram.message_footer" if source == "telegram"
+                            else "web.message_footer"))
     await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
     now = time.time()
     changes = activity_changes(ticket, now, from_staff=True)
     await client.db.update_ticket(ticket["id"], **changes)
-    await client.db.audit(channel.guild.id, member.id, "ticket.message", source="web",
+    await client.db.audit(channel.guild.id, member.id, "ticket.message", source=source,
                           target=f"ticket:{ticket['id']}")

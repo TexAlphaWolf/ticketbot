@@ -9,6 +9,7 @@ CLOSED_CHANNEL_HOURS = 12      # closed tickets can be reopened for this long
 DEFAULT_RETENTION_DAYS = 30    # Low/Medium transcripts are deleted from the log after this
 STATS_KEEP_DAYS = 365          # closed ticket metadata (for /stats) is kept this long
 AUDIT_KEEP_DAYS = 365          # audit log entries are kept this long
+TELEGRAM_MESSAGE_DAYS = 30     # Telegram notifications can be answered this long
 AUDIT_SHOWN = 25               # entries shown by /audit
 COMMANDS_KEEP_DAYS = 30        # finished web commands are kept this long
 WEB_COMMAND_POLL_SECONDS = 3   # how often the bot looks for actions asked from the web

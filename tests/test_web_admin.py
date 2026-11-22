@@ -50,16 +50,19 @@ def test_settings(api):  # noqa: F811
     h = admin(api)
     s = api.get(BASE + "/settings").json()
     assert s == {"language": "en", "retention_days": 30, "staff_reminders": True,
-                 "auto_assign": False, "ticket_cooldown": 0, "ticket_mode": "channel",
-                 "staff_role": "50"}
+                 "auto_assign": False, "ticket_cooldown": 0, "telegram_messages": True,
+                 "ticket_mode": "channel", "staff_role": "50"}
     r = api.patch(BASE + "/settings", json={"language": "it", "ticket_cooldown": 15},
                   headers=h)
     assert r.json()["language"] == "it" and r.json()["ticket_cooldown"] == 15
     assert queued(api) == ["panel.refresh", "guidelines.refresh"]
     assert ("settings.language", "web") in audit_actions(api)
     assert ("settings.cooldown", "web") in audit_actions(api)
-    api.patch(BASE + "/settings", json={"auto_assign": True}, headers=h)
+    r = api.patch(BASE + "/settings", json={"auto_assign": True, "telegram_messages": False},
+                  headers=h)
+    assert r.json()["telegram_messages"] is False
     assert queued(api) == ["panel.refresh", "guidelines.refresh"]     # nothing to redo
+    assert ("settings.telegram_messages", "web") in audit_actions(api)
     for bad in ({"language": "fr"}, {"ticket_cooldown": 99999}, {"retention_days": 0}):
         assert api.patch(BASE + "/settings", json=bad, headers=h).status_code == 422
     r = api.put(BASE + "/settings/mode", json={"mode": "thread"}, headers=h)

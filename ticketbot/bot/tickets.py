@@ -463,7 +463,7 @@ async def create_ticket(client, guild: discord.Guild, user: discord.Member,
         guild=esc(guild.name), type=esc(f"{ticket_type['emoji']} {ticket_type['label']}"),
         user=esc(user), subject=esc(subject), description=esc(description[:500]),
         waiting=waiting, in_progress=in_progress, url=channel_url(guild.id, channel.id),
-    ))
+    ), ticket_id=ticket_id)
     return channel, queue
 
 
@@ -511,7 +511,8 @@ async def escalate(client, guild: discord.Guild, channel, ticket: dict, cfg: dic
                    details={"level": level, "reason": reason})
     await telegram_notify(client, cfg, _(
         "tg.escalated", guild=esc(guild.name), channel=esc(ticket_label(ticket)),
-        level=level, role=esc(role.name), url=channel_url(guild.id, channel.id)))
+        level=level, role=esc(role.name), url=channel_url(guild.id, channel.id)),
+        ticket_id=ticket["id"])
     return True
 
 
@@ -692,7 +693,7 @@ async def notify_high_priority(client, cfg: dict, channel, ticket: dict, member,
             "tg.high", guild=esc(channel.guild.name), channel=esc(channel.name),
             type=esc(type_label(ticket)), subject=esc(ticket.get("subject") or "-"),
             user=esc(member), url=channel_url(channel.guild.id, channel.id),
-        ))
+        ), ticket_id=ticket["id"])
 
 
 async def transfer_ticket(interaction: discord.Interaction, member: discord.Member) -> None:
@@ -881,6 +882,7 @@ async def close_ticket(client, channel: discord.TextChannel, ticket: dict,
           type=esc(type_label(ticket)), priority=priority_label(_, priority),
           user=esc(closed_by), reason=esc(reason)),
         document=staff_html, filename=f"{channel.name}.html",
+        ticket_id=ticket["id"], answerable=False,
     )
 
     await set_members_can_write(channel, False)
@@ -1071,7 +1073,7 @@ class RatingModal(discord.ui.Modal):
             "tg.rating", guild=esc(guild.name), ticket=esc(ticket_label(ticket)),
             stars=stars(self.value), comment=esc(comment or "-"),
             staff=esc(user_name(guild, ticket.get("claimed_by"), client)),
-        ))
+        ), ticket_id=ticket["id"], answerable=False)
 
 
 # ------------------------------------------------------------ guidelines ---
