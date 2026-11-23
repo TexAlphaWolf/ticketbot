@@ -3,13 +3,19 @@
 #   docker compose up -d --build                     bot + dashboard, SQLite in ./data
 #   docker compose --profile postgres up -d --build  the same, plus a PostgreSQL server
 #   docker compose --profile monitoring up -d        Prometheus and Grafana (see below)
+#   docker compose --profile tunnel up -d            the dashboard on the internet
+#
+# On a Raspberry Pi (or any server) `docker compose pull` downloads the ready image
+# instead of building it: see docs/raspberry-pi.md.
 #
 # The dashboard is on http://127.0.0.1:8080 (only from this computer). To reach it from
 # outside, put a reverse proxy or a tunnel in front of it and set WEB_PUBLIC_URL in .env.
 
 x-ticketbot: &ticketbot
+  # The image published on GitHub for every version (PC and Raspberry Pi); with
+  # `--build` it is built here from these files instead
+  image: ghcr.io/texalphawolf/ticketbot:${TICKETBOT_VERSION:-3.0.0-beta.4}
   build: .
-  image: ticketbot:3.0.0b4
   restart: unless-stopped
   env_file: .env
   volumes:
@@ -31,6 +37,8 @@ services:
     command: ["python", "-m", "ticketbot", "web", "--wait", "180"]
     environment:
       WEB_HOST: 0.0.0.0          # inside the container; the port below decides who sees it
+      # The containers of this compose file (e.g. the tunnel) may say who the visitor is
+      WEB_TRUSTED_PROXIES: 172.30.42.0/24
     ports:
       - "127.0.0.1:${WEB_PORT:-8080}:${WEB_PORT:-8080}"
     healthcheck:
@@ -60,6 +68,24 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Optional: the dashboard on the internet through a Cloudflare Tunnel, without opening
+  # ports on the router. In Cloudflare Zero Trust → Networks → Tunnels create a tunnel,
+  # copy its token and add a public hostname (e.g. ticket.example.com) → http://web:8080.
+  # Then set in .env
+  #   TUNNEL_TOKEN=...
+  #   WEB_PUBLIC_URL=https://ticket.example.com
+  # and: docker compose --profile tunnel up -d   (docs/raspberry-pi.md, step 6)
+  tunnel:
+    image: cloudflare/cloudflared:2026.11.1
+    container_name: ticketbot-tunnel
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - web
 
   # Optional: Prometheus and Grafana with a ready TicketBot dashboard. Set in .env
   #   METRICS_TOKEN=...      (python -m ticketbot keygen --metrics)
@@ -101,6 +127,13 @@ services:
       - "127.0.0.1:3000:3000"
     depends_on:
       - prometheus
+
+# A fixed address range, so the web server knows which containers it can trust
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.42.0/24
 
 configs:
   metrics_token:

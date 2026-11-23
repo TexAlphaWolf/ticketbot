@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased] - V3
+
+### Added
+- **Ready Docker image** for every version on GitHub Container Registry, for PCs and
+  Raspberry Pi (`ghcr.io/texalphawolf/ticketbot`, linux/amd64 and linux/arm64, built by
+  the new `Image` workflow at every tag; `latest` only for stable versions):
+  `docker compose pull` uses it instead of building it
+- **Cloudflare Tunnel** in `docker-compose.yml` (`--profile tunnel`, `TUNNEL_TOKEN`):
+  the dashboard on the internet in HTTPS without opening ports on the router. The
+  containers get a fixed network (`172.30.42.0/24`) that the web server trusts, so it
+  sees the visitors' real IP addresses through the tunnel
+- `docs/raspberry-pi.md`: TicketBot 24/7 on a Raspberry Pi 5, from the system to the
+  tunnel, the Discord redirect, backups, updates and monitoring
+
 ## [3.0.0-beta.4] - 2026-11-22
 
 Fourth beta of TicketBot V3: the staff answers tickets from Telegram, every server gets

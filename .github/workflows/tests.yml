@@ -53,6 +53,7 @@ jobs:
           docker compose config --quiet
           docker compose --profile postgres config --quiet
           docker compose --profile monitoring config --quiet
+          docker compose --profile tunnel config --quiet
       - name: The dashboard starts once the database is ready
         run: |
           key=$(docker run --rm ticketbot:ci python -m ticketbot keygen | head -n 1)

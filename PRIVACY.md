@@ -142,8 +142,12 @@ The data is **never sold, shared for advertising or used for any other purpose**
   ticket an answer is for; they are deleted earlier with the ticket. Deleting a ticket
   everywhere also deletes the bot's notifications about it from the Telegram chat, when
   Telegram still allows it (in the first 48 hours).
+- **Cloudflare** (optional, for whoever hosts the bot): when the web dashboard is put
+  on the internet through a Cloudflare Tunnel, the dashboard's traffic (pages, ticket
+  data shown in them, login cookies, IP addresses) passes through Cloudflare's network,
+  which decrypts and re-encrypts it on its servers to deliver it.
 
-Discord and Telegram process this data under their own privacy policies.
+Discord, Telegram and Cloudflare process this data under their own privacy policies.
 
 ## 5. Data retention
 

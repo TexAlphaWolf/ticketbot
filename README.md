@@ -126,6 +126,11 @@ docker compose up -d --build
 docker compose logs -f
 ```
 
+Every version is also published as a ready image for PCs and Raspberry Pi
+(`ghcr.io/texalphawolf/ticketbot`, amd64 and arm64): `docker compose pull` and
+`docker compose up -d` use it instead of building it (see
+[docs/raspberry-pi.md](docs/raspberry-pi.md)).
+
 This starts two containers from the same image: `ticketbot` (the bot) and
 `ticketbot-web` (the web dashboard, on `http://127.0.0.1:8080`, reachable only from
 this computer). The dashboard waits until the bot has created or updated the database,
@@ -391,6 +396,10 @@ journalctl -u ticketbot -f                       # logs
 
 systemd starts the bot at boot and automatically restarts it if it crashes.
 With Docker, `restart: unless-stopped` in `docker-compose.yml` does the same.
+
+**On a Raspberry Pi** (or any server), with Docker, the dashboard on the internet
+through a Cloudflare Tunnel, backups and monitoring: follow
+[docs/raspberry-pi.md](docs/raspberry-pi.md).
 
 ## Encryption
 
